@@ -1,0 +1,295 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  EMPLOYEE
+  MASTER
+}
+
+enum ProcessStatus {
+  EM_ANDAMENTO
+  AGUARDANDO_CLIENTE
+  AGUARDANDO_FUNCIONARIO
+  CORRECAO_SOLICITADA
+  CONCLUIDO
+  CANCELADO
+}
+
+enum StepKey {
+  ETAPA_1
+  ETAPA_2
+  ETAPA_3
+  ETAPA_4
+  ETAPA_5
+  ETAPA_6
+}
+
+enum StepSide {
+  CLIENTE
+  FUNCIONARIO
+}
+
+enum DocumentItemKey {
+  IDENTIFICACAO_SOCIOS
+  COMPROVANTE_RESIDENCIA
+  FOTO_FACHADA
+}
+
+enum DocumentItemStatus {
+  PENDENTE
+  AGUARDANDO_VALIDACAO
+  APROVADO
+  REPROVADO
+}
+
+enum AuditActorRole {
+  CLIENTE
+  FUNCIONARIO
+  MASTER
+  SYSTEM
+}
+
+enum ChatAuthorRole {
+  CLIENTE
+  FUNCIONARIO
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+}
+
+enum SlaStatus {
+  ON_TRACK
+  AT_RISK
+  OVERDUE
+  STOPPED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ownedProcesses Process[] @relation("ProcessOwner")
+  sessions       Session[]
+}
+
+model Process {
+  id              String        @id @default(uuid())
+  clientName      String?
+  clientEmail     String
+  clientPhone     String?
+  status          ProcessStatus @default(EM_ANDAMENTO)
+  currentStep     StepKey       @default(ETAPA_1)
+  ownerId         String?
+  owner           User?         @relation("ProcessOwner", fields: [ownerId], references: [id])
+  cancelledAt     DateTime?
+  cancelledByRole AuditActorRole?
+  cancelledById   String?
+  cancelReason    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  steps         ProcessStep[]
+  checklists    Checklist[]
+  documents     DocumentItem[]
+  chats         ChatThread[]
+  ownerHistory  ProcessOwnerHistory[]
+  slaEvents     SlaEvent[]
+  reports       Report[]
+}
+
+model ProcessStep {
+  id        String   @id @default(uuid())
+  processId String
+  stepKey   StepKey
+  side      StepSide
+  data      Json
+  status    ProcessStatus
+  locked    Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  process Process @relation(fields: [processId], references: [id])
+
+  @@unique([processId, stepKey])
+}
+
+model Checklist {
+  id        String   @id @default(uuid())
+  processId String
+  stepKey   StepKey
+  items     Json
+  status    String
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  process Process @relation(fields: [processId], references: [id])
+
+  @@unique([processId, stepKey])
+}
+
+model DocumentItem {
+  id        String             @id @default(uuid())
+  processId String
+  itemKey   DocumentItemKey
+  status    DocumentItemStatus @default(PENDENTE)
+  version   Int                @default(1)
+  reason    String?
+  updatedAt DateTime           @updatedAt
+  createdAt DateTime           @default(now())
+
+  process Process @relation(fields: [processId], references: [id])
+  files   DocumentFile[]
+
+  @@unique([processId, itemKey])
+}
+
+model DocumentFile {
+  id        String   @id @default(uuid())
+  itemId    String
+  fileName  String
+  mimeType  String
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
+  uploadedByRole AuditActorRole
+  uploadedById   String?
+
+  item DocumentItem @relation(fields: [itemId], references: [id])
+}
+
+model ChatThread {
+  id        String   @id @default(uuid())
+  processId String
+  createdAt DateTime @default(now())
+
+  process Process @relation(fields: [processId], references: [id])
+  messages ChatMessage[]
+
+  @@unique([processId])
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  threadId  String
+  authorRole ChatAuthorRole
+  authorId  String?
+  body      String
+  createdAt DateTime @default(now())
+
+  thread ChatThread @relation(fields: [threadId], references: [id])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  role         AuditActorRole
+  userId       String?
+  clientEmail  String?
+  clientWhatsapp String?
+  tokenHash    String   @unique
+  expiresAt    DateTime
+  lastActiveAt DateTime
+  rotatedAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+model CustomerLinkToken {
+  id             String   @id @default(uuid())
+  email          String?
+  whatsapp       String?
+  tokenHash      String   @unique
+  tokenExpiresAt DateTime
+  otpHash        String?
+  otpExpiresAt   DateTime?
+  usedAt         DateTime?
+  createdAt      DateTime @default(now())
+}
+
+model ProcessOwnerHistory {
+  id        String   @id @default(uuid())
+  processId String
+  ownerId   String?
+  assignedAt DateTime @default(now())
+  assignedBy String?
+
+  process Process @relation(fields: [processId], references: [id])
+}
+
+model AuditEvent {
+  id        String   @id @default(uuid())
+  actorRole AuditActorRole
+  actorId   String?
+  actorEmail String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+}
+
+model SlaConfigStep {
+  id        String   @id @default(uuid())
+  stepKey   StepKey
+  side      StepSide
+  durationHours Int
+  alertPercent Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([stepKey, side])
+}
+
+model SlaEvent {
+  id        String   @id @default(uuid())
+  processId String
+  stepKey   StepKey
+  side      StepSide
+  startedAt DateTime
+  dueAt     DateTime
+  status    SlaStatus
+  lastNotifiedAt DateTime?
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  process Process @relation(fields: [processId], references: [id])
+
+  @@unique([processId, stepKey, side])
+}
+
+model Report {
+  id        String   @id @default(uuid())
+  processId String
+  fileName  String
+  mimeType  String
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  process Process @relation(fields: [processId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  channel   NotificationChannel
+  recipient String
+  subject   String
+  body      String
+  status    String
+  createdAt DateTime @default(now())
+}

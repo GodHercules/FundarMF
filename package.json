@@ -1,0 +1,20 @@
+{
+  "name": "fundarmf",
+  "private": true,
+  "packageManager": "pnpm@9.12.2",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm -r dev",
+    "dev:back": "pnpm -r --filter fundarmf-api --filter fundarmf-worker --parallel dev",
+    "dev:front": "pnpm --filter fundarmf-web dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:up": "docker compose up -d postgres redis mailpit",
+    "db:down": "docker compose down",
+    "format": "pnpm -r format"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "fundarmf-worker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@fundarmf/shared": "workspace:*",
+    "@prisma/client": "^5.19.1",
+    "bullmq": "^5.16.0",
+    "dayjs": "^1.11.13",
+    "dotenv": "^16.4.5",
+    "ioredis": "^5.4.1",
+    "pdfkit": "^0.15.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.5",
+    "@types/pdfkit": "^0.13.6",
+    "typescript": "^5.5.4",
+    "tsx": "^4.19.1",
+    "vitest": "^2.1.0"
+  }
+}

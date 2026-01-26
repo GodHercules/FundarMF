@@ -1,0 +1,14 @@
+import { ButtonHTMLAttributes } from "react";
+import clsx from "clsx";
+
+export function Button({ className, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      className={clsx(
+        "inline-flex items-center justify-center rounded-lg bg-ink px-5 py-2 text-sm font-semibold uppercase tracking-[0.12em] text-paper shadow-soft transition hover:-translate-y-0.5 hover:bg-navy",
+        className
+      )}
+      {...props}
+    />
+  );
+}
