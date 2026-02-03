@@ -9,7 +9,7 @@ class UpdateSlaDto {
   @IsIn(["ETAPA_1", "ETAPA_2", "ETAPA_3", "ETAPA_4", "ETAPA_5", "ETAPA_6"])
   stepKey: any;
 
-  @IsIn(["CLIENTE", "FUNCIONARIO"])
+  @IsIn(["CLIENTE", "OPERADOR"])
   side: any;
 
   @IsInt()

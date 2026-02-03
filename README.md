@@ -1,58 +1,78 @@
 # FundarMF
 
-Sistema de Workflow para Abertura de Empresa (base para futuras alterações). Stack moderna, com backend NestJS, front Next.js + React, PostgreSQL, Redis + BullMQ, OpenAPI e jobs.
+Sistema de Workflow para Abertura de Empresa (base para futuras alterações). Stack moderna, com backend NestJS, front Next.js + React, PostgreSQL, pg-boss (jobs), OpenAPI e jobs.
 
 ## Stack escolhida
 - Frontend: Next.js + React + TypeScript + Tailwind
 - Backend: NestJS + TypeScript + Prisma
 - Banco: PostgreSQL
-- Fila/Jobs: Redis + BullMQ
+- Fila/Jobs: PostgreSQL (pg-boss)
 - PDF: pdfkit
 
 ## Estrutura
 ```
 apps/
   api/        # NestJS API
-  web/        # Next.js front (Cliente, Funcionário, Master)
+  web/        # Next.js front (Cliente, Operador, Master)
   worker/     # Jobs (auto-atribuição, SLA, relatório PDF)
 packages/
   shared/     # tipos e enums compartilhados
 ```
 
 ## Setup rápido
-1) Subir banco, Redis e servidor SMTP local:
+### Pré-requisitos
+- Node.js 20+ (o repo usa `pnpm@9.12.2` via `packageManager`)
+- Docker + Docker Compose
+
+### Passo a passo (dev)
+1) Subir o banco e o SMTP local (Mailpit):
+```bash
+pnpm db:up
 ```
-docker compose up -d postgres redis mailpit
-```
-Mailpit (caixa de entrada dev): `http://localhost:8025`
+Portas:
+- Postgres: `localhost:5499`
+- SMTP: `localhost:1025`
+- Mailpit UI: `http://localhost:8025`
 
 2) Instalar dependências:
-```
+```bash
 pnpm install
 ```
 
-3) Envs já criados no repositório (ajuste se necessário):
-- `apps/api/.env`
-- `apps/worker/.env`
-- `apps/web/.env`
+3) Conferir variáveis de ambiente:
+- Já existem arquivos `.env` versionados:
+  - `apps/api/.env`
+  - `apps/worker/.env`
+  - `apps/web/.env`
+- Se preferir resetar, copie dos `.env.example`.
+- Observação: se usar o Postgres do Docker (`5499`), garanta que `DATABASE_URL` do **api** e **worker** apontem para `localhost:5499`.
+- Troque segredos antes de qualquer uso real (SMTP/Twilio/Session).
 
-4) Rodar migrations + seed:
-```
+4) Rodar migrations + seed do Prisma:
+```bash
 cd apps/api
 pnpm prisma:migrate
 pnpm prisma:seed
 ```
 
-5) Rodar serviços em dev (apenas 2 comandos):
-```
+5) Rodar serviços em dev:
+```bash
 pnpm dev:back
 pnpm dev:front
+```
+Isso sobe:
+- API (NestJS) em `http://localhost:4000`
+- Worker (jobs) em background
+- Web (Next.js) em `http://localhost:3000`
+
+6) (Opcional) Encerrar containers do banco:
+```bash
+pnpm db:down
 ```
 
 ## Variáveis de ambiente principais
 **apps/api/.env**
 - `DATABASE_URL`
-- `REDIS_URL`
 - `API_PORT`
 - `SESSION_TTL_HOURS` (48h)
 - `SESSION_ROTATE_MINUTES`
@@ -63,11 +83,12 @@ pnpm dev:front
 - `EMAIL_FROM`
 - `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` (Mailpit em dev ou SMTP real)
 - `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_WHATSAPP_FROM` / `TWILIO_MESSAGING_SERVICE_SID` (WhatsApp via Twilio)
+- `WHATSAPP_PROVIDER` (`fake` em dev, `twilio` em prod)
 - `WHATSAPP_BRAND` / `COMPANY_NAME` / `COMPANY_LOCATION` (identidade das mensagens)
+- `CHAT_FAQ_PATH` (ex: `apps/api/src/modules/chat/faq.json`)
 
 **apps/worker/.env**
 - `DATABASE_URL`
-- `REDIS_URL`
 - `WORKER_CONCURRENCY`
 
 **apps/web/.env**
@@ -75,20 +96,21 @@ pnpm dev:front
 
 ## Seeds (credenciais de teste)
 - **MASTER**: `master@fundarmf.local` / `Master@123`
-- **Funcionário**: `funcionario@fundarmf.local` / `Func@123`
-- **Cliente exemplo**: `cliente@fundarmf.local` (OTP será retornado na resposta da API em dev)
+> Apenas o usuário master é criado no seed. Operadores devem ser criados via `/admin/users`.
 
 ## Endpoints principais (API)
 - `POST /auth/customer/request-link`
 - `POST /auth/customer/verify`
-- `POST /auth/employee/login`
+- `POST /auth/customer/resend-otp`
+- `POST /auth/operator/login`
 - `POST /auth/master/login`
 - `POST /auth/logout`
 - `GET /auth/me`
 
-- `POST /processes` (cliente)
+- `POST /processes` (operador/master)
 - `GET /processes` (lista por papel)
 - `GET /processes/:id`
+- `POST /processes/:id/send-link`
 - `PUT /processes/:id/steps`
 - `POST /processes/:id/submit-step`
 - `POST /processes/:id/approve-step`
@@ -106,6 +128,10 @@ pnpm dev:front
 - `GET /chats/:processId`
 - `POST /chats/:processId/messages`
 
+- `GET /notifications`
+- `GET /notifications/unread-count`
+- `PATCH /notifications/:id/read`
+
 - `GET /sla/config` (master)
 - `PUT /sla/config` (master)
 
@@ -119,16 +145,17 @@ pnpm dev:front
 OpenAPI: `http://localhost:4000/docs`
 
 ## Fluxos críticos (resumo)
-1) **Cliente** solicita link → recebe OTP se não houver sessão ativa → valida link → cria processo → preenche etapas → envia para validação.
-2) **Funcionário** recebe caso (auto-atribuição) → valida checklist + documentos → aprova ou solicita correções → quando etapa 6 aprovada, processo é concluído.
-3) **Master** acompanha tudo, configura SLA, transfere dono, audita e pode cancelar processos.
+1) **Operador** cria processo → vira dono → envia link ao cliente (e-mail/WhatsApp) → acompanha e valida.
+2) **Cliente** acessa link → preenche formulário obrigatório → envia → aguarda validação.
+3) **Operador** valida checklist + documentos → aprova ou solicita correções → quando etapa 6 aprovada, processo é concluído.
+4) **Master** acompanha tudo, configura SLA, transfere dono, audita e pode cancelar processos.
 
 ## Regras implementadas
 - **Unicidade**: constraint DB garante 1 processo ativo por e-mail.
 - **Cancelamento**: motivo obrigatório; bloqueia edição, para SLAs e notifica envolvidos.
 - **Dono exclusivo**: update do owner com lock transacional + histórico.
 - **Auto-atribuição**: least-load com fallback round-robin (baseado no último assignment).
-- **Etapas travadas**: cliente envia para validação; funcionário aprova ou solicita correção.
+- **Etapas travadas**: cliente envia para validação; operador aprova ou solicita correção.
 - **Checklist obrigatório**: aprovação só quando checklist completo.
 - **Documentos**: validação por item, reprovação por lote, versionamento simples.
 - **SLA**: eventos por etapa/lado com alertas por percentual.

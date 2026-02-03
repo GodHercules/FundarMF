@@ -45,15 +45,6 @@ export class AuthService {
       .join("\n");
   }
 
-  private ensureWhatsAppConfigured() {
-    const hasTwilio = Boolean(
-      process.env.TWILIO_ACCOUNT_SID &&
-        process.env.TWILIO_AUTH_TOKEN &&
-        (process.env.TWILIO_WHATSAPP_FROM || process.env.TWILIO_MESSAGING_SERVICE_SID)
-    );
-    return hasTwilio;
-  }
-
   private buildCustomerAccessEmail(linkUrl: string, otp?: string) {
     const linkTtl = Number(process.env.LINK_TTL_HOURS ?? 24);
     const otpTtl = Number(process.env.OTP_TTL_MINUTES ?? 10);
@@ -131,9 +122,6 @@ export class AuthService {
     }
 
     if (normalizedWhatsapp) {
-      if (!this.ensureWhatsAppConfigured()) {
-        throw new BadRequestException("WhatsApp não configurado no servidor.");
-      }
       await this.notificationService.sendWhatsApp(normalizedWhatsapp, this.buildCustomerAccessWhatsApp(linkUrl, otp));
     }
 
@@ -152,7 +140,7 @@ export class AuthService {
     const tokenHash = this.hash(token);
     const link = await this.prisma.customerLinkToken.findUnique({ where: { tokenHash } });
     if (!link || link.usedAt || dayjs(link.tokenExpiresAt).isBefore(dayjs())) {
-      throw new BadRequestException("Link inválido ou expirado.");
+      throw new BadRequestException({ code: "LINK_INVALID" });
     }
 
     if (link.otpHash) {
@@ -160,10 +148,10 @@ export class AuthService {
         throw new BadRequestException({ code: "OTP_REQUIRED" });
       }
       if (dayjs(link.otpExpiresAt).isBefore(dayjs())) {
-        throw new BadRequestException("OTP expirado.");
+        throw new BadRequestException({ code: "OTP_EXPIRED" });
       }
       if (this.hash(otp) !== link.otpHash) {
-        throw new BadRequestException("OTP inválido.");
+        throw new BadRequestException({ code: "OTP_INVALID" });
       }
     }
 
@@ -186,7 +174,44 @@ export class AuthService {
     return { sessionToken };
   }
 
-  async loginUser(email: string, password: string, role: "EMPLOYEE" | "MASTER") {
+  async resendCustomerOtp(token: string) {
+    const tokenHash = this.hash(token);
+    const link = await this.prisma.customerLinkToken.findUnique({ where: { tokenHash } });
+    if (!link || link.usedAt || dayjs(link.tokenExpiresAt).isBefore(dayjs())) {
+      throw new BadRequestException({ code: "LINK_INVALID" });
+    }
+    if (!link.email) {
+      throw new BadRequestException("E-mail não disponível para reenvio do OTP.");
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = this.hash(otp);
+    const otpExpiresAt = dayjs().add(Number(process.env.OTP_TTL_MINUTES ?? 10), "minute").toDate();
+
+    await this.prisma.customerLinkToken.update({
+      where: { id: link.id },
+      data: { otpHash, otpExpiresAt }
+    });
+
+    const linkUrl = `${process.env.FRONTEND_URL ?? "http://localhost:3000"}/client/link?token=${token}`;
+    await this.notificationService.sendEmail(
+      link.email,
+      "Seu novo OTP do FundarMF",
+      this.buildCustomerAccessEmail(linkUrl, otp)
+    );
+
+    await this.auditService.record(
+      { role: "SYSTEM" },
+      "customer_otp_resent",
+      "CustomerLinkToken",
+      link.id,
+      { email: link.email }
+    );
+
+    return { ok: true };
+  }
+
+  async loginUser(email: string, password: string, role: "OPERATOR" | "MASTER") {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user || user.role !== role || !user.active) {
       throw new UnauthorizedException("Credenciais inválidas.");
@@ -197,7 +222,7 @@ export class AuthService {
       throw new UnauthorizedException("Credenciais inválidas.");
     }
 
-    const actor: Actor = { role: role === "EMPLOYEE" ? "FUNCIONARIO" : "MASTER", userId: user.id, email: user.email };
+    const actor: Actor = { role: role === "OPERATOR" ? "OPERADOR" : "MASTER", userId: user.id, email: user.email };
     const { token } = await this.sessionService.createSession(actor, Number(process.env.SESSION_TTL_HOURS ?? 48));
 
     await this.auditService.record(actor, "user_login", "Session", undefined, { email: user.email });

@@ -8,14 +8,14 @@ datasource db {
 }
 
 enum Role {
-  EMPLOYEE
+  OPERATOR
   MASTER
 }
 
 enum ProcessStatus {
   EM_ANDAMENTO
   AGUARDANDO_CLIENTE
-  AGUARDANDO_FUNCIONARIO
+  AGUARDANDO_OPERADOR
   CORRECAO_SOLICITADA
   CONCLUIDO
   CANCELADO
@@ -32,7 +32,7 @@ enum StepKey {
 
 enum StepSide {
   CLIENTE
-  FUNCIONARIO
+  OPERADOR
 }
 
 enum DocumentItemKey {
@@ -50,14 +50,15 @@ enum DocumentItemStatus {
 
 enum AuditActorRole {
   CLIENTE
-  FUNCIONARIO
+  OPERADOR
   MASTER
   SYSTEM
 }
 
 enum ChatAuthorRole {
   CLIENTE
-  FUNCIONARIO
+  OPERADOR
+  BOT
 }
 
 enum NotificationChannel {
@@ -77,6 +78,7 @@ model User {
   email        String   @unique
   name         String
   passwordHash String
+  whatsapp     String?
   role         Role
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
@@ -84,6 +86,7 @@ model User {
 
   ownedProcesses Process[] @relation("ProcessOwner")
   sessions       Session[]
+  notifications  UserNotification[]
 }
 
 model Process {
@@ -109,6 +112,7 @@ model Process {
   ownerHistory  ProcessOwnerHistory[]
   slaEvents     SlaEvent[]
   reports       Report[]
+  notifications UserNotification[]
 }
 
 model ProcessStep {
@@ -145,6 +149,7 @@ model DocumentItem {
   id        String             @id @default(uuid())
   processId String
   itemKey   DocumentItemKey
+  socioId   String?
   status    DocumentItemStatus @default(PENDENTE)
   version   Int                @default(1)
   reason    String?
@@ -154,7 +159,7 @@ model DocumentItem {
   process Process @relation(fields: [processId], references: [id])
   files   DocumentFile[]
 
-  @@unique([processId, itemKey])
+  @@unique([processId, itemKey, socioId])
 }
 
 model DocumentFile {
@@ -175,6 +180,8 @@ model ChatThread {
   id        String   @id @default(uuid())
   processId String
   createdAt DateTime @default(now())
+  botState  Json?
+  handoffAt DateTime?
 
   process Process @relation(fields: [processId], references: [id])
   messages ChatMessage[]
@@ -292,4 +299,20 @@ model Notification {
   body      String
   status    String
   createdAt DateTime @default(now())
+}
+
+model UserNotification {
+  id        String   @id @default(uuid())
+  userId    String
+  processId String?
+  type      String
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  process Process? @relation(fields: [processId], references: [id])
+
+  @@index([userId, readAt])
 }

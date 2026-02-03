@@ -7,22 +7,37 @@ import { AuditService } from "../audit/audit.service";
 export class AdminService {
   constructor(private readonly prisma: PrismaService, private readonly auditService: AuditService) {}
 
+  private ensureStrongPassword(password: string) {
+    const hasMin = password.length >= 6;
+    const hasUpper = /[A-Z]/.test(password);
+    const hasLower = /[a-z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    const hasSymbol = /[^A-Za-z0-9]/.test(password);
+    const score = [hasUpper, hasLower, hasNumber, hasSymbol].filter(Boolean).length;
+
+    if (!hasMin || score < 2) {
+      throw new BadRequestException("Senha fraca. Use 6+ caracteres e combine letras, números e símbolos.");
+    }
+  }
+
   async listUsers() {
     return this.prisma.user.findMany({ orderBy: { createdAt: "desc" } });
   }
 
-  async createEmployee(email: string, name: string, password: string) {
+  async createOperator(email: string, name: string, password: string, whatsapp?: string) {
     const exists = await this.prisma.user.findUnique({ where: { email } });
     if (exists) {
       throw new BadRequestException("E-mail já cadastrado.");
     }
+    this.ensureStrongPassword(password);
     const passwordHash = await bcrypt.hash(password, 10);
     return this.prisma.user.create({
       data: {
         email,
         name,
         passwordHash,
-        role: "EMPLOYEE"
+        whatsapp,
+        role: "OPERATOR"
       }
     });
   }

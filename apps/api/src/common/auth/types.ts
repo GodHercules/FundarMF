@@ -1,4 +1,4 @@
-export type ActorRole = "CLIENTE" | "FUNCIONARIO" | "MASTER" | "SYSTEM";
+export type ActorRole = "CLIENTE" | "OPERADOR" | "MASTER" | "SYSTEM";
 
 export interface Actor {
   role: ActorRole;

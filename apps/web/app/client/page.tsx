@@ -5,7 +5,9 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
 import { Card } from "@/components/Card";
+import { Logo } from "@/components/Logo";
 import Link from "next/link";
+import { notifySuccess } from "@/lib/notify";
 
 export default function ClientPortal() {
   const [email, setEmail] = useState("");
@@ -34,17 +36,19 @@ export default function ClientPortal() {
           ? `Link e OTP enviados para seu ${channels}.`
           : `Link enviado para seu ${channels}.`
       );
+      notifySuccess("Link de acesso enviado.");
     } catch (error: any) {
       setMessage(error.message ?? "Erro ao solicitar link.");
     }
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-6 py-16">
+    <main className="mx-auto flex min-h-screen w-full max-w-screen-xl flex-col gap-8 px-4 py-16 sm:px-6 lg:px-10 2xl:px-16">
       <Link href="/" className="text-sm font-semibold text-slate">
         ← Voltar
       </Link>
       <div className="flex flex-col gap-3">
+        <Logo withText />
         <span className="badge bg-brass/15 text-ink">Portal do Cliente</span>
         <h1 className="text-3xl font-semibold">Acesso contábil seguro</h1>
         <p className="text-slate">Receba o link com validação e acompanhe seu processo com transparência.</p>

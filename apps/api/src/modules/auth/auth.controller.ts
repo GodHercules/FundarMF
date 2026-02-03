@@ -6,6 +6,7 @@ import { VerifyLinkDto } from "./dto/verify-link.dto";
 import { LoginDto } from "./dto/login.dto";
 import { SessionService } from "./session.service";
 import { AuthGuard } from "../../common/auth/auth.guard";
+import { ResendOtpDto } from "./dto/resend-otp.dto";
 
 @Controller("auth")
 export class AuthController {
@@ -23,9 +24,14 @@ export class AuthController {
     return { ok: true };
   }
 
-  @Post("employee/login")
-  async loginEmployee(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
-    const { token } = await this.authService.loginUser(dto.email, dto.password, "EMPLOYEE");
+  @Post("customer/resend-otp")
+  async resendOtp(@Body() dto: ResendOtpDto) {
+    return this.authService.resendCustomerOtp(dto.token);
+  }
+
+  @Post("operator/login")
+  async loginOperator(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+    const { token } = await this.authService.loginUser(dto.email, dto.password, "OPERATOR");
     res.cookie(this.sessionService.cookieName, token, this.sessionService.buildCookieOptions());
     return { ok: true };
   }

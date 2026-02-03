@@ -17,8 +17,8 @@ export async function autoAssign() {
 
   if (unassigned.length === 0) return { assigned: 0 };
 
-  const employees = await prisma.user.findMany({ where: { role: "EMPLOYEE", active: true } });
-  if (employees.length === 0) return { assigned: 0 };
+  const operators = await prisma.user.findMany({ where: { role: "OPERATOR", active: true } });
+  if (operators.length === 0) return { assigned: 0 };
 
   const load = await prisma.process.groupBy({
     by: ["ownerId"],
@@ -36,7 +36,7 @@ export async function autoAssign() {
   );
 
   for (const process of unassigned) {
-    const sorted = [...employees].sort((a, b) => {
+    const sorted = [...operators].sort((a, b) => {
       const countA = loadMap.get(a.id) ?? 0;
       const countB = loadMap.get(b.id) ?? 0;
       if (countA !== countB) return countA - countB;

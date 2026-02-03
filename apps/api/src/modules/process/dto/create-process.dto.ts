@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength } from "class-validator";
+import { IsBoolean, IsEmail, IsOptional, IsString, MinLength } from "class-validator";
 
 export class CreateProcessDto {
   @IsString()
@@ -10,4 +10,12 @@ export class CreateProcessDto {
 
   @IsEmail()
   email: string;
+
+  @IsOptional()
+  @IsBoolean()
+  sendEmail?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  sendWhatsapp?: boolean;
 }

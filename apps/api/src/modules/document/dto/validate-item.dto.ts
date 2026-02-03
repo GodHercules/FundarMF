@@ -8,5 +8,9 @@ export class ValidateItemDto {
   reason: string;
 
   @IsOptional()
+  @IsString()
+  socioId?: string;
+
+  @IsOptional()
   fileReasons?: Record<string, string>;
 }

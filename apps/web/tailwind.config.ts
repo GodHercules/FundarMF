@@ -9,19 +9,19 @@ const config: Config = {
         body: ["\"Work Sans\"", "sans-serif"]
       },
       colors: {
-        ink: "#1b2533",
-        paper: "#f7f2e9",
-        ledger: "#e9e2d6",
-        brass: "#c8a14a",
-        emerald: "#1f7a5c",
-        navy: "#0d1b2a",
-        clay: "#c97c5d",
-        sky: "#7cb7cc",
-        slate: "#475569"
+        ink: "#0b1f3a",
+        paper: "#f7fbff",
+        ledger: "#e6f0ff",
+        brass: "#2d6cdf",
+        emerald: "#1b7ed6",
+        navy: "#0a1730",
+        clay: "#d65c5c",
+        sky: "#4b93ff",
+        slate: "#4a617a"
       },
       boxShadow: {
-        soft: "0 12px 30px rgba(13, 27, 42, 0.12)",
-        glow: "0 0 0 3px rgba(200, 161, 74, 0.25)"
+        soft: "0 18px 40px rgba(11, 31, 58, 0.12)",
+        glow: "0 0 0 3px rgba(45, 108, 223, 0.2)"
       }
     }
   },

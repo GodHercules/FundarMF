@@ -15,7 +15,7 @@ export class ChecklistService {
       throw new NotFoundException("Checklist não encontrado.");
     }
 
-    if (actor.role === "FUNCIONARIO") {
+    if (actor.role === "OPERADOR") {
       const process = await this.prisma.process.findUnique({ where: { id: processId } });
       if (process?.ownerId !== actor.userId) {
         throw new ForbiddenException();
@@ -30,7 +30,7 @@ export class ChecklistService {
   }
 
   async updateChecklist(processId: string, stepKey: string, items: Record<string, boolean>, actor: Actor) {
-    if (actor.role !== "FUNCIONARIO") {
+    if (actor.role !== "OPERADOR") {
       throw new ForbiddenException();
     }
 

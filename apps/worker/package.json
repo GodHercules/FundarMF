@@ -12,10 +12,9 @@
   "dependencies": {
     "@fundarmf/shared": "workspace:*",
     "@prisma/client": "^5.19.1",
-    "bullmq": "^5.16.0",
     "dayjs": "^1.11.13",
     "dotenv": "^16.4.5",
-    "ioredis": "^5.4.1",
+    "pg-boss": "^10.4.0",
     "pdfkit": "^0.15.0"
   },
   "devDependencies": {

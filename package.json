@@ -13,7 +13,7 @@
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
-    "db:up": "docker compose up -d postgres redis mailpit",
+    "db:up": "docker compose up -d postgres mailpit",
     "db:down": "docker compose down",
     "format": "pnpm -r format"
   }

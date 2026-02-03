@@ -8,6 +8,10 @@ import { StorageService } from "../storage/storage.service";
 import { NotificationService } from "../notification/notification.service";
 
 const ALLOWED_MIME = ["application/pdf", "image/jpeg", "image/png"];
+const SOCIO_ITEM_KEYS: DocumentItemKey[] = [
+  DocumentItemKey.IDENTIFICACAO_SOCIOS,
+  DocumentItemKey.COMPROVANTE_RESIDENCIA
+];
 
 @Injectable()
 export class DocumentService {
@@ -26,17 +30,49 @@ export class DocumentService {
     return process;
   }
 
+  private async isEnderecoVirtual(processId: string) {
+    const step2 = await this.prisma.processStep.findUnique({
+      where: { processId_stepKey: { processId, stepKey: "ETAPA_2" } }
+    });
+    const endereco = (step2?.data as any)?.endereco ?? {};
+    return endereco?.escritorioVirtual === "Sim";
+  }
+
   async uploadFiles(
     processId: string,
     itemKey: DocumentItemKey,
+    socioId: string | undefined,
     files: Express.Multer.File[],
     actor: Actor
   ) {
-    if (actor.role !== "CLIENTE") {
-      throw new ForbiddenException();
-    }
     const processRecord = await this.getProcess(processId);
-    if (!isClientOwner(actor, processRecord.clientEmail, processRecord.clientPhone)) {
+    const isVirtual = await this.isEnderecoVirtual(processId);
+
+    if (itemKey === DocumentItemKey.FOTO_FACHADA && socioId) {
+      throw new BadRequestException("Foto de fachada não deve estar vinculada a sócio.");
+    }
+
+    if (actor.role === "OPERADOR" || actor.role === "MASTER") {
+      if (actor.role === "OPERADOR" && processRecord.ownerId !== actor.userId) {
+        throw new ForbiddenException();
+      }
+      if (itemKey !== DocumentItemKey.FOTO_FACHADA) {
+        throw new BadRequestException("Apenas foto de fachada pode ser anexada internamente.");
+      }
+      if (!isVirtual) {
+        throw new BadRequestException("Foto de fachada é anexada pelo cliente quando o endereço não é virtual.");
+      }
+    } else if (actor.role === "CLIENTE") {
+      if (!isClientOwner(actor, processRecord.clientEmail, processRecord.clientPhone)) {
+        throw new ForbiddenException();
+      }
+      if (itemKey === DocumentItemKey.FOTO_FACHADA && isVirtual) {
+        throw new BadRequestException("Foto de fachada será anexada pelo operador.");
+      }
+      if (SOCIO_ITEM_KEYS.includes(itemKey) && !socioId) {
+        throw new BadRequestException("Selecione o sócio para enviar o documento.");
+      }
+    } else {
       throw new ForbiddenException();
     }
     if (processRecord.status === ProcessStatus.CANCELADO || processRecord.status === ProcessStatus.CONCLUIDO) {
@@ -77,11 +113,14 @@ export class DocumentService {
       }
     }
 
-    const item = await this.prisma.documentItem.findUnique({
-      where: { processId_itemKey: { processId, itemKey } }
+    const normalizedSocioId = socioId ?? null;
+    let item = await this.prisma.documentItem.findFirst({
+      where: { processId, itemKey, socioId: normalizedSocioId }
     });
     if (!item) {
-      throw new NotFoundException("Item de documento não encontrado.");
+      item = await this.prisma.documentItem.create({
+        data: { processId, itemKey, socioId: normalizedSocioId }
+      });
     }
 
     let version = item.version;
@@ -106,7 +145,7 @@ export class DocumentService {
         mimeType: file.mimetype,
         size: file.size,
         data: file.buffer,
-        uploadedByRole: "CLIENTE"
+        uploadedByRole: actor.role === "CLIENTE" ? "CLIENTE" : actor.role
       });
     }
 
@@ -122,21 +161,22 @@ export class DocumentService {
   async validateItem(
     processId: string,
     itemKey: DocumentItemKey,
+    socioId: string | undefined,
     status: "APROVADO" | "REPROVADO",
     reason: string,
     actor: Actor
   ) {
-    if (actor.role !== "FUNCIONARIO") {
+    if (actor.role !== "OPERADOR" && actor.role !== "MASTER") {
       throw new ForbiddenException();
     }
 
     const processRecord = await this.getProcess(processId);
-    if (processRecord.ownerId !== actor.userId) {
+    if (actor.role === "OPERADOR" && processRecord.ownerId !== actor.userId) {
       throw new ForbiddenException();
     }
 
-    const item = await this.prisma.documentItem.findUnique({
-      where: { processId_itemKey: { processId, itemKey } }
+    const item = await this.prisma.documentItem.findFirst({
+      where: { processId, itemKey, socioId: socioId ?? null }
     });
     if (!item) {
       throw new NotFoundException("Item de documento não encontrado.");
@@ -162,6 +202,29 @@ export class DocumentService {
         processRecord.clientPhone ?? processRecord.clientEmail,
         `Item ${itemKey} reprovado. Motivo: ${reason}`
       );
+
+      const targetUserId = processRecord.ownerId ?? actor.userId;
+      if (targetUserId) {
+        const owner = await this.prisma.user.findUnique({ where: { id: targetUserId } });
+        await this.notificationService.createInApp({
+          userId: targetUserId,
+          processId,
+          title: "Documento reprovado",
+          body: `Documento ${itemKey} reprovado para ${processRecord.clientEmail}.`,
+          type: "document_rejected"
+        });
+        if (owner) {
+          await this.notificationService.sendEmail(
+            owner.email,
+            "Documento reprovado",
+            `Documento ${itemKey} reprovado para ${processRecord.clientEmail}.`
+          );
+          await this.notificationService.sendWhatsApp(
+            owner.whatsapp ?? owner.email,
+            `Documento ${itemKey} reprovado para ${processRecord.clientEmail}.`
+          );
+        }
+      }
     }
 
     return { ok: true };
@@ -178,7 +241,7 @@ export class DocumentService {
     if (actor.role === "CLIENTE") {
       throw new ForbiddenException();
     }
-    if (actor.role === "FUNCIONARIO" && processRecord.ownerId !== actor.userId) {
+    if (actor.role === "OPERADOR" && processRecord.ownerId !== actor.userId) {
       throw new ForbiddenException();
     }
 

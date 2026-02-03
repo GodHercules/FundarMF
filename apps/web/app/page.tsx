@@ -1,15 +1,46 @@
 import Link from "next/link";
+import { Logo } from "@/components/Logo";
 
-export default function Home() {
+type Metrics = {
+  criticalSteps: number;
+  avgCompletionDays: number;
+  activeAlerts: number;
+  auditedDocuments: number;
+};
+
+async function getMetrics(): Promise<Metrics> {
+  const fallback = { criticalSteps: 0, avgCompletionDays: 0, activeAlerts: 0, auditedDocuments: 0 };
+  try {
+    const baseUrl = process.env.API_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+    const response = await fetch(`${baseUrl}/public/metrics`, { next: { revalidate: 60 } });
+    if (!response.ok) return fallback;
+    const data = (await response.json()) as Metrics;
+    return { ...fallback, ...data };
+  } catch {
+    return fallback;
+  }
+}
+
+export default async function Home() {
+  const metrics = await getMetrics();
+  const avgDays = Math.max(0, Math.round(metrics.avgCompletionDays));
+  const indicatorItems = [
+    { label: "Etapas críticas monitoradas", value: String(metrics.criticalSteps).padStart(2, "0") },
+    { label: "Tempo médio de conclusão", value: `${avgDays}d` },
+    { label: "Alertas SLA ativos", value: String(metrics.activeAlerts).padStart(2, "0") },
+    { label: "Documentos auditados", value: String(metrics.auditedDocuments).padStart(2, "0") }
+  ];
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-12 px-6 py-16">
+    <main className="mx-auto flex min-h-screen w-full max-w-screen-2xl flex-col gap-12 px-4 py-16 sm:px-6 lg:px-10 2xl:px-16">
       <header className="grid gap-8 md:grid-cols-[1.1fr_0.9fr] md:items-center">
         <div className="flex flex-col gap-6">
+          <Logo withText size={64} />
           <span className="badge bg-brass/15 text-ink">FundarMF</span>
           <h1 className="text-4xl font-semibold leading-tight sm:text-5xl">
             Contabilidade guiada para abrir sua empresa com segurança
           </h1>
-          <p className="max-w-2xl text-lg text-slate">
+          <p className="max-w-3xl text-lg text-slate">
             Um fluxo claro, com etapas validadas, documentos auditáveis e SLA controlado. Tudo em um painel
             com linguagem de escritório contábil e rastreio completo.
           </p>
@@ -17,7 +48,7 @@ export default function Home() {
             <Link href="/client" className="inline-flex items-center gap-2 text-sm font-semibold text-brass">
               Acessar portal do cliente →
             </Link>
-            <Link href="/employee" className="inline-flex items-center gap-2 text-sm font-semibold text-ink">
+            <Link href="/operator" className="inline-flex items-center gap-2 text-sm font-semibold text-ink">
               Área interna →
             </Link>
           </div>
@@ -30,12 +61,7 @@ export default function Home() {
               <h2 className="mt-2 text-2xl font-semibold">Painel de indicadores</h2>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              {[
-                { label: "Etapas críticas monitoradas", value: "06" },
-                { label: "Tempo médio de conclusão", value: "12d" },
-                { label: "Alertas SLA ativos", value: "03" },
-                { label: "Documentos auditados", value: "124" }
-              ].map((item) => (
+              {indicatorItems.map((item) => (
                 <div key={item.label} className="rounded-xl border border-ink/10 bg-white/80 p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-slate">{item.label}</p>
                   <p className="mt-2 text-2xl font-semibold text-ink">{item.value}</p>
@@ -57,9 +83,9 @@ export default function Home() {
             href: "/client"
           },
           {
-            title: "Portal do Funcionário",
+            title: "Portal do Operador",
             desc: "Valide etapas, controle SLAs e registre ocorrências.",
-            href: "/employee"
+            href: "/operator"
           },
           {
             title: "Portal Master",

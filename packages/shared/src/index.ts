@@ -1,16 +1,16 @@
-export type Role = "CLIENT" | "EMPLOYEE" | "MASTER";
+export type Role = "CLIENT" | "OPERATOR" | "MASTER";
 
 export type ProcessStatus =
   | "EM_ANDAMENTO"
   | "AGUARDANDO_CLIENTE"
-  | "AGUARDANDO_FUNCIONARIO"
+  | "AGUARDANDO_OPERADOR"
   | "CORRECAO_SOLICITADA"
   | "CONCLUIDO"
   | "CANCELADO";
 
 export type StepKey = "ETAPA_1" | "ETAPA_2" | "ETAPA_3" | "ETAPA_4" | "ETAPA_5" | "ETAPA_6";
 
-export type StepSide = "CLIENTE" | "FUNCIONARIO";
+export type StepSide = "CLIENTE" | "OPERADOR";
 
 export type DocumentItemKey =
   | "IDENTIFICACAO_SOCIOS"
@@ -21,7 +21,7 @@ export type ChecklistStatus = "PENDENTE" | "COMPLETO";
 
 export type DocumentItemStatus = "PENDENTE" | "AGUARDANDO_VALIDACAO" | "APROVADO" | "REPROVADO";
 
-export type MessageAuthor = "CLIENTE" | "FUNCIONARIO";
+export type MessageAuthor = "CLIENTE" | "OPERADOR" | "BOT";
 
 export const STEP_ORDER: StepKey[] = [
   "ETAPA_1",

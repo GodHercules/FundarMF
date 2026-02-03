@@ -10,6 +10,7 @@ import { ChatModule } from "./chat/chat.module";
 import { SlaModule } from "./sla/sla.module";
 import { NotificationModule } from "./notification/notification.module";
 import { AuditModule } from "./audit/audit.module";
+import { PublicModule } from "./public/public.module";
 
 @Module({
   imports: [
@@ -22,7 +23,8 @@ import { AuditModule } from "./audit/audit.module";
     ChatModule,
     SlaModule,
     NotificationModule,
-    AuditModule
+    AuditModule,
+    PublicModule
   ],
   providers: [PrismaService]
 })

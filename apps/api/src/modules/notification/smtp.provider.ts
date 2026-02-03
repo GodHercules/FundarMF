@@ -1,15 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import nodemailer, { Transporter } from "nodemailer";
 import twilio, { Twilio } from "twilio";
-import { NotificationProvider } from "./notification.types";
+import { EmailProvider, WhatsAppProvider } from "./notification.types";
 
 @Injectable()
-export class SmtpNotificationProvider implements NotificationProvider {
+export class SmtpEmailProvider implements EmailProvider {
   private readonly transporter: Transporter;
   private readonly from: string;
-  private readonly twilioClient?: Twilio;
-  private readonly twilioFrom?: string;
-  private readonly twilioMessagingServiceSid?: string;
 
   constructor() {
     const host = process.env.SMTP_HOST;
@@ -21,7 +18,7 @@ export class SmtpNotificationProvider implements NotificationProvider {
     this.from = process.env.EMAIL_FROM ?? "no-reply@fundarmf.local";
 
     if (!host) {
-      throw new Error("SMTP_HOST is required to use SmtpNotificationProvider");
+      throw new Error("SMTP_HOST is required to use SmtpEmailProvider");
     }
 
     this.transporter = nodemailer.createTransport({
@@ -30,17 +27,6 @@ export class SmtpNotificationProvider implements NotificationProvider {
       secure,
       auth: user && pass ? { user, pass } : undefined
     });
-
-    const accountSid = process.env.TWILIO_ACCOUNT_SID;
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
-    const fromNumber = process.env.TWILIO_WHATSAPP_FROM;
-    const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
-
-    if (accountSid && authToken) {
-      this.twilioClient = twilio(accountSid, authToken);
-      this.twilioFrom = fromNumber;
-      this.twilioMessagingServiceSid = messagingServiceSid?.trim() ? messagingServiceSid : undefined;
-    }
   }
 
   async sendEmail(to: string, subject: string, body: string) {
@@ -58,17 +44,35 @@ export class SmtpNotificationProvider implements NotificationProvider {
       html
     });
   }
+}
 
-  async sendWhatsApp(to: string, body: string) {
-    if (!this.twilioClient) {
-      throw new Error("Twilio WhatsApp is not configured.");
+@Injectable()
+export class TwilioWhatsAppProvider implements WhatsAppProvider {
+  private readonly twilioClient: Twilio;
+  private readonly twilioFrom?: string;
+  private readonly twilioMessagingServiceSid?: string;
+
+  constructor() {
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const fromNumber = process.env.TWILIO_WHATSAPP_FROM;
+    const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+
+    if (!accountSid || !authToken) {
+      throw new Error("TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN are required for TwilioWhatsAppProvider");
     }
 
-    const normalizedTo = to.startsWith("whatsapp:") ? to : `whatsapp:${to}`;
+    this.twilioClient = twilio(accountSid, authToken);
+    this.twilioFrom = fromNumber;
+    this.twilioMessagingServiceSid = messagingServiceSid?.trim() ? messagingServiceSid : undefined;
 
     if (!this.twilioMessagingServiceSid && !this.twilioFrom) {
       throw new Error("TWILIO_WHATSAPP_FROM or TWILIO_MESSAGING_SERVICE_SID is required.");
     }
+  }
+
+  async sendWhatsApp(to: string, body: string) {
+    const normalizedTo = to.startsWith("whatsapp:") ? to : `whatsapp:${to}`;
 
     await this.twilioClient.messages.create({
       to: normalizedTo,

@@ -7,7 +7,7 @@ export interface StoredFileInput {
   mimeType: string;
   size: number;
   data: Buffer;
-  uploadedByRole: "CLIENTE" | "FUNCIONARIO" | "MASTER" | "SYSTEM";
+  uploadedByRole: "CLIENTE" | "OPERADOR" | "MASTER" | "SYSTEM";
   uploadedById?: string;
 }
 

@@ -5,6 +5,7 @@ import { AuthGuard } from "../../common/auth/auth.guard";
 import { RolesGuard } from "../../common/auth/roles.guard";
 import { Roles } from "../../common/auth/roles.decorator";
 import { CreateProcessDto } from "./dto/create-process.dto";
+import { SendLinkDto } from "./dto/send-link.dto";
 import { UpdateStepDto } from "./dto/update-step.dto";
 import { SubmitStepDto } from "./dto/submit-step.dto";
 import { ApproveStepDto } from "./dto/approve-step.dto";
@@ -17,12 +18,23 @@ export class ProcessController {
   constructor(private readonly processService: ProcessService) {}
 
   @Post()
-  @Roles("CLIENTE")
-  async create(@Body() dto: CreateProcessDto) {
-    return this.processService.createProcessFromClient({
+  @Roles("OPERADOR", "MASTER")
+  async create(@Body() dto: CreateProcessDto, @Req() req: Request) {
+    return this.processService.createProcessByOperator(req.actor!, {
       nome: dto.nome,
       email: dto.email,
-      telefone: dto.telefone
+      telefone: dto.telefone,
+      sendEmail: dto.sendEmail,
+      sendWhatsapp: dto.sendWhatsapp
+    });
+  }
+
+  @Post(":id/send-link")
+  @Roles("OPERADOR", "MASTER")
+  async sendLink(@Param("id") id: string, @Body() dto: SendLinkDto, @Req() req: Request) {
+    return this.processService.sendClientLink(id, req.actor!, {
+      sendEmail: dto.sendEmail,
+      sendWhatsapp: dto.sendWhatsapp
     });
   }
 
@@ -54,6 +66,11 @@ export class ProcessController {
   @Post(":id/request-correction")
   async correction(@Param("id") id: string, @Body() dto: RequestCorrectionDto, @Req() req: Request) {
     return this.processService.requestCorrection(id, req.actor!, dto.stepKey, dto.fields, dto.reason);
+  }
+
+  @Post(":id/mark-in-progress")
+  async markInProgress(@Param("id") id: string, @Req() req: Request) {
+    return this.processService.markInProgress(id, req.actor!);
   }
 
   @Post(":id/cancel")

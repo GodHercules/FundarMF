@@ -11,7 +11,8 @@ import { CommonModule } from "../../common/common.module";
 @Module({
   imports: [NotificationModule, AuditModule, CommonModule],
   controllers: [AuthController],
-  providers: [AuthService, SessionService, PrismaService]
+  providers: [AuthService, SessionService, PrismaService],
+  exports: [AuthService, SessionService]
 })
 export class AuthModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

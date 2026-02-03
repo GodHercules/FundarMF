@@ -4,7 +4,7 @@ const statusColor: Record<string, string> = {
   CONCLUIDO: "bg-emerald",
   EM_ANDAMENTO: "bg-sky",
   AGUARDANDO_CLIENTE: "bg-brass",
-  AGUARDANDO_FUNCIONARIO: "bg-sky",
+  AGUARDANDO_OPERADOR: "bg-sky",
   CORRECAO_SOLICITADA: "bg-clay",
   CANCELADO: "bg-slate"
 };

@@ -1,14 +1,15 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { Prisma, ProcessStatus, StepKey, StepSide } from "@prisma/client";
+import { DocumentItemKey, Prisma, ProcessStatus, StepKey, StepSide } from "@prisma/client";
 import { PrismaService } from "../../shared/prisma.service";
 import { Actor } from "../../common/auth/types";
 import { isClientOwner, normalizePhone } from "../../common/auth/identity";
 import { SlaService } from "../sla/sla.service";
 import { AuditService } from "../audit/audit.service";
 import { NotificationService } from "../notification/notification.service";
+import { AuthService } from "../auth/auth.service";
 
 const CLIENT_STEPS: StepKey[] = ["ETAPA_1", "ETAPA_2", "ETAPA_4", "ETAPA_5", "ETAPA_6"];
-const EMPLOYEE_STEPS: StepKey[] = ["ETAPA_3"];
+const OPERATOR_STEPS: StepKey[] = ["ETAPA_3"];
 
 function nextStep(step: StepKey): StepKey | null {
   const order: StepKey[] = ["ETAPA_1", "ETAPA_2", "ETAPA_3", "ETAPA_4", "ETAPA_5", "ETAPA_6"];
@@ -18,7 +19,7 @@ function nextStep(step: StepKey): StepKey | null {
 }
 
 function stepSide(step: StepKey): StepSide {
-  return step === "ETAPA_3" ? "FUNCIONARIO" : "CLIENTE";
+  return step === "ETAPA_3" ? "OPERADOR" : "CLIENTE";
 }
 
 @Injectable()
@@ -27,10 +28,117 @@ export class ProcessService {
     private readonly prisma: PrismaService,
     private readonly slaService: SlaService,
     private readonly auditService: AuditService,
-    private readonly notificationService: NotificationService
+    private readonly notificationService: NotificationService,
+    private readonly authService: AuthService
   ) {}
 
-  async createProcessFromClient(payload: { nome: string; email: string; telefone: string }) {
+  private async notifyOwner(
+    processId: string,
+    ownerId: string | null,
+    payload: { title: string; body: string; type: string }
+  ) {
+    if (!ownerId) return;
+    const owner = await this.prisma.user.findUnique({ where: { id: ownerId } });
+    if (!owner) return;
+
+    await this.notificationService.createInApp({
+      userId: owner.id,
+      processId,
+      title: payload.title,
+      body: payload.body,
+      type: payload.type
+    });
+
+    await this.notificationService.sendEmail(owner.email, payload.title, payload.body);
+    await this.notificationService.sendWhatsApp(owner.whatsapp ?? owner.email, payload.body);
+  }
+
+  private buildChecklistData() {
+    return {
+      step2: {
+        razoesSociais: false,
+        municipio: false,
+        contatoCnpj: false
+      },
+      step4: {
+        dadosCompletos: false,
+        percentuaisOk: false,
+        administradores: false,
+        responsavelCnpj: false
+      },
+      step5: {
+        enderecoOk: false,
+        iptuOk: false,
+        fotoOk: false,
+        escritorioVirtual: false
+      },
+      step6: {
+        identificacaoSocios: false,
+        comprovanteResidencia: false,
+        fotoFachada: false
+      }
+    };
+  }
+
+  private normalizeSocios(raw: unknown) {
+    if (Array.isArray(raw)) {
+      return raw.filter((item) => item && typeof item === "object") as Record<string, unknown>[];
+    }
+    if (raw && typeof raw === "object") {
+      return [raw as Record<string, unknown>];
+    }
+    return [];
+  }
+
+  private async syncDocumentItems(processId: string, data: Record<string, unknown>) {
+    const socios = this.normalizeSocios(data.quadroSocietario);
+    const socioIds = socios
+      .map((socio) => socio.socioId)
+      .filter((value) => typeof value === "string" && value.length > 0) as string[];
+
+    if (socioIds.length > 0) {
+      const existing = await this.prisma.documentItem.findMany({
+        where: {
+          processId,
+          itemKey: { in: [DocumentItemKey.IDENTIFICACAO_SOCIOS, DocumentItemKey.COMPROVANTE_RESIDENCIA] }
+        }
+      });
+      const existingKeys = new Set(existing.map((item) => `${item.itemKey}:${item.socioId ?? ""}`));
+      const toCreate: { processId: string; itemKey: DocumentItemKey; socioId: string }[] = [];
+
+      for (const socioId of socioIds) {
+        for (const itemKey of [DocumentItemKey.IDENTIFICACAO_SOCIOS, DocumentItemKey.COMPROVANTE_RESIDENCIA]) {
+          const key = `${itemKey}:${socioId}`;
+          if (!existingKeys.has(key)) {
+            toCreate.push({ processId, itemKey, socioId });
+            existingKeys.add(key);
+          }
+        }
+      }
+
+      if (toCreate.length > 0) {
+        await this.prisma.documentItem.createMany({ data: toCreate });
+      }
+    }
+
+    const fachada = await this.prisma.documentItem.findFirst({
+      where: { processId, itemKey: DocumentItemKey.FOTO_FACHADA, socioId: null }
+    });
+    if (!fachada) {
+      await this.prisma.documentItem.create({
+        data: { processId, itemKey: DocumentItemKey.FOTO_FACHADA }
+      });
+    }
+  }
+
+  async createProcessByOperator(
+    actor: Actor,
+    payload: { nome: string; email: string; telefone: string; sendEmail?: boolean; sendWhatsapp?: boolean }
+  ) {
+    if (actor.role !== "OPERADOR" && actor.role !== "MASTER") {
+      throw new ForbiddenException();
+    }
+
     const normalizedPhone = normalizePhone(payload.telefone) ?? payload.telefone;
     const active = await this.prisma.process.findFirst({
       where: {
@@ -42,6 +150,7 @@ export class ProcessService {
       throw new BadRequestException("Já existe um processo ativo para este e-mail.");
     }
 
+    const checklistDefaults = this.buildChecklistData();
     const process = await this.prisma.process.create({
       data: {
         clientName: payload.nome,
@@ -49,6 +158,7 @@ export class ProcessService {
         clientPhone: normalizedPhone,
         status: ProcessStatus.AGUARDANDO_CLIENTE,
         currentStep: StepKey.ETAPA_2,
+        ownerId: actor.userId,
         steps: {
           create: {
             stepKey: StepKey.ETAPA_1,
@@ -62,62 +172,104 @@ export class ProcessService {
           }
         },
         documents: {
-          create: [
-            { itemKey: "IDENTIFICACAO_SOCIOS" },
-            { itemKey: "COMPROVANTE_RESIDENCIA" },
-            { itemKey: "FOTO_FACHADA" }
-          ]
+          create: [{ itemKey: DocumentItemKey.FOTO_FACHADA }]
         },
         checklists: {
           create: [
             {
               stepKey: StepKey.ETAPA_2,
               status: "PENDENTE",
-              items: {
-                razoesSociais: false,
-                municipio: false,
-                contatoCnpj: false,
-                tributacao: false,
-                cnae: false
-              }
+              items: checklistDefaults.step2
             },
             {
               stepKey: StepKey.ETAPA_4,
               status: "PENDENTE",
-              items: {
-                dadosCompletos: false,
-                percentuaisOk: false,
-                administradores: false,
-                responsavelCnpj: false
-              }
+              items: checklistDefaults.step4
             },
             {
               stepKey: StepKey.ETAPA_5,
               status: "PENDENTE",
-              items: {
-                enderecoOk: false,
-                iptuOk: false,
-                fotoOk: false,
-                escritorioVirtual: false
-              }
+              items: checklistDefaults.step5
             },
             {
               stepKey: StepKey.ETAPA_6,
               status: "PENDENTE",
-              items: {
-                identificacaoSocios: false,
-                comprovanteResidencia: false,
-                fotoFachada: false
-              }
+              items: checklistDefaults.step6
             }
           ]
-        }
+        },
+        ownerHistory: actor.userId
+          ? {
+              create: [{ ownerId: actor.userId, assignedBy: actor.userId }]
+            }
+          : undefined
       }
     });
 
     await this.slaService.startSla(process.id, StepKey.ETAPA_2, StepSide.CLIENTE);
 
+    await this.auditService.record(actor, "process_started", "Process", process.id, {
+      clientEmail: payload.email
+    });
+
+    if (actor.userId) {
+      await this.notifyOwner(process.id, actor.userId, {
+        title: "Processo iniciado",
+        body: `Processo ${process.id} iniciado para ${payload.nome}.`,
+        type: "process_started"
+      });
+    }
+
+    if (payload.sendEmail || payload.sendWhatsapp) {
+      await this.sendClientLink(process.id, actor, {
+        sendEmail: payload.sendEmail ?? true,
+        sendWhatsapp: payload.sendWhatsapp ?? Boolean(normalizedPhone)
+      });
+    }
+
     return process;
+  }
+
+  async sendClientLink(processId: string, actor: Actor, channels: { sendEmail?: boolean; sendWhatsapp?: boolean }) {
+    if (actor.role !== "OPERADOR" && actor.role !== "MASTER") {
+      throw new ForbiddenException();
+    }
+
+    const process = await this.prisma.process.findUnique({ where: { id: processId } });
+    if (!process) {
+      throw new NotFoundException("Processo não encontrado.");
+    }
+
+    if (actor.role === "OPERADOR" && process.ownerId !== actor.userId) {
+      throw new ForbiddenException();
+    }
+
+    const sendEmail = channels.sendEmail ?? true;
+    const sendWhatsapp = channels.sendWhatsapp ?? Boolean(process.clientPhone);
+
+    if (!sendEmail && !sendWhatsapp) {
+      throw new BadRequestException("Selecione ao menos um canal para envio.");
+    }
+
+    await this.authService.requestCustomerLink(
+      sendEmail ? process.clientEmail : undefined,
+      sendWhatsapp ? process.clientPhone ?? undefined : undefined
+    );
+
+    await this.auditService.record(actor, "client_link_sent", "Process", processId, {
+      sendEmail,
+      sendWhatsapp
+    });
+
+    if (actor.userId) {
+      await this.notifyOwner(processId, actor.userId, {
+        title: "Link enviado ao cliente",
+        body: `Link de acesso enviado para ${process.clientEmail}.`,
+        type: "client_link_sent"
+      });
+    }
+
+    return { ok: true };
   }
 
   async listProcesses(actor: Actor) {
@@ -140,7 +292,7 @@ export class ProcessService {
       });
     }
 
-    if (actor.role === "FUNCIONARIO") {
+    if (actor.role === "OPERADOR") {
       return this.prisma.process.findMany({
         where: { ownerId: actor.userId },
         orderBy: { createdAt: "desc" }
@@ -153,7 +305,25 @@ export class ProcessService {
   async getProcess(processId: string, actor: Actor) {
     const process = await this.prisma.process.findUnique({
       where: { id: processId },
-      include: { steps: true, checklists: true, documents: true, chats: true, slaEvents: true }
+      include: {
+        steps: true,
+        checklists: true,
+        documents: {
+          include: {
+            files: {
+              select: {
+                id: true,
+                fileName: true,
+                mimeType: true,
+                size: true,
+                createdAt: true
+              }
+            }
+          }
+        },
+        chats: true,
+        slaEvents: true
+      }
     });
     if (!process) {
       throw new NotFoundException("Processo não encontrado.");
@@ -163,7 +333,7 @@ export class ProcessService {
       throw new ForbiddenException();
     }
 
-    if (actor.role === "FUNCIONARIO" && process.ownerId !== actor.userId) {
+    if (actor.role === "OPERADOR" && process.ownerId !== actor.userId) {
       throw new ForbiddenException();
     }
 
@@ -184,14 +354,17 @@ export class ProcessService {
       throw new ForbiddenException();
     }
 
-    if (process.currentStep !== stepKey) {
+    const operatorPreStep3 =
+      actor.role === "OPERADOR" && stepKey === "ETAPA_3" && process.currentStep === "ETAPA_2";
+
+    if (process.currentStep !== stepKey && !operatorPreStep3) {
       throw new BadRequestException("Etapa não é a atual do processo.");
     }
 
     if (actor.role === "CLIENTE" && !CLIENT_STEPS.includes(stepKey)) {
       throw new ForbiddenException();
     }
-    if (actor.role === "FUNCIONARIO" && !EMPLOYEE_STEPS.includes(stepKey)) {
+    if (actor.role === "OPERADOR" && !OPERATOR_STEPS.includes(stepKey)) {
       throw new ForbiddenException();
     }
 
@@ -228,6 +401,22 @@ export class ProcessService {
       }
     });
 
+    if (stepKey === "ETAPA_2") {
+      await this.syncDocumentItems(processId, merged as Record<string, unknown>);
+    }
+
+    if (operatorPreStep3) {
+      await this.prisma.process.update({
+        where: { id: processId },
+        data: {
+          currentStep: "ETAPA_3",
+          status: ProcessStatus.AGUARDANDO_OPERADOR
+        }
+      });
+      await this.slaService.stopSla(processId, "ETAPA_2", "CLIENTE");
+      await this.slaService.startSla(processId, "ETAPA_3", "OPERADOR");
+    }
+
     await this.auditService.record(actor, "update_step", "ProcessStep", updated.id, { stepKey });
 
     return updated;
@@ -247,24 +436,30 @@ export class ProcessService {
 
     await this.prisma.processStep.update({
       where: { processId_stepKey: { processId, stepKey } },
-      data: { status: ProcessStatus.AGUARDANDO_FUNCIONARIO, locked: true }
+      data: { status: ProcessStatus.AGUARDANDO_OPERADOR, locked: true }
     });
 
     await this.prisma.process.update({
       where: { id: processId },
-      data: { status: ProcessStatus.AGUARDANDO_FUNCIONARIO }
+      data: { status: ProcessStatus.AGUARDANDO_OPERADOR }
     });
 
     await this.slaService.stopSla(processId, stepKey, "CLIENTE");
-    await this.slaService.startSla(processId, stepKey, "FUNCIONARIO");
+    await this.slaService.startSla(processId, stepKey, "OPERADOR");
 
     await this.auditService.record(actor, "submit_step", "Process", processId, { stepKey });
+
+    await this.notifyOwner(processId, process.ownerId ?? null, {
+      title: "Cliente enviou o formulário",
+      body: `O cliente ${process.clientEmail} enviou o formulário final da etapa ${stepKey}.`,
+      type: "client_submitted"
+    });
 
     return { ok: true };
   }
 
   async approveStep(processId: string, actor: Actor, stepKey: StepKey) {
-    if (actor.role !== "FUNCIONARIO") {
+    if (actor.role !== "OPERADOR") {
       throw new ForbiddenException();
     }
 
@@ -299,7 +494,7 @@ export class ProcessService {
       data: { status: ProcessStatus.CONCLUIDO, locked: true }
     });
 
-    await this.slaService.stopSla(processId, stepKey, "FUNCIONARIO");
+    await this.slaService.stopSla(processId, stepKey, "OPERADOR");
 
     const next = nextStep(stepKey);
     if (!next) {
@@ -319,7 +514,7 @@ export class ProcessService {
     }
 
     const nextSide = stepSide(next);
-    const newStatus = nextSide === "CLIENTE" ? ProcessStatus.AGUARDANDO_CLIENTE : ProcessStatus.AGUARDANDO_FUNCIONARIO;
+    const newStatus = nextSide === "CLIENTE" ? ProcessStatus.AGUARDANDO_CLIENTE : ProcessStatus.AGUARDANDO_OPERADOR;
 
     await this.prisma.process.update({
       where: { id: processId },
@@ -334,7 +529,7 @@ export class ProcessService {
   }
 
   async requestCorrection(processId: string, actor: Actor, stepKey: StepKey, fields: string[], reason: string) {
-    if (actor.role !== "FUNCIONARIO") {
+    if (actor.role !== "OPERADOR") {
       throw new ForbiddenException();
     }
     const process = await this.getProcess(processId, actor);
@@ -375,7 +570,7 @@ export class ProcessService {
       data: { status: ProcessStatus.CORRECAO_SOLICITADA }
     });
 
-    await this.slaService.stopSla(processId, stepKey, "FUNCIONARIO");
+    await this.slaService.stopSla(processId, stepKey, "OPERADOR");
     await this.slaService.startSla(processId, stepKey, "CLIENTE");
 
     await this.notificationService.sendEmail(
@@ -388,7 +583,31 @@ export class ProcessService {
       `Correção solicitada na ${stepKey}: ${reason}`
     );
 
+    await this.notifyOwner(processId, process.ownerId ?? null, {
+      title: "Correção solicitada",
+      body: `Correção solicitada na ${stepKey} para ${process.clientEmail}.`,
+      type: "correction_requested"
+    });
+
     await this.auditService.record(actor, "request_correction", "Process", processId, { stepKey, fields, reason });
+
+    return updated;
+  }
+
+  async markInProgress(processId: string, actor: Actor) {
+    const process = await this.getProcess(processId, actor);
+    this.ensureNotReadOnly(process);
+
+    if (actor.role !== "OPERADOR") {
+      throw new ForbiddenException();
+    }
+
+    const updated = await this.prisma.process.update({
+      where: { id: processId },
+      data: { status: ProcessStatus.EM_ANDAMENTO }
+    });
+
+    await this.auditService.record(actor, "mark_in_progress", "Process", processId);
 
     return updated;
   }

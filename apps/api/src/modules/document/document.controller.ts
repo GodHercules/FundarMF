@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Res,
   UploadedFiles,
   UseGuards,
@@ -28,11 +29,12 @@ export class DocumentController {
   async upload(
     @Param("processId") processId: string,
     @Param("itemKey") itemKey: any,
+    @Query("socioId") socioId: string | undefined,
     @UploadedFiles() files: Express.Multer.File[],
     @Res({ passthrough: true }) res: Response,
     @Req() req: any
   ) {
-    return this.documentService.uploadFiles(processId, itemKey, files, req.actor!);
+    return this.documentService.uploadFiles(processId, itemKey, socioId, files, req.actor!);
   }
 
   @Post(":processId/items/:itemKey/validate")
@@ -42,7 +44,7 @@ export class DocumentController {
     @Body() dto: ValidateItemDto,
     @Req() req: any
   ) {
-    return this.documentService.validateItem(processId, itemKey, dto.status, dto.reason, req.actor!);
+    return this.documentService.validateItem(processId, itemKey, dto.socioId, dto.status, dto.reason, req.actor!);
   }
 
   @Get(":processId/items/:itemKey/preview/:fileId")

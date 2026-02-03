@@ -1,0 +1,57 @@
+{
+  "intents": [
+    {
+      "id": "documentos",
+      "title": "Documentos",
+      "keywords": ["documento", "rg", "cnh", "identidade", "comprovante", "pdf", "foto", "fachada", "upload", "anexo", "arquivo"],
+      "answer": "Para cada sócio, envie um documento de identificação (RG/CNH ou documento profissional) e um comprovante de residência. Envie PDFs ou imagens legíveis, preferencialmente com foto inteira e sem cortes.",
+      "followUps": [
+        "Se o documento estiver ilegível ou cortado, reenvie com melhor qualidade.",
+        "Você pode enviar mais de um arquivo por item."
+      ]
+    },
+    {
+      "id": "socios",
+      "title": "Dados dos sócios",
+      "keywords": ["sócio", "socio", "estado civil", "regime", "profissão", "profissao", "cpf", "percentual", "participação", "administrador"],
+      "answer": "Preencha os dados de cada sócio: nome completo, CPF, e-mail, telefone, participação, administrador, estado civil e profissão. Se o sócio for casado(a), informe o regime de casamento.",
+      "followUps": [
+        "Se tiver mais de um sócio, use “Adicionar sócio”.",
+        "Caso o sócio seja pessoa jurídica, informe no documento de identificação."
+      ]
+    },
+    {
+      "id": "endereco",
+      "title": "Endereço",
+      "keywords": ["endereço", "endereco", "virtual", "fachada", "cep", "bairro", "cidade", "uf", "iptu"],
+      "answer": "Se o endereço for virtual, marque como “Sim” para auto-preencher. Se não for virtual, preencha todos os campos e envie a foto da fachada.",
+      "followUps": [
+        "Para endereço virtual, a foto da fachada será anexada pelo operador.",
+        "Para endereço físico, a foto é obrigatória."
+      ]
+    },
+    {
+      "id": "prazos",
+      "title": "Prazos e andamento",
+      "keywords": ["prazo", "andamento", "status", "finalizei", "finalizar", "concluí", "conclui", "o que falta"],
+      "answer": "Para finalizar, preencha todos os campos obrigatórios e clique em “Enviar tudo para validação”. Depois disso, o operador valida e retorna com aprovação ou correções.",
+      "followUps": [
+        "Você pode acompanhar o status no painel do cliente.",
+        "Se algo faltar, o operador solicitará correções."
+      ]
+    },
+    {
+      "id": "erros_upload",
+      "title": "Erros de upload/validação",
+      "keywords": ["erro", "falha", "não funcionou", "nao funcionou", "travou", "upload", "não envia", "nao envia", "validacao", "validação"],
+      "answer": "Tente reenviar o arquivo em PDF/JPG/PNG, com tamanho menor e legível. Se o problema persistir, informe o nome do arquivo e o erro exibido.",
+      "followUps": [
+        "Caso o erro continue, posso encaminhar para o operador.",
+        "Se possível, descreva o passo a passo do que ocorreu."
+      ]
+    }
+  ],
+  "fallback": {
+    "question": "Posso ajudar com documentos, dados de sócios, endereço/foto de fachada, prazos/andamento ou erros de upload. Sobre qual tema é sua dúvida?"
+  }
+}

@@ -20,7 +20,7 @@ export class AdminController {
 
   @Post("users")
   async createUser(@Body() dto: CreateUserDto, @Req() req: Request) {
-    return this.adminService.createEmployee(dto.email, dto.name, dto.password);
+    return this.adminService.createOperator(dto.email, dto.name, dto.password, dto.whatsapp);
   }
 
   @Post("processes/:id/assign")
