@@ -1,3 +1,17 @@
 {
-  "/page": "app/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/client/dashboard/page": "app/client/dashboard/page.js",
+  "/client/link/page": "app/client/link/page.js",
+  "/client/page": "app/client/page.js",
+  "/client/submitted/page": "app/client/submitted/page.js",
+  "/client/onboarding/page": "app/client/onboarding/page.js",
+  "/master/dashboard/page": "app/master/dashboard/page.js",
+  "/master/page": "app/master/page.js",
+  "/client/process/[id]/page": "app/client/process/[id]/page.js",
+  "/operator/dashboard/page": "app/operator/dashboard/page.js",
+  "/operator/page": "app/operator/page.js",
+  "/operator/request-link/page": "app/operator/request-link/page.js",
+  "/operator/start/page": "app/operator/start/page.js",
+  "/page": "app/page.js",
+  "/operator/process/[id]/page": "app/operator/process/[id]/page.js"
 }
