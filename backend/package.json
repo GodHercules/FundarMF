@@ -17,6 +17,6 @@
     "db:up": "docker compose up -d postgres mailpit",
     "db:down": "docker compose down",
     "format": "pnpm -r format",
-    "deploy:render": "pnpm --filter fundarmf-api build && pnpm --filter fundarmf-api prisma:deploy && pnpm --filter fundarmf-api prisma:seed"
+    "deploy:render": "pnpm --filter fundarmf-api prisma:generate && pnpm --filter fundarmf-api build && pnpm --filter fundarmf-api prisma:deploy && pnpm --filter fundarmf-api prisma:seed"
   }
 }
