@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getCountries, getCountryCallingCode, parsePhoneNumber } from "libphonenumber-js";
+import type { CountryCode } from "libphonenumber-js";
 import ReactCountryFlag from "react-country-flag";
 import { Input } from "@/components/Input";
 import { maskPhoneNumberBR, onlyDigits } from "@/lib/masks";
@@ -28,7 +29,7 @@ export function PhoneInput({ value, onChange, label, required, disabled, classNa
     }));
   }, []);
 
-  const [country, setCountry] = useState("BR");
+  const [country, setCountry] = useState<CountryCode>("BR");
   const [ddd, setDdd] = useState("");
   const [number, setNumber] = useState("");
   const [open, setOpen] = useState(false);
@@ -60,7 +61,7 @@ export function PhoneInput({ value, onChange, label, required, disabled, classNa
     }
   }, [value]);
 
-  const emit = (nextCountry: string, nextDdd: string, nextNumber: string) => {
+  const emit = (nextCountry: CountryCode, nextDdd: string, nextNumber: string) => {
     const calling = getCountryCallingCode(nextCountry);
     const digits = nextCountry === "BR"
       ? onlyDigits(`${nextDdd}${nextNumber}`)
@@ -69,7 +70,7 @@ export function PhoneInput({ value, onChange, label, required, disabled, classNa
     onChange(e164);
   };
 
-  const onCountryChange = (next: string) => {
+  const onCountryChange = (next: CountryCode) => {
     setCountry(next);
     setDdd("");
     setNumber("");
