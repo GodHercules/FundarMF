@@ -1,0 +1,1 @@
+{"version":3,"file":"current-actor.decorator.js","sourceRoot":"","sources":["../../../../src/common/auth/current-actor.decorator.ts"],"names":[],"mappings":";;;AAAA,2CAAwE;AAG3D,QAAA,YAAY,GAAG,IAAA,6BAAoB,EAAC,CAAC,IAAa,EAAE,GAAqB,EAAqB,EAAE;IAC3G,MAAM,OAAO,GAAG,GAAG,CAAC,YAAY,EAAE,CAAC,UAAU,EAAE,CAAC;IAChD,OAAO,OAAO,CAAC,KAAK,CAAC;AACvB,CAAC,CAAC,CAAC"}

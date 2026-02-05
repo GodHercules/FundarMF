@@ -1,0 +1,22 @@
+{
+  "name": "fundarmf-backend",
+  "private": true,
+  "packageManager": "pnpm@9.12.2",
+  "workspaces": [
+    "api",
+    "worker",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm -r dev",
+    "dev:api": "pnpm --filter fundarmf-api dev",
+    "dev:worker": "pnpm --filter fundarmf-worker dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:up": "docker compose up -d postgres mailpit",
+    "db:down": "docker compose down",
+    "format": "pnpm -r format",
+    "deploy:render": "pnpm --filter fundarmf-api build && pnpm --filter fundarmf-api prisma:deploy && pnpm --filter fundarmf-api prisma:seed"
+  }
+}

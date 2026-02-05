@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: fundarmf-postgres
+    environment:
+      POSTGRES_DB: fundarmf
+      POSTGRES_USER: fundarmf
+      POSTGRES_PASSWORD: fundarmf
+    ports:
+      - "5499:5432"
+
+    volumes:
+      - fundarmf_pg:/var/lib/postgresql/data
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: fundarmf-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+volumes:
+  fundarmf_pg:
