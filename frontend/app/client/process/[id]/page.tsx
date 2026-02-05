@@ -177,7 +177,8 @@ export default function ClientProcess() {
       api(`/chats/${processId}`)
     ]);
     setProcess(processData);
-    setChatMessages(chatData?.messages ?? []);
+    const chat = chatData as { messages?: any[] } | undefined | null;
+    setChatMessages(chat?.messages ?? []);
   }
 
   useEffect(() => {
