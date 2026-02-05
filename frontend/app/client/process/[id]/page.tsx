@@ -100,13 +100,13 @@ function getStepData(process: any, stepKey: string) {
 }
 
 function normalizeStep<T extends Record<string, string>>(defaults: T, data: Record<string, unknown>) {
-  const normalized = { ...defaults };
+  const normalized: Record<string, string> = { ...defaults };
   Object.keys(defaults).forEach((key) => {
     const value = data[key];
     if (typeof value === "string") normalized[key] = value;
     if (typeof value === "number") normalized[key] = String(value);
   });
-  return normalized;
+  return normalized as T;
 }
 
 function normalizeSocios(input: unknown, legacy?: Record<string, unknown>) {
