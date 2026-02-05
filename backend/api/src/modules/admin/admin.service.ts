@@ -44,6 +44,101 @@ export class AdminService {
     });
   }
 
+  async deleteOperator(userId: string, actorId?: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException("Usuário não encontrado.");
+    }
+    if (user.role !== "OPERATOR") {
+      throw new BadRequestException("Apenas operadores podem ser removidos.");
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.process.updateMany({
+        where: { ownerId: userId },
+        data: { ownerId: null }
+      });
+
+      await tx.session.deleteMany({
+        where: { userId }
+      });
+
+      await tx.userNotification.deleteMany({
+        where: { userId }
+      });
+
+      await tx.user.delete({
+        where: { id: userId }
+      });
+    });
+
+    await this.auditService.record(
+      actorId ? { role: "MASTER", userId: actorId } : { role: "SYSTEM" },
+      "user_deleted",
+      "User",
+      userId
+    );
+
+    return { ok: true };
+  }
+
+  async deleteProcess(processId: string, actorId?: string, reason?: string) {
+    const process = await this.prisma.process.findUnique({ where: { id: processId } });
+    if (!process) {
+      throw new NotFoundException("Processo não encontrado.");
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const documentItems = await tx.documentItem.findMany({
+        where: { processId },
+        select: { id: true }
+      });
+      const documentItemIds = documentItems.map((item) => item.id);
+
+      if (documentItemIds.length > 0) {
+        await tx.documentFile.deleteMany({
+          where: { itemId: { in: documentItemIds } }
+        });
+      }
+
+      await tx.documentItem.deleteMany({ where: { processId } });
+      await tx.processStep.deleteMany({ where: { processId } });
+      await tx.checklist.deleteMany({ where: { processId } });
+      await tx.slaEvent.deleteMany({ where: { processId } });
+      await tx.report.deleteMany({ where: { processId } });
+      await tx.userNotification.deleteMany({ where: { processId } });
+      await tx.processOwnerHistory.deleteMany({ where: { processId } });
+
+      const threads = await tx.chatThread.findMany({
+        where: { processId },
+        select: { id: true }
+      });
+      const threadIds = threads.map((thread) => thread.id);
+
+      if (threadIds.length > 0) {
+        await tx.chatMessage.deleteMany({
+          where: { threadId: { in: threadIds } }
+        });
+      }
+
+      await tx.chatThread.deleteMany({ where: { processId } });
+
+      await tx.process.delete({
+        where: { id: processId }
+      });
+    });
+
+    await this.auditService.record(
+      actorId ? { role: "MASTER", userId: actorId } : { role: "SYSTEM" },
+      "process_deleted",
+      "Process",
+      processId,
+      { reason: reason ?? "Processo removido pelo master" }
+    );
+
+    return { ok: true };
+  }
+
   async assignOwner(processId: string, ownerId: string, actorId?: string) {
     await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Process" WHERE id = ${processId} FOR UPDATE`;
