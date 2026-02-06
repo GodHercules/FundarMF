@@ -31,3 +31,6 @@ export const STEP_ORDER: StepKey[] = [
   "ETAPA_5",
   "ETAPA_6"
 ];
+
+export const NOTIFY_EMAIL_JOB = "notify:email";
+export const NOTIFY_WHATSAPP_JOB = "notify:whatsapp";

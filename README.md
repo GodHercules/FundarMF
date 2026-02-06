@@ -89,7 +89,7 @@ pnpm dev
 
 ---
 
-### 6) (Opcional) Subir o Worker
+### 6) (Opcional, mas recomendado) Subir o Worker
 **Onde rodar:** dentro de `backend`, em outro terminal.
 
 ```bash
@@ -97,9 +97,23 @@ cd backend
 pnpm --filter fundarmf-worker dev
 ```
 
-**Por que rodar:** executa jobs peridicos (SLA, relatrios, cancelamento por inatividade).
+**Por que rodar:** executa jobs peridicos (SLA, relatrios, cancelamento por inatividade) e o envio assncrono de notificaes (e-mail/WhatsApp).
 
 ---
+
+## Notificaes (e-mail + WhatsApp)
+- Os disparos continuam na API (servios de Auth/Process/Chat/Document).
+- A entrega real ocorre no `backend/worker` via pg-boss.
+- Modos:
+  - `NOTIFY_MODE=mock`: no envia; loga destino + contedo.
+  - `NOTIFY_MODE=terminal`: no envia; imprime preview (HTML do e-mail + texto do WhatsApp).
+  - `NOTIFY_MODE=real`: envia de verdade via provedor.
+
+### Endpoints de teste (apenas MASTER)
+- `POST /notifications/test-email`
+  - body: `{ "to": "email@exemplo.com", "subject": "Teste", "body": "Mensagem" }`
+- `POST /notifications/test-whatsapp`
+  - body: `{ "to": "+5511999999999", "body": "Mensagem" }`
 
 ## Fluxo principal (como testar)
 1. Abra `http://localhost:3000` (login nico).
@@ -132,7 +146,7 @@ Se o cliente no preencher os dados em 5 dias, o processo  cancelado automaticame
 
 ## Variveis de ambiente importantes
 
-### backend/api/.env
+### backend/api/.env (usado pela API e pelo Worker)
 ```
 DATABASE_URL=postgresql://fundarmf:fundarmf@localhost:5499/fundarmf?schema=public
 API_PORT=4000
@@ -147,25 +161,35 @@ RATE_LIMIT_MAX=1000
 UPLOAD_MAX_FILE_MB=8
 UPLOAD_MAX_FILES_PER_ITEM=12
 UPLOAD_MAX_TOTAL_MB=60
-FRONTEND_URL=http://localhost:3000
-EMAIL_FROM=contato@fundarmf.com.br
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=SEU_USER
-SMTP_PASS=SEU_PASS
-EMAIL_PROVIDER=smtp
-RESEND_API_KEY=
-WHATSAPP_BRAND=MF Contabilidade
-COMPANY_NAME=MF Contabilidade
-COMPANY_LOCATION=Bahia, Brazil
-```
-
-### backend/worker/.env
-```
-DATABASE_URL=postgresql://fundarmf:fundarmf@localhost:5499/fundarmf?schema=public
-WORKER_CONCURRENCY=3
-WORKER_CANCEL_INACTIVE_EVERY_MS=3600000
-```
+  FRONTEND_URL=http://localhost:3000
+  EMAIL_FROM=contato@fundarmf.com.br
+  EMAIL_REPLY_TO=
+  SMTP_HOST=smtp.gmail.com
+  SMTP_PORT=587
+  SMTP_USER=SEU_USER
+  SMTP_PASS=SEU_PASS
+  EMAIL_PROVIDER=smtp
+  RESEND_API_KEY=
+  NOTIFY_MODE=mock
+  NOTIFY_EMAIL_ENABLED=true
+  NOTIFY_WHATSAPP_ENABLED=true
+  NOTIFY_RETRY_LIMIT=5
+  NOTIFY_RETRY_DELAY_MS=60000
+  NOTIFY_RETRY_BACKOFF=true
+  NOTIFY_SEND_TIMEOUT_MS=15000
+  NOTIFY_TEMPLATE_DIR=
+  WHATSAPP_BRAND=MF Contabilidade
+  COMPANY_NAME=MF Contabilidade
+  COMPANY_LOCATION=Bahia, Brazil
+  WORKER_AUTO_ASSIGN_EVERY_MS=3600000
+  WORKER_SLA_CHECK_EVERY_MS=3600000
+  WORKER_REPORTS_EVERY_MS=3600000
+  WORKER_CANCEL_INACTIVE_EVERY_MS=3600000
+  WORKER_CONCURRENCY=3
+  ```
+  
+  ### backend/worker/.env
+  No usado. O Worker l as mesmas variveis do `backend/api/.env`.
 
 ### frontend/.env
 ```
@@ -289,17 +313,33 @@ pnpm install && pnpm build
 ### Backend no Render
 1. Crie um novo servio Web (Node).
 2. Defina a raiz como `backend`.
-3. Variveis de ambiente necessrias:
-   - `DATABASE_URL`
-   - `SESSION_SECRET`
-   - `FRONTEND_URL`
-   - `COOKIE_SECURE=true`
-   - `OTP_TTL_MINUTES=1440`
-   - `LINK_TTL_HOURS=120`
-   - **Para e-mail (sem SMTP):**
-     - `EMAIL_PROVIDER=resend`
-     - `RESEND_API_KEY=...`
-     - `EMAIL_FROM=seu-dominio-validado@...`
+  3. Variveis de ambiente necessrias:
+     - `DATABASE_URL`
+     - `SESSION_SECRET`
+     - `FRONTEND_URL`
+     - `COOKIE_SECURE=true`
+     - `OTP_TTL_MINUTES=1440`
+     - `LINK_TTL_HOURS=120`
+     - **Notificaes (fila + worker):**
+       - `NOTIFY_MODE=real`
+       - `NOTIFY_EMAIL_ENABLED=true`
+       - `NOTIFY_WHATSAPP_ENABLED=true`
+     - **Para e-mail (Resend - sem domnio prprio):**
+       - `EMAIL_PROVIDER=resend`
+       - `RESEND_API_KEY=...`
+       - `EMAIL_FROM=seu-remetente-compartilhado@...`
+     - **Para e-mail (SMTP - alternativa):**
+       - `EMAIL_PROVIDER=smtp`
+       - `SMTP_HOST=...`
+       - `SMTP_PORT=587`
+       - `SMTP_USER=...`
+       - `SMTP_PASS=...`
+       - `EMAIL_FROM=...`
+     - **Para WhatsApp (Twilio Sandbox):**
+       - `WHATSAPP_PROVIDER=twilio`
+       - `TWILIO_ACCOUNT_SID=...`
+       - `TWILIO_AUTH_TOKEN=...`
+       - `TWILIO_WHATSAPP_FROM=whatsapp:+14155238886`
 4. Build command:
 ```
 pnpm install && pnpm deploy:render
@@ -312,10 +352,15 @@ pnpm --filter fundarmf-api start
 ### Worker no Render
 1. Crie um Worker Service.
 2. Defina a raiz como `backend`.
-3. Variveis:
-   - `DATABASE_URL`
-   - `WORKER_CONCURRENCY`
-   - `WORKER_CANCEL_INACTIVE_EVERY_MS=3600000`
+  3. Variveis:
+     - `DATABASE_URL`
+     - `WORKER_CONCURRENCY`
+     - `WORKER_CANCEL_INACTIVE_EVERY_MS=3600000`
+     - `NOTIFY_MODE=real` (ou `terminal` / `mock`)
+     - `NOTIFY_EMAIL_ENABLED=true`
+     - `NOTIFY_WHATSAPP_ENABLED=true`
+     - `EMAIL_PROVIDER` + credenciais (Resend ou SMTP)
+     - `WHATSAPP_PROVIDER` + credenciais (Twilio Sandbox)
 4. Build command:
 ```
 pnpm install && pnpm --filter fundarmf-worker build

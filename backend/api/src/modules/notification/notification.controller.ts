@@ -1,9 +1,10 @@
-import { Controller, Get, Param, Patch, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { Request } from "express";
 import { AuthGuard } from "../../common/auth/auth.guard";
 import { RolesGuard } from "../../common/auth/roles.guard";
 import { Roles } from "../../common/auth/roles.decorator";
 import { NotificationService } from "./notification.service";
+import { TestEmailDto, TestWhatsAppDto } from "./notification-test.dto";
 
 @Controller("notifications")
 @UseGuards(AuthGuard, RolesGuard)
@@ -27,5 +28,19 @@ export class NotificationController {
   @Patch(":id/read")
   async markRead(@Param("id") id: string, @Req() req: Request) {
     return this.notificationService.markRead(req.actor!.userId!, id);
+  }
+
+  @Post("test-email")
+  @Roles("MASTER")
+  async sendTestEmail(@Body() dto: TestEmailDto) {
+    await this.notificationService.sendEmail(dto.to, dto.subject, dto.body);
+    return { ok: true };
+  }
+
+  @Post("test-whatsapp")
+  @Roles("MASTER")
+  async sendTestWhatsApp(@Body() dto: TestWhatsAppDto) {
+    await this.notificationService.sendWhatsApp(dto.to, dto.body);
+    return { ok: true };
   }
 }

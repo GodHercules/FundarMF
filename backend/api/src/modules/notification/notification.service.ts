@@ -1,7 +1,9 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../shared/prisma.service";
-import { EMAIL_PROVIDER, EmailProvider, WHATSAPP_PROVIDER, WhatsAppProvider } from "./notification.types";
 import { timeAsync } from "../../shared/perf";
+import { getRequestContext } from "../../shared/request-context";
+import { renderBaseEmail } from "./email.template";
+import { NotificationQueue } from "./notification.queue";
 
 export type InAppPayload = {
   userId: string;
@@ -14,19 +16,45 @@ export type InAppPayload = {
 @Injectable()
 export class NotificationService {
   constructor(
-    @Inject(EMAIL_PROVIDER)
-    private readonly emailProvider: EmailProvider,
-    @Inject(WHATSAPP_PROVIDER)
-    private readonly whatsappProvider: WhatsAppProvider,
+    private readonly queue: NotificationQueue,
     private readonly prisma: PrismaService
   ) {}
 
   async sendEmail(to: string, subject: string, body: string) {
-    await timeAsync("externalMs", () => this.emailProvider.sendEmail(to, subject, body));
+    try {
+      const { html, text } = renderBaseEmail({ title: subject, body });
+      const from = process.env.EMAIL_FROM ?? "no-reply@fundarmf.local";
+      const replyTo = process.env.EMAIL_REPLY_TO?.trim() || undefined;
+      const correlationId = getRequestContext()?.correlationId;
+      await timeAsync("externalMs", () =>
+        this.queue.enqueueEmail({
+          to,
+          subject,
+          text,
+          html,
+          from,
+          replyTo,
+          correlationId
+        })
+      );
+    } catch (err) {
+      console.error("[notify] sendEmail failed", err);
+    }
   }
 
   async sendWhatsApp(to: string, body: string) {
-    await timeAsync("externalMs", () => this.whatsappProvider.sendWhatsApp(to, body));
+    try {
+      const correlationId = getRequestContext()?.correlationId;
+      await timeAsync("externalMs", () =>
+        this.queue.enqueueWhatsApp({
+          to,
+          body,
+          correlationId
+        })
+      );
+    } catch (err) {
+      console.error("[notify] sendWhatsApp failed", err);
+    }
   }
 
   async createInApp(payload: InAppPayload) {

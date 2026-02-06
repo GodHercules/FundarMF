@@ -8,29 +8,43 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../shared/prisma.service");
-const notification_types_1 = require("./notification.types");
 const perf_1 = require("../../shared/perf");
+const request_context_1 = require("../../shared/request-context");
+const email_template_1 = require("./email.template");
+const notification_queue_1 = require("./notification.queue");
 let NotificationService = class NotificationService {
-    emailProvider;
-    whatsappProvider;
+    queue;
     prisma;
-    constructor(emailProvider, whatsappProvider, prisma) {
-        this.emailProvider = emailProvider;
-        this.whatsappProvider = whatsappProvider;
+    constructor(queue, prisma) {
+        this.queue = queue;
         this.prisma = prisma;
     }
     async sendEmail(to, subject, body) {
-        await (0, perf_1.timeAsync)("externalMs", () => this.emailProvider.sendEmail(to, subject, body));
+        const { html, text } = (0, email_template_1.renderBaseEmail)({ title: subject, body });
+        const from = process.env.EMAIL_FROM ?? "no-reply@fundarmf.local";
+        const replyTo = process.env.EMAIL_REPLY_TO?.trim() || undefined;
+        const correlationId = (0, request_context_1.getRequestContext)()?.correlationId;
+        await (0, perf_1.timeAsync)("externalMs", () => this.queue.enqueueEmail({
+            to,
+            subject,
+            text,
+            html,
+            from,
+            replyTo,
+            correlationId
+        }));
     }
     async sendWhatsApp(to, body) {
-        await (0, perf_1.timeAsync)("externalMs", () => this.whatsappProvider.sendWhatsApp(to, body));
+        const correlationId = (0, request_context_1.getRequestContext)()?.correlationId;
+        await (0, perf_1.timeAsync)("externalMs", () => this.queue.enqueueWhatsApp({
+            to,
+            body,
+            correlationId
+        }));
     }
     async createInApp(payload) {
         return this.prisma.userNotification.create({
@@ -69,8 +83,7 @@ let NotificationService = class NotificationService {
 exports.NotificationService = NotificationService;
 exports.NotificationService = NotificationService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, common_1.Inject)(notification_types_1.EMAIL_PROVIDER)),
-    __param(1, (0, common_1.Inject)(notification_types_1.WHATSAPP_PROVIDER)),
-    __metadata("design:paramtypes", [Object, Object, prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [notification_queue_1.NotificationQueue,
+        prisma_service_1.PrismaService])
 ], NotificationService);
 //# sourceMappingURL=notification.service.js.map

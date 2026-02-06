@@ -5,7 +5,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 require("dotenv/config");
 const pg_boss_1 = __importDefault(require("pg-boss"));
+const client_1 = require("@prisma/client");
 const jobs_1 = require("./jobs");
+const shared_1 = require("@fundarmf/shared");
+const dispatcher_1 = require("./notify/dispatcher");
 const toPositiveMs = (value, fallback) => {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
@@ -43,6 +46,11 @@ const jobs = [
         name: "generateReports",
         everyMs: toPositiveMs(process.env.WORKER_REPORTS_EVERY_MS, 3_600_000),
         handler: jobs_1.generateReports
+    },
+    {
+        name: "cancelInactiveProcesses",
+        everyMs: toPositiveMs(process.env.WORKER_CANCEL_INACTIVE_EVERY_MS, 3_600_000),
+        handler: jobs_1.cancelInactiveProcesses
     }
 ];
 const concurrency = (() => {
@@ -54,6 +62,8 @@ if (!connectionString) {
     throw new Error("DATABASE_URL is required for the worker.");
 }
 const boss = new pg_boss_1.default({ connectionString });
+const prisma = new client_1.PrismaClient();
+const dispatcher = new dispatcher_1.NotificationDispatcher(prisma);
 const setupJob = async (job) => {
     const cron = msToCron(job.everyMs);
     if (!cron) {
@@ -70,17 +80,33 @@ const setupJob = async (job) => {
     await boss.work(job.name, { teamSize: concurrency }, async () => job.handler());
     await boss.send(job.name);
 };
+const setupNotifyQueues = async () => {
+    await boss.createQueue(shared_1.NOTIFY_EMAIL_JOB);
+    await boss.createQueue(shared_1.NOTIFY_WHATSAPP_JOB);
+    await boss.work(shared_1.NOTIFY_EMAIL_JOB, { teamSize: concurrency, includeMetadata: true }, async (jobs) => {
+        for (const job of jobs) {
+            await dispatcher.handleEmail(job);
+        }
+    });
+    await boss.work(shared_1.NOTIFY_WHATSAPP_JOB, { teamSize: concurrency, includeMetadata: true }, async (jobs) => {
+        for (const job of jobs) {
+            await dispatcher.handleWhatsApp(job);
+        }
+    });
+};
 const bootstrap = async () => {
     boss.on("error", (err) => console.error("PgBoss error", err));
     await boss.start();
     for (const job of jobs) {
         await setupJob(job);
     }
+    await setupNotifyQueues();
     console.log("FundarMF worker running (pg-boss on Postgres).");
 };
 const shutdown = async () => {
     try {
         await boss.stop();
+        await prisma.$disconnect();
     }
     finally {
         process.exit(0);
