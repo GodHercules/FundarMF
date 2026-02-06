@@ -25,6 +25,16 @@ export class NotificationService {
     private readonly prisma: PrismaService
   ) {}
 
+  private async resolveAudience(email: string) {
+    try {
+      const user = await this.prisma.user.findUnique({ where: { email } });
+      if (!user) return "client";
+      return user.role === "MASTER" || user.role === "OPERATOR" ? "operator" : "client";
+    } catch {
+      return "unknown";
+    }
+  }
+
   async sendEmail(to: string, subject: string, body: string) {
     try {
       const inline = (process.env.NOTIFY_INLINE ?? "false") === "true";
@@ -49,6 +59,16 @@ export class NotificationService {
           })
         );
       }
+
+      const audience = await this.resolveAudience(to);
+      void this.sendWebhook({
+        channel: "email",
+        to,
+        subject,
+        body: text,
+        audience,
+        reason: "notification_sent"
+      });
     } catch (err) {
       console.error("[notify] sendEmail failed", err);
     }
@@ -79,9 +99,15 @@ export class NotificationService {
   async sendWebhook(payload: {
     email?: string;
     whatsapp?: string;
-    link: string;
+    link?: string;
     otp?: string;
     reason: string;
+    channel?: "email" | "whatsapp" | "system";
+    to?: string;
+    subject?: string;
+    body?: string;
+    audience?: "client" | "operator" | "unknown";
+    requestedBy?: { email?: string; role?: string };
   }) {
     const enabled = (process.env.N8N_WEBHOOK_ENABLED ?? "true") === "true";
     const url = process.env.N8N_WEBHOOK_URL;

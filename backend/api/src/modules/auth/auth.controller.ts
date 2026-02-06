@@ -17,8 +17,11 @@ export class AuthController {
   @Post("customer/request-link")
   @UseGuards(AuthGuard, RolesGuard)
   @Roles("OPERADOR", "MASTER")
-  async requestLink(@Body() dto: RequestLinkDto) {
-    return this.authService.requestCustomerLink(dto.email, dto.whatsapp, dto.nome);
+  async requestLink(@Req() req: Request, @Body() dto: RequestLinkDto) {
+    return this.authService.requestCustomerLink(dto.email, dto.whatsapp, dto.nome, {
+      email: req.actor?.email,
+      role: req.actor?.role
+    });
   }
 
   @Post("customer/verify")

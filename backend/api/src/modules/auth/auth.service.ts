@@ -70,7 +70,12 @@ export class AuthService {
     return lines.join("\n");
   }
 
-  async requestCustomerLink(email?: string, whatsapp?: string, name?: string) {
+  async requestCustomerLink(
+    email?: string,
+    whatsapp?: string,
+    name?: string,
+    requestedBy?: { email?: string; role?: string }
+  ) {
     if (!email && !whatsapp) {
       throw new BadRequestException("Informe e-mail ou WhatsApp.");
     }
@@ -127,7 +132,8 @@ export class AuthService {
       whatsapp: normalizedWhatsapp,
       link: linkUrl,
       otp,
-      reason: "link_created"
+      reason: "link_created",
+      requestedBy
     });
 
     await this.auditService.record(
@@ -217,7 +223,8 @@ export class AuthService {
       whatsapp: link.whatsapp ?? undefined,
       link: linkUrl,
       otp,
-      reason: "otp_resent"
+      reason: "otp_resent",
+      requestedBy: { email: link.email ?? undefined, role: "CLIENTE" }
     });
 
     await this.auditService.record(
