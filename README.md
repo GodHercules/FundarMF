@@ -146,10 +146,10 @@ Se o cliente no preencher os dados em 5 dias, o processo  cancelado automaticame
 
 ## Variveis de ambiente importantes
 
-### backend/api/.env (usado pela API e pelo Worker)
+### backend/.env (nico arquivo para API e Worker)
 ```
-DATABASE_URL=postgresql://fundarmf:fundarmf@localhost:5499/fundarmf?schema=public
-API_PORT=4000
+  DATABASE_URL=postgresql://fundarmf:fundarmf@localhost:5499/fundarmf?schema=public
+  API_PORT=4000
 SESSION_SECRET=change-me
 SESSION_TTL_HOURS=48
 SESSION_ROTATE_MINUTES=60
@@ -188,8 +188,8 @@ UPLOAD_MAX_TOTAL_MB=60
   WORKER_CONCURRENCY=3
   ```
   
-  ### backend/worker/.env
-  No usado. O Worker l as mesmas variveis do `backend/api/.env`.
+  ### backend/api/.env
+  No usado. A API l as mesmas variveis do `backend/.env`.
 
 ### frontend/.env
 ```

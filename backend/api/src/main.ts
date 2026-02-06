@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+import dotenv from "dotenv";
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
 import cookieParser from "cookie-parser";
@@ -9,6 +12,16 @@ import { requestContextMiddleware } from "./shared/request-context";
 import { RequestLoggingInterceptor } from "./shared/request-logging.interceptor";
 
 async function bootstrap() {
+  const backendEnv = path.join(process.cwd(), ".env");
+  const apiEnv = path.join(process.cwd(), "api", ".env");
+  if (fs.existsSync(backendEnv)) {
+    dotenv.config({ path: backendEnv });
+  } else if (fs.existsSync(apiEnv)) {
+    dotenv.config({ path: apiEnv });
+  } else {
+    dotenv.config();
+  }
+
   const app = await NestFactory.create(AppModule);
   app.use(requestContextMiddleware);
   app.use(helmet());

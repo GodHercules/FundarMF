@@ -11,7 +11,7 @@ import { EmailJobPayload, WhatsAppJobPayload } from "./notify/types";
 const candidateEnvPaths = [
   path.join(process.cwd(), ".env"),
   path.join(process.cwd(), "api", ".env"),
-  path.join(process.cwd(), "..", "api", ".env")
+  path.join(process.cwd(), "..", ".env")
 ];
 
 const envPath = candidateEnvPaths.find((candidate) => fs.existsSync(candidate));
