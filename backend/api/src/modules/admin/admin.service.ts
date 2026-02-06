@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import bcrypt from "bcryptjs";
 import { PrismaService } from "../../shared/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { timeAsync } from "../../shared/perf";
 
 @Injectable()
 export class AdminService {
@@ -32,7 +33,7 @@ export class AdminService {
       throw new BadRequestException("E-mail j cadastrado.");
     }
     this.ensureStrongPassword(password);
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await timeAsync("hashMs", () => bcrypt.hash(password, 10));
     return this.prisma.user.create({
       data: {
         email,
@@ -51,6 +52,18 @@ export class AdminService {
     }
     if (user.role !== "OPERATOR") {
       throw new BadRequestException("Apenas operadores podem ser removidos.");
+    }
+
+    const activeProcesses = await this.prisma.process.count({
+      where: {
+        ownerId: userId,
+        status: { notIn: ["CONCLUIDO", "CANCELADO"] }
+      }
+    });
+    if (activeProcesses > 0) {
+      throw new ConflictException(
+        "Operador possui processo(s) em andamento. Exclua os processos em andamento antes de remover o operador."
+      );
     }
 
     await this.prisma.$transaction(async (tx) => {

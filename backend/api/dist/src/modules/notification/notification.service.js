@@ -16,6 +16,7 @@ exports.NotificationService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../shared/prisma.service");
 const notification_types_1 = require("./notification.types");
+const perf_1 = require("../../shared/perf");
 let NotificationService = class NotificationService {
     emailProvider;
     whatsappProvider;
@@ -26,10 +27,10 @@ let NotificationService = class NotificationService {
         this.prisma = prisma;
     }
     async sendEmail(to, subject, body) {
-        await this.emailProvider.sendEmail(to, subject, body);
+        await (0, perf_1.timeAsync)("externalMs", () => this.emailProvider.sendEmail(to, subject, body));
     }
     async sendWhatsApp(to, body) {
-        await this.whatsappProvider.sendWhatsApp(to, body);
+        await (0, perf_1.timeAsync)("externalMs", () => this.whatsappProvider.sendWhatsApp(to, body));
     }
     async createInApp(payload) {
         return this.prisma.userNotification.create({

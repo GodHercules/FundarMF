@@ -21,6 +21,7 @@ const prisma_service_1 = require("../../shared/prisma.service");
 const session_service_1 = require("./session.service");
 const notification_service_1 = require("../notification/notification.service");
 const audit_service_1 = require("../audit/audit.service");
+const perf_1 = require("../../shared/perf");
 let AuthService = class AuthService {
     prisma;
     sessionService;
@@ -104,11 +105,15 @@ let AuthService = class AuthService {
             }
         });
         const linkUrl = `${process.env.FRONTEND_URL ?? "http://localhost:3000"}/client/link?token=${token}`;
+        const notifyTasks = [];
         if (email) {
-            await this.notificationService.sendEmail(email, "Seu acesso ao FundarMF", this.buildCustomerAccessEmail(linkUrl, otp, name));
+            notifyTasks.push(this.notificationService.sendEmail(email, "Seu acesso ao FundarMF", this.buildCustomerAccessEmail(linkUrl, otp, name)));
         }
         if (normalizedWhatsapp) {
-            await this.notificationService.sendWhatsApp(normalizedWhatsapp, this.buildCustomerAccessWhatsApp(linkUrl, otp, name));
+            notifyTasks.push(this.notificationService.sendWhatsApp(normalizedWhatsapp, this.buildCustomerAccessWhatsApp(linkUrl, otp, name)));
+        }
+        if (notifyTasks.length > 0) {
+            await Promise.all(notifyTasks);
         }
         await this.auditService.record({ role: "SYSTEM" }, "customer_link_requested", "CustomerLinkToken", undefined, { email, whatsapp: normalizedWhatsapp });
         return { otpRequired: true };
@@ -179,7 +184,7 @@ let AuthService = class AuthService {
         if (!user || user.role !== role || !user.active) {
             throw new common_1.UnauthorizedException("Credenciais inválidas.");
         }
-        const ok = await bcryptjs_1.default.compare(password, user.passwordHash);
+        const ok = await (0, perf_1.timeAsync)("hashMs", () => bcryptjs_1.default.compare(password, user.passwordHash));
         if (!ok) {
             throw new common_1.UnauthorizedException("Credenciais inválidas.");
         }
@@ -193,7 +198,7 @@ let AuthService = class AuthService {
         if (!user || !user.active) {
             throw new common_1.UnauthorizedException("Credenciais inválidas.");
         }
-        const ok = await bcryptjs_1.default.compare(password, user.passwordHash);
+        const ok = await (0, perf_1.timeAsync)("hashMs", () => bcryptjs_1.default.compare(password, user.passwordHash));
         if (!ok) {
             throw new common_1.UnauthorizedException("Credenciais inválidas.");
         }

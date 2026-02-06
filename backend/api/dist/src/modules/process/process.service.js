@@ -72,8 +72,10 @@ let ProcessService = class ProcessService {
             body: payload.body,
             type: payload.type
         });
-        await this.notificationService.sendEmail(owner.email, payload.title, payload.body);
-        await this.notificationService.sendWhatsApp(owner.whatsapp ?? owner.email, payload.body);
+        await Promise.all([
+            this.notificationService.sendEmail(owner.email, payload.title, payload.body),
+            this.notificationService.sendWhatsApp(owner.whatsapp ?? owner.email, payload.body)
+        ]);
     }
     buildChecklistData() {
         return {
@@ -492,8 +494,10 @@ let ProcessService = class ProcessService {
                 data: { status: client_1.ProcessStatus.CONCLUIDO, currentStep: stepKey }
             });
             await this.slaService.stopAll(processId);
-            await this.notificationService.sendEmail(process.clientEmail, "Processo concluído", "Seu processo foi concluído com sucesso.");
-            await this.notificationService.sendWhatsApp(process.clientPhone ?? process.clientEmail, "Processo concluído.");
+            await Promise.all([
+                this.notificationService.sendEmail(process.clientEmail, "Processo concluído", "Seu processo foi concluído com sucesso."),
+                this.notificationService.sendWhatsApp(process.clientPhone ?? process.clientEmail, "Processo concluído.")
+            ]);
             await this.auditService.record(actor, "process_completed", "Process", processId);
             return { ok: true, status: "CONCLUIDO" };
         }
@@ -545,8 +549,10 @@ let ProcessService = class ProcessService {
         });
         await this.slaService.stopSla(processId, stepKey, "OPERADOR");
         await this.slaService.startSla(processId, stepKey, "CLIENTE");
-        await this.notificationService.sendEmail(process.clientEmail, "Correção solicitada", `Correção solicitada na ${stepKey}: ${reason}`);
-        await this.notificationService.sendWhatsApp(process.clientPhone ?? process.clientEmail, `Correção solicitada na ${stepKey}: ${reason}`);
+        await Promise.all([
+            this.notificationService.sendEmail(process.clientEmail, "Correção solicitada", `Correção solicitada na ${stepKey}: ${reason}`),
+            this.notificationService.sendWhatsApp(process.clientPhone ?? process.clientEmail, `Correção solicitada na ${stepKey}: ${reason}`)
+        ]);
         await this.notifyOwner(processId, process.ownerId ?? null, {
             title: "Correção solicitada",
             body: `Correção solicitada na ${stepKey} para ${process.clientEmail}.`,
@@ -586,8 +592,10 @@ let ProcessService = class ProcessService {
             data: { locked: true }
         });
         await this.slaService.stopAll(processId);
-        await this.notificationService.sendEmail(process.clientEmail, "Processo cancelado", `Seu processo foi cancelado. Motivo: ${reason}`);
-        await this.notificationService.sendWhatsApp(process.clientPhone ?? process.clientEmail, `Processo cancelado. Motivo: ${reason}`);
+        await Promise.all([
+            this.notificationService.sendEmail(process.clientEmail, "Processo cancelado", `Seu processo foi cancelado. Motivo: ${reason}`),
+            this.notificationService.sendWhatsApp(process.clientPhone ?? process.clientEmail, `Processo cancelado. Motivo: ${reason}`)
+        ]);
         await this.auditService.record(actor, "process_cancelled", "Process", processId, { reason });
         return { ok: true };
     }

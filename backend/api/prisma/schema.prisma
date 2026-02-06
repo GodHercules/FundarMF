@@ -113,6 +113,11 @@ model Process {
   slaEvents     SlaEvent[]
   reports       Report[]
   notifications UserNotification[]
+
+  @@index([ownerId, createdAt])
+  @@index([clientEmail, createdAt])
+  @@index([clientPhone, createdAt])
+  @@index([status, createdAt])
 }
 
 model ProcessStep {

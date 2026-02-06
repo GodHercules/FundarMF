@@ -12,6 +12,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.RolesGuard = exports.ROLES_KEY = void 0;
 const common_1 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
+const node_perf_hooks_1 = require("node:perf_hooks");
+const request_context_1 = require("../../shared/request-context");
 exports.ROLES_KEY = "roles";
 let RolesGuard = class RolesGuard {
     reflector;
@@ -19,19 +21,24 @@ let RolesGuard = class RolesGuard {
         this.reflector = reflector;
     }
     canActivate(context) {
+        const start = node_perf_hooks_1.performance.now();
         const roles = this.reflector.getAllAndOverride(exports.ROLES_KEY, [
             context.getHandler(),
             context.getClass()
         ]);
         if (!roles || roles.length === 0) {
+            (0, request_context_1.addPerfTime)("rolesGuardMs", node_perf_hooks_1.performance.now() - start);
             return true;
         }
         const request = context.switchToHttp().getRequest();
         const actor = request.actor;
         if (!actor) {
+            (0, request_context_1.addPerfTime)("rolesGuardMs", node_perf_hooks_1.performance.now() - start);
             return false;
         }
-        return roles.includes(actor.role);
+        const result = roles.includes(actor.role);
+        (0, request_context_1.addPerfTime)("rolesGuardMs", node_perf_hooks_1.performance.now() - start);
+        return result;
     }
 };
 exports.RolesGuard = RolesGuard;

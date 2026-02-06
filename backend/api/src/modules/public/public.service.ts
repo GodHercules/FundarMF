@@ -2,6 +2,7 @@ import dayjs from "dayjs";
 import { Injectable } from "@nestjs/common";
 import { DocumentItemStatus, ProcessStatus, SlaStatus } from "@prisma/client";
 import { PrismaService } from "../../shared/prisma.service";
+import { timeAsync } from "../../shared/perf";
 
 type MunicipalityCache = {
   value: string[];
@@ -50,9 +51,11 @@ export class PublicService {
     }
 
     try {
-      const response = await fetch("https://servicodados.ibge.gov.br/api/v1/localidades/municipios", {
-        headers: { Accept: "application/json" }
-      });
+      const response = await timeAsync("externalMs", () =>
+        fetch("https://servicodados.ibge.gov.br/api/v1/localidades/municipios", {
+          headers: { Accept: "application/json" }
+        })
+      );
       if (!response.ok) {
         throw new Error("IBGE unavailable");
       }

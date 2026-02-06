@@ -10,8 +10,11 @@ const helmet_1 = __importDefault(require("helmet"));
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const swagger_1 = require("@nestjs/swagger");
 const app_module_1 = require("./modules/app.module");
+const request_context_1 = require("./shared/request-context");
+const request_logging_interceptor_1 = require("./shared/request-logging.interceptor");
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
+    app.use(request_context_1.requestContextMiddleware);
     app.use((0, helmet_1.default)());
     app.use((0, cookie_parser_1.default)());
     app.enableCors({
@@ -28,6 +31,7 @@ async function bootstrap() {
         whitelist: true,
         transform: true
     }));
+    app.useGlobalInterceptors(new request_logging_interceptor_1.RequestLoggingInterceptor());
     const config = new swagger_1.DocumentBuilder()
         .setTitle("FundarMF API")
         .setDescription("Workflow de abertura de empresa")

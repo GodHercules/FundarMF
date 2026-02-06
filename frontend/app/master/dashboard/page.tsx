@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { Card } from "@/components/Card";
@@ -11,6 +11,7 @@ import { Input } from "@/components/Input";
 import { PhoneInput } from "@/components/PhoneInput";
 import { PasswordField } from "@/components/PasswordField";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { logClientPerf } from "@/lib/perf";
 
 export default function MasterDashboard() {
   const [processes, setProcesses] = useState<any[]>([]);
@@ -26,6 +27,14 @@ export default function MasterDashboard() {
   const [userOffset, setUserOffset] = useState(0);
   const [hasMoreProcesses, setHasMoreProcesses] = useState(true);
   const [hasMoreUsers, setHasMoreUsers] = useState(true);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const initialLoadStart = useRef<number | null>(null);
+  const [processToDelete, setProcessToDelete] = useState<any | null>(null);
+  const [operatorToDelete, setOperatorToDelete] = useState<any | null>(null);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [confirmProcessText, setConfirmProcessText] = useState("");
+  const [confirmOperatorText, setConfirmOperatorText] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const processPageSize = 8;
   const userPageSize = 10;
@@ -63,11 +72,23 @@ export default function MasterDashboard() {
 
   async function loadAll() {
     await Promise.all([loadProcesses(0, false), loadUsers(0, false), loadUnassigned()]);
+    setInitialLoadDone(true);
   }
 
   useEffect(() => {
+    initialLoadStart.current = typeof performance !== "undefined" ? performance.now() : Date.now();
     loadAll();
   }, []);
+
+  useEffect(() => {
+    if (!initialLoadDone) return;
+    const start = initialLoadStart.current;
+    if (!start) return;
+    logClientPerf("page_ready", {
+      page: "master/dashboard",
+      readyMs: Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - start)
+    });
+  }, [initialLoadDone]);
 
   function passwordIsAcceptable(value: string) {
     const hasMin = value.length >= 6;
@@ -132,6 +153,52 @@ export default function MasterDashboard() {
     }
   }
 
+  async function handleDeleteProcess() {
+    if (!processToDelete) return;
+    if (confirmProcessText.trim().toUpperCase() !== "EXCLUIR") {
+      notifyError("Digite EXCLUIR para confirmar.");
+      return;
+    }
+    setDeleting(true);
+    try {
+      await api(`/admin/processes/${processToDelete.id}`, {
+        method: "DELETE",
+        body: JSON.stringify({ reason: deleteReason || undefined })
+      });
+      notifySuccess("Processo excluído permanentemente.");
+      setProcessToDelete(null);
+      setConfirmProcessText("");
+      setDeleteReason("");
+      await Promise.all([loadProcesses(0, false), loadUnassigned()]);
+    } catch {
+      // handled by api notify
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function handleDeleteOperator() {
+    if (!operatorToDelete) return;
+    if (confirmOperatorText.trim().toUpperCase() !== "EXCLUIR") {
+      notifyError("Digite EXCLUIR para confirmar.");
+      return;
+    }
+    setDeleting(true);
+    try {
+      await api(`/admin/users/${operatorToDelete.id}`, {
+        method: "DELETE"
+      });
+      notifySuccess("Operador excluído permanentemente.");
+      setOperatorToDelete(null);
+      setConfirmOperatorText("");
+      await loadUsers(0, false);
+    } catch {
+      // handled by api notify
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <main className="app-container flex min-h-screen flex-col gap-8 py-12">
       <Link href="/" className="text-sm font-semibold text-slate">
@@ -170,8 +237,19 @@ export default function MasterDashboard() {
           <div className="mt-4 space-y-3">
             {users.map((user) => (
               <div key={user.id} className="flex items-center justify-between">
-                <span className="text-sm text-slate">{user.name}</span>
-                <span className="text-xs text-slate">{user.role === "OPERATOR" ? "OPERADOR" : "MASTER"}</span>
+                <div className="flex flex-col">
+                  <span className="text-sm text-slate">{user.name}</span>
+                  <span className="text-xs text-slate">{user.role === "OPERATOR" ? "OPERADOR" : "MASTER"}</span>
+                </div>
+                {user.role === "OPERATOR" && (
+                  <button
+                    type="button"
+                    className="rounded-full border border-ink/15 px-3 py-1 text-xs font-semibold text-ink hover:border-brass"
+                    onClick={() => setOperatorToDelete(user)}
+                  >
+                    Excluir
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -216,6 +294,13 @@ export default function MasterDashboard() {
                     </option>
                   ))}
               </select>
+              <button
+                type="button"
+                className="rounded-xl border border-ink/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink hover:border-brass"
+                onClick={() => setProcessToDelete(process)}
+              >
+                Excluir processo
+              </button>
             </div>
           </Card>
         ))}
@@ -290,6 +375,84 @@ export default function MasterDashboard() {
                 Criar operador
               </Button>
               {message && <p className="text-sm text-slate">{message}</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {processToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4 py-6">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-soft md:max-w-xl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Excluir processo</h2>
+              <button
+                type="button"
+                className="rounded-full bg-slate/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate"
+                onClick={() => {
+                  setProcessToDelete(null);
+                  setConfirmProcessText("");
+                  setDeleteReason("");
+                }}
+              >
+                Fechar
+              </button>
+            </div>
+            <p className="mt-2 text-sm text-slate">
+              Esta ação é permanente. Digite <strong>EXCLUIR</strong> para confirmar.
+            </p>
+            <div className="mt-4 grid gap-4">
+              <Input
+                placeholder="Motivo (opcional)"
+                value={deleteReason}
+                onChange={(event) => setDeleteReason(event.target.value)}
+              />
+              <Input
+                placeholder="Digite EXCLUIR para confirmar"
+                value={confirmProcessText}
+                onChange={(event) => setConfirmProcessText(event.target.value)}
+              />
+            </div>
+            <div className="mt-5 flex items-center justify-between">
+              <Button className="bg-ink" onClick={handleDeleteProcess} disabled={deleting}>
+                {deleting ? "Excluindo..." : "Excluir definitivamente"}
+              </Button>
+              <span className="text-xs text-slate">Processo: {processToDelete.id}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {operatorToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4 py-6">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-soft md:max-w-xl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Excluir operador</h2>
+              <button
+                type="button"
+                className="rounded-full bg-slate/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate"
+                onClick={() => {
+                  setOperatorToDelete(null);
+                  setConfirmOperatorText("");
+                }}
+              >
+                Fechar
+              </button>
+            </div>
+            <p className="mt-2 text-sm text-slate">
+              Esta ação é permanente. Digite <strong>EXCLUIR</strong> para confirmar.
+            </p>
+            <div className="mt-4 grid gap-4">
+              <Input
+                placeholder="Digite EXCLUIR para confirmar"
+                value={confirmOperatorText}
+                onChange={(event) => setConfirmOperatorText(event.target.value)}
+              />
+            </div>
+            <div className="mt-5 flex items-center justify-between">
+              <Button className="bg-ink" onClick={handleDeleteOperator} disabled={deleting}>
+                {deleting ? "Excluindo..." : "Excluir definitivamente"}
+              </Button>
+              <span className="text-xs text-slate">{operatorToDelete.name}</span>
             </div>
           </div>
         </div>

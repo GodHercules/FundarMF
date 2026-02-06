@@ -17,6 +17,7 @@ const dayjs_1 = __importDefault(require("dayjs"));
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../../shared/prisma.service");
+const perf_1 = require("../../shared/perf");
 let municipalitiesCache = null;
 let PublicService = class PublicService {
     prisma;
@@ -55,9 +56,9 @@ let PublicService = class PublicService {
             return { items: municipalitiesCache.value, cached: true };
         }
         try {
-            const response = await fetch("https://servicodados.ibge.gov.br/api/v1/localidades/municipios", {
+            const response = await (0, perf_1.timeAsync)("externalMs", () => fetch("https://servicodados.ibge.gov.br/api/v1/localidades/municipios", {
                 headers: { Accept: "application/json" }
-            });
+            }));
             if (!response.ok) {
                 throw new Error("IBGE unavailable");
             }

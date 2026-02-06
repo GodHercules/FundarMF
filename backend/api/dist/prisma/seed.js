@@ -7,12 +7,17 @@ const client_1 = require("@prisma/client");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const prisma = new client_1.PrismaClient();
 async function main() {
-    const passwordHash = await bcryptjs_1.default.hash("Master@123", 10);
+    const passwordHash = await bcryptjs_1.default.hash("Fundar0502MF", 10);
     const master = await prisma.user.upsert({
-        where: { email: "master@fundarmf.local" },
-        update: {},
+        where: { email: "master@fundarmf.com.br" },
+        update: {
+            name: "Master Admin",
+            whatsapp: "+55 71 98888-0000",
+            passwordHash,
+            role: "MASTER"
+        },
         create: {
-            email: "master@fundarmf.local",
+            email: "master@fundarmf.com.br",
             name: "Master Admin",
             whatsapp: "+55 71 98888-0000",
             passwordHash,

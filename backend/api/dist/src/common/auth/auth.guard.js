@@ -8,10 +8,15 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthGuard = void 0;
 const common_1 = require("@nestjs/common");
+const node_perf_hooks_1 = require("node:perf_hooks");
+const request_context_1 = require("../../shared/request-context");
 let AuthGuard = class AuthGuard {
     canActivate(context) {
+        const start = node_perf_hooks_1.performance.now();
         const request = context.switchToHttp().getRequest();
-        return Boolean(request.actor);
+        const result = Boolean(request.actor);
+        (0, request_context_1.addPerfTime)("authGuardMs", node_perf_hooks_1.performance.now() - start);
+        return result;
     }
 };
 exports.AuthGuard = AuthGuard;

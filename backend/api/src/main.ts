@@ -5,9 +5,12 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./modules/app.module";
+import { requestContextMiddleware } from "./shared/request-context";
+import { RequestLoggingInterceptor } from "./shared/request-logging.interceptor";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.use(requestContextMiddleware);
   app.use(helmet());
   app.use(cookieParser());
   app.enableCors({
@@ -30,6 +33,7 @@ async function bootstrap() {
       transform: true
     })
   );
+  app.useGlobalInterceptors(new RequestLoggingInterceptor());
 
   const config = new DocumentBuilder()
     .setTitle("FundarMF API")

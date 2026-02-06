@@ -7,6 +7,7 @@ import { SessionService } from "./session.service";
 import { NotificationService } from "../notification/notification.service";
 import { AuditService } from "../audit/audit.service";
 import { Actor } from "../../common/auth/types";
+import { timeAsync } from "../../shared/perf";
 
 @Injectable()
 export class AuthService {
@@ -99,19 +100,26 @@ export class AuthService {
 
     const linkUrl = `${process.env.FRONTEND_URL ?? "http://localhost:3000"}/client/link?token=${token}`;
 
+    const notifyTasks: Promise<unknown>[] = [];
     if (email) {
-      await this.notificationService.sendEmail(
-        email,
-        "Seu acesso ao FundarMF",
-        this.buildCustomerAccessEmail(linkUrl, otp, name)
+      notifyTasks.push(
+        this.notificationService.sendEmail(
+          email,
+          "Seu acesso ao FundarMF",
+          this.buildCustomerAccessEmail(linkUrl, otp, name)
+        )
       );
     }
-
     if (normalizedWhatsapp) {
-      await this.notificationService.sendWhatsApp(
-        normalizedWhatsapp,
-        this.buildCustomerAccessWhatsApp(linkUrl, otp, name)
+      notifyTasks.push(
+        this.notificationService.sendWhatsApp(
+          normalizedWhatsapp,
+          this.buildCustomerAccessWhatsApp(linkUrl, otp, name)
+        )
       );
+    }
+    if (notifyTasks.length > 0) {
+      await Promise.all(notifyTasks);
     }
 
     await this.auditService.record(
@@ -194,11 +202,7 @@ export class AuthService {
     });
 
     const linkUrl = `${process.env.FRONTEND_URL ?? "http://localhost:3000"}/client/link?token=${token}`;
-    await this.notificationService.sendEmail(
-      link.email,
-      "Seu novo OTP do FundarMF",
-      this.buildCustomerAccessEmail(linkUrl, otp)
-    );
+    await this.notificationService.sendEmail(link.email, "Seu novo OTP do FundarMF", this.buildCustomerAccessEmail(linkUrl, otp));
 
     await this.auditService.record(
       { role: "SYSTEM" },
@@ -217,7 +221,7 @@ export class AuthService {
       throw new UnauthorizedException("Credenciais inválidas.");
     }
 
-    const ok = await bcrypt.compare(password, user.passwordHash);
+    const ok = await timeAsync("hashMs", () => bcrypt.compare(password, user.passwordHash));
     if (!ok) {
       throw new UnauthorizedException("Credenciais inválidas.");
     }
@@ -236,7 +240,7 @@ export class AuthService {
       throw new UnauthorizedException("Credenciais inválidas.");
     }
 
-    const ok = await bcrypt.compare(password, user.passwordHash);
+    const ok = await timeAsync("hashMs", () => bcrypt.compare(password, user.passwordHash));
     if (!ok) {
       throw new UnauthorizedException("Credenciais inválidas.");
     }

@@ -1,16 +1,39 @@
 ﻿export const API_BASE = "/api";
 
 import { notifyError } from "@/lib/notify";
+import { logClientPerf } from "@/lib/perf";
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   try {
-    const response = await fetch(`${API_BASE}${path}`, {
+    const requestUrl = `${API_BASE}${path}`;
+    const perfUrl =
+      typeof window !== "undefined" ? new URL(requestUrl, window.location.origin).toString() : requestUrl;
+    const start = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const response = await fetch(requestUrl, {
       ...options,
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
         ...(options.headers ?? {})
       }
+    });
+    const end = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const method = options.method ?? "GET";
+    let ttfbMs: number | undefined;
+    if (typeof performance !== "undefined" && "getEntriesByName" in performance) {
+      const entries = performance.getEntriesByName(perfUrl);
+      const lastEntry = entries[entries.length - 1] as PerformanceResourceTiming | undefined;
+      if (lastEntry && "responseStart" in lastEntry) {
+        ttfbMs = Math.round(lastEntry.responseStart - lastEntry.startTime);
+      }
+    }
+    logClientPerf("api_request", {
+      path,
+      method,
+      status: response.status,
+      totalMs: Math.round(end - start),
+      ttfbMs,
+      correlationId: response.headers.get("x-correlation-id") ?? undefined
     });
 
     if (!response.ok) {

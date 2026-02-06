@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../shared/prisma.service";
 import { EMAIL_PROVIDER, EmailProvider, WHATSAPP_PROVIDER, WhatsAppProvider } from "./notification.types";
+import { timeAsync } from "../../shared/perf";
 
 export type InAppPayload = {
   userId: string;
@@ -21,11 +22,11 @@ export class NotificationService {
   ) {}
 
   async sendEmail(to: string, subject: string, body: string) {
-    await this.emailProvider.sendEmail(to, subject, body);
+    await timeAsync("externalMs", () => this.emailProvider.sendEmail(to, subject, body));
   }
 
   async sendWhatsApp(to: string, body: string) {
-    await this.whatsappProvider.sendWhatsApp(to, body);
+    await timeAsync("externalMs", () => this.whatsappProvider.sendWhatsApp(to, body));
   }
 
   async createInApp(payload: InAppPayload) {
