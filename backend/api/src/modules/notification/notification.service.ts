@@ -76,6 +76,48 @@ export class NotificationService {
     }
   }
 
+  async sendWebhook(payload: {
+    email?: string;
+    whatsapp?: string;
+    link: string;
+    otp?: string;
+    reason: string;
+  }) {
+    const enabled = (process.env.N8N_WEBHOOK_ENABLED ?? "true") === "true";
+    const url = process.env.N8N_WEBHOOK_URL;
+    if (!enabled || !url) return;
+
+    const correlationId = getRequestContext()?.correlationId;
+    const secret = process.env.N8N_WEBHOOK_SECRET;
+    const controller = new AbortController();
+    const timeoutMs = Number(process.env.N8N_WEBHOOK_TIMEOUT_MS ?? 5000);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(secret ? { "x-webhook-secret": secret } : {}),
+          ...(correlationId ? { "x-correlation-id": correlationId } : {})
+        },
+        body: JSON.stringify({
+          ...payload,
+          correlationId
+        }),
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        console.warn("[notify] webhook failed", response.status, text);
+      }
+    } catch (err) {
+      console.warn("[notify] webhook error", err);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   async createInApp(payload: InAppPayload) {
     return this.prisma.userNotification.create({
       data: {
