@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.FakeWhatsAppProvider = exports.MockEmailProvider = void 0;
+exports.TerminalWhatsAppProvider = exports.FakeWhatsAppProvider = exports.TerminalEmailProvider = exports.MockEmailProvider = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../shared/prisma.service");
 let MockEmailProvider = class MockEmailProvider {
@@ -35,6 +35,29 @@ exports.MockEmailProvider = MockEmailProvider = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], MockEmailProvider);
+let TerminalEmailProvider = class TerminalEmailProvider {
+    async sendEmail(to, subject, body) {
+        const htmlPreview = body
+            .split("\n")
+            .map((line) => line.trim())
+            .map((line) => (line ? `<p style="margin:0 0 8px;">${line}</p>` : "<br/>"))
+            .join("");
+        console.log("----- EMAIL (terminal mode) -----");
+        console.log(`To: ${to}`);
+        console.log(`Subject: ${subject}`);
+        console.log("");
+        console.log("HTML:");
+        console.log(htmlPreview);
+        console.log("");
+        console.log("Text:");
+        console.log(body);
+        console.log("--------------------------------");
+    }
+};
+exports.TerminalEmailProvider = TerminalEmailProvider;
+exports.TerminalEmailProvider = TerminalEmailProvider = __decorate([
+    (0, common_1.Injectable)()
+], TerminalEmailProvider);
 let FakeWhatsAppProvider = class FakeWhatsAppProvider {
     prisma;
     constructor(prisma) {
@@ -58,4 +81,17 @@ exports.FakeWhatsAppProvider = FakeWhatsAppProvider = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], FakeWhatsAppProvider);
+let TerminalWhatsAppProvider = class TerminalWhatsAppProvider {
+    async sendWhatsApp(to, body) {
+        console.log("----- WHATSAPP (terminal mode) -----");
+        console.log(`To: ${to}`);
+        console.log("");
+        console.log(body);
+        console.log("-----------------------------------");
+    }
+};
+exports.TerminalWhatsAppProvider = TerminalWhatsAppProvider;
+exports.TerminalWhatsAppProvider = TerminalWhatsAppProvider = __decorate([
+    (0, common_1.Injectable)()
+], TerminalWhatsAppProvider);
 //# sourceMappingURL=mock.provider.js.map

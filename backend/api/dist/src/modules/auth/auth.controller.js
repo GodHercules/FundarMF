@@ -30,8 +30,11 @@ let AuthController = class AuthController {
         this.authService = authService;
         this.sessionService = sessionService;
     }
-    async requestLink(dto) {
-        return this.authService.requestCustomerLink(dto.email, dto.whatsapp, dto.nome);
+    async requestLink(req, dto) {
+        return this.authService.requestCustomerLink(dto.email, dto.whatsapp, dto.nome, {
+            email: req.actor?.email,
+            role: req.actor?.role
+        });
     }
     async verify(dto, res) {
         const { sessionToken } = await this.authService.verifyCustomerLink(dto.token, dto.otp);
@@ -70,9 +73,10 @@ __decorate([
     (0, common_1.Post)("customer/request-link"),
     (0, common_1.UseGuards)(auth_guard_1.AuthGuard, roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)("OPERADOR", "MASTER"),
-    __param(0, (0, common_1.Body)()),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [request_link_dto_1.RequestLinkDto]),
+    __metadata("design:paramtypes", [Object, request_link_dto_1.RequestLinkDto]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "requestLink", null);
 __decorate([

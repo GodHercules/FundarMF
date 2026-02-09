@@ -41,6 +41,12 @@ let NotificationQueue = class NotificationQueue {
         const retryDelay = toNumber(process.env.NOTIFY_RETRY_DELAY_MS, 60_000);
         const retryBackoff = (process.env.NOTIFY_RETRY_BACKOFF ?? "true") === "true";
         try {
+            console.log("[notify] enqueue email", JSON.stringify({
+                correlationId,
+                to: payload.to,
+                subject: payload.subject,
+                mode: process.env.NOTIFY_MODE ?? "mock"
+            }));
             return await this.boss.send(shared_1.NOTIFY_EMAIL_JOB, { ...payload, correlationId }, {
                 retryLimit,
                 retryDelay,
@@ -60,6 +66,11 @@ let NotificationQueue = class NotificationQueue {
         const retryDelay = toNumber(process.env.NOTIFY_RETRY_DELAY_MS, 60_000);
         const retryBackoff = (process.env.NOTIFY_RETRY_BACKOFF ?? "true") === "true";
         try {
+            console.log("[notify] enqueue whatsapp", JSON.stringify({
+                correlationId,
+                to: payload.to,
+                mode: process.env.NOTIFY_MODE ?? "mock"
+            }));
             return await this.boss.send(shared_1.NOTIFY_WHATSAPP_JOB, { ...payload, correlationId }, {
                 retryLimit,
                 retryDelay,

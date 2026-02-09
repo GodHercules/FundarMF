@@ -3,6 +3,7 @@ import path from "node:path";
 import dotenv from "dotenv";
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -22,7 +23,23 @@ async function bootstrap() {
     dotenv.config();
   }
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Render (and most hosted platforms) run Node behind a reverse proxy and will set X-Forwarded-For.
+  // express-rate-limit validates this header and requires trust proxy to be enabled to avoid IP spoofing.
+  const trustProxyRaw = process.env.TRUST_PROXY?.trim();
+  if (trustProxyRaw) {
+    if (trustProxyRaw === "true") app.set("trust proxy", true);
+    else if (trustProxyRaw === "false") app.set("trust proxy", false);
+    else {
+      const n = Number(trustProxyRaw);
+      if (Number.isFinite(n)) app.set("trust proxy", n);
+    }
+  } else if (process.env.RENDER || process.env.NODE_ENV === "production") {
+    // 1 hop is the safe default: trust only the immediate proxy in front of the app.
+    app.set("trust proxy", 1);
+  }
+
   app.use(requestContextMiddleware);
   app.use(helmet());
   app.use(cookieParser());

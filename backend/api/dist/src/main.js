@@ -3,6 +3,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const node_fs_1 = __importDefault(require("node:fs"));
+const node_path_1 = __importDefault(require("node:path"));
+const dotenv_1 = __importDefault(require("dotenv"));
 const core_1 = require("@nestjs/core");
 const common_1 = require("@nestjs/common");
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
@@ -13,7 +16,36 @@ const app_module_1 = require("./modules/app.module");
 const request_context_1 = require("./shared/request-context");
 const request_logging_interceptor_1 = require("./shared/request-logging.interceptor");
 async function bootstrap() {
+    const backendEnv = node_path_1.default.join(process.cwd(), ".env");
+    const apiEnv = node_path_1.default.join(process.cwd(), "api", ".env");
+    if (node_fs_1.default.existsSync(backendEnv)) {
+        dotenv_1.default.config({ path: backendEnv });
+    }
+    else if (node_fs_1.default.existsSync(apiEnv)) {
+        dotenv_1.default.config({ path: apiEnv });
+    }
+    else {
+        dotenv_1.default.config();
+    }
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
+    // Render (and most hosted platforms) run Node behind a reverse proxy and will set X-Forwarded-For.
+    // express-rate-limit validates this header and requires trust proxy to be enabled to avoid IP spoofing.
+    const trustProxyRaw = process.env.TRUST_PROXY?.trim();
+    if (trustProxyRaw) {
+        if (trustProxyRaw === "true")
+            app.set("trust proxy", true);
+        else if (trustProxyRaw === "false")
+            app.set("trust proxy", false);
+        else {
+            const n = Number(trustProxyRaw);
+            if (Number.isFinite(n))
+                app.set("trust proxy", n);
+        }
+    }
+    else if (process.env.RENDER || process.env.NODE_ENV === "production") {
+        // 1 hop is the safe default: trust only the immediate proxy in front of the app.
+        app.set("trust proxy", 1);
+    }
     app.use(request_context_1.requestContextMiddleware);
     app.use((0, helmet_1.default)());
     app.use((0, cookie_parser_1.default)());

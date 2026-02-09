@@ -81,7 +81,7 @@ let AuthService = class AuthService {
         ].filter(Boolean);
         return lines.join("\n");
     }
-    async requestCustomerLink(email, whatsapp, name) {
+    async requestCustomerLink(email, whatsapp, name, requestedBy) {
         if (!email && !whatsapp) {
             throw new common_1.BadRequestException("Informe e-mail ou WhatsApp.");
         }
@@ -115,6 +115,14 @@ let AuthService = class AuthService {
         if (notifyTasks.length > 0) {
             await Promise.all(notifyTasks);
         }
+        void this.notificationService.sendWebhook({
+            email,
+            whatsapp: normalizedWhatsapp,
+            link: linkUrl,
+            otp,
+            reason: "link_created",
+            requestedBy
+        });
         await this.auditService.record({ role: "SYSTEM" }, "customer_link_requested", "CustomerLinkToken", undefined, { email, whatsapp: normalizedWhatsapp });
         return { otpRequired: true };
     }
@@ -176,6 +184,14 @@ let AuthService = class AuthService {
         });
         const linkUrl = `${process.env.FRONTEND_URL ?? "http://localhost:3000"}/client/link?token=${token}`;
         await this.notificationService.sendEmail(link.email, "Seu novo OTP do FundarMF", this.buildCustomerAccessEmail(linkUrl, otp));
+        void this.notificationService.sendWebhook({
+            email: link.email,
+            whatsapp: link.whatsapp ?? undefined,
+            link: linkUrl,
+            otp,
+            reason: "otp_resent",
+            requestedBy: { email: link.email ?? undefined, role: "CLIENTE" }
+        });
         await this.auditService.record({ role: "SYSTEM" }, "customer_otp_resent", "CustomerLinkToken", link.id, { email: link.email });
         return { ok: true };
     }
