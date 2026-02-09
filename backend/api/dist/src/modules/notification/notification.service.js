@@ -102,7 +102,7 @@ let NotificationService = class NotificationService {
     }
     async sendWebhook(payload) {
         const enabled = (process.env.N8N_WEBHOOK_ENABLED ?? "true") === "true";
-        const url = process.env.N8N_WEBHOOK_URL;
+        const url = process.env.N8N_WEBHOOK_URL?.trim();
         if (!enabled || !url)
             return;
         const correlationId = (0, request_context_1.getRequestContext)()?.correlationId;
@@ -126,11 +126,13 @@ let NotificationService = class NotificationService {
             });
             if (!response.ok) {
                 const text = await response.text().catch(() => "");
-                console.warn("[notify] webhook failed", response.status, text);
+                // Include URL to confirm the deployed env var value (Render sometimes keeps old values until a redeploy/restart).
+                const preview = text.length > 800 ? `${text.slice(0, 800)}...` : text;
+                console.warn("[notify] webhook failed", response.status, url, preview);
             }
         }
         catch (err) {
-            console.warn("[notify] webhook error", err);
+            console.warn("[notify] webhook error", url, err);
         }
         finally {
             clearTimeout(timeout);
