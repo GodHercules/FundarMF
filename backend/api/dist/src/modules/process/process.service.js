@@ -97,9 +97,9 @@ let ProcessService = class ProcessService {
                     details
                 },
                 emails: {
-                    client: drafts.client ? { to: process.clientEmail, ...drafts.client } : undefined,
-                    operator: drafts.operator ? { to: owner?.email ?? undefined, ...drafts.operator } : undefined,
-                    both: drafts.both ? { ...drafts.both } : undefined
+                    client: drafts.client ? { target: "client", to: process.clientEmail, ...drafts.client } : undefined,
+                    operator: drafts.operator ? { target: "operator", to: owner?.email ?? undefined, ...drafts.operator } : undefined,
+                    both: drafts.both ? { target: "both", ...drafts.both } : undefined
                 }
             });
         }

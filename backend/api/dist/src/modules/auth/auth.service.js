@@ -127,6 +127,7 @@ let AuthService = class AuthService {
                 requestedBy,
                 emails: {
                     client: {
+                        target: "client",
                         to: email,
                         subject,
                         text: emailRendered.text,
@@ -230,6 +231,7 @@ let AuthService = class AuthService {
             requestedBy: { email: link.email ?? undefined, role: "CLIENTE" },
             emails: {
                 client: {
+                    target: "client",
                     to: link.email,
                     subject,
                     text: emailRendered.text,

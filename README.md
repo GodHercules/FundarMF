@@ -117,7 +117,7 @@ O payload inclui, quando aplicvel:
 - `process`: metadados do processo (id, status, etapa atual, progresso, etc.)
 - `emails`: rascunhos prontos de e-mail em HTML e texto:
   - `emails.client`, `emails.operator`, `emails.both`
-  - cada item: `{ to?, subject, text, html }`
+  - cada item: `{ target: "client"|"operator"|"both", to?, subject, text, html }`
 
 ### Endpoints de teste (apenas MASTER)
 - `POST /notifications/test-email`
