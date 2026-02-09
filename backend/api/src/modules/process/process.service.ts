@@ -331,16 +331,6 @@ export class ProcessService {
       sendWhatsapp
     });
 
-    if (actor.userId) {
-      await this.notifyOwner(processId, actor.userId, {
-        title: "Link enviado ao cliente",
-        body: `Link de acesso enviado para ${process.clientEmail}.`,
-        type: "client_link_sent"
-      });
-    }
-
-    void this.sendProcessWebhook(processId, "client_link_sent", actor);
-
     return { ok: true };
   }
 

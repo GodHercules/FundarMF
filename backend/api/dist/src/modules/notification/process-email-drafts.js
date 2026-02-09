@@ -86,17 +86,8 @@ function buildProcessEmailDrafts(input) {
         };
     }
     if (event === "client_link_sent") {
-        const operatorSubject = `Link enviado ao cliente: ${clientName} (${process.id})`;
-        const operatorLines = [
-            "Link de acesso do cliente foi enviado.",
-            "",
-            `Processo: ${process.id}`,
-            `Cliente: ${clientName}`,
-            `Email do cliente: ${process.clientEmail}`,
-            `Status: ${statusLabel}`,
-            `Etapa atual: ${process.currentStep} (${stepLabel})`
-        ];
-        return { operator: render(operatorSubject, operatorLines, { label: "Ver processo", url: urls.operator }), meta };
+        // O link/OTP e exclusivo do cliente. O operador nao deve receber notificacao sobre isso.
+        return { meta };
     }
     if (event === "client_submitted") {
         const stepKey = details?.stepKey ?? process.currentStep;
