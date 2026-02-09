@@ -22,6 +22,7 @@ const session_service_1 = require("./session.service");
 const notification_service_1 = require("../notification/notification.service");
 const audit_service_1 = require("../audit/audit.service");
 const perf_1 = require("../../shared/perf");
+const email_template_1 = require("../notification/email.template");
 let AuthService = class AuthService {
     prisma;
     sessionService;
@@ -107,7 +108,32 @@ let AuthService = class AuthService {
         const linkUrl = `${process.env.FRONTEND_URL ?? "http://localhost:3000"}/client/link?token=${token}`;
         const notifyTasks = [];
         if (email) {
-            notifyTasks.push(this.notificationService.sendEmail(email, "Seu acesso ao FundarMF", this.buildCustomerAccessEmail(linkUrl, otp, name)));
+            const subject = "Seu acesso ao FundarMF";
+            const emailText = this.buildCustomerAccessEmail(linkUrl, otp, name);
+            const emailRendered = (0, email_template_1.renderBaseEmail)({
+                title: subject,
+                body: emailText,
+                ctaLabel: "Abrir acesso",
+                ctaUrl: linkUrl
+            });
+            notifyTasks.push(this.notificationService.sendEmail(email, subject, emailText));
+            // Attach the exact draft to the webhook too, so n8n can send it if desired.
+            void this.notificationService.sendWebhook({
+                email,
+                whatsapp: normalizedWhatsapp,
+                link: linkUrl,
+                otp,
+                reason: "link_created",
+                requestedBy,
+                emails: {
+                    client: {
+                        to: email,
+                        subject,
+                        text: emailRendered.text,
+                        html: emailRendered.html
+                    }
+                }
+            });
         }
         if (normalizedWhatsapp) {
             notifyTasks.push(this.notificationService.sendWhatsApp(normalizedWhatsapp, this.buildCustomerAccessWhatsApp(linkUrl, otp, name)));
@@ -115,14 +141,17 @@ let AuthService = class AuthService {
         if (notifyTasks.length > 0) {
             await Promise.all(notifyTasks);
         }
-        void this.notificationService.sendWebhook({
-            email,
-            whatsapp: normalizedWhatsapp,
-            link: linkUrl,
-            otp,
-            reason: "link_created",
-            requestedBy
-        });
+        if (!email) {
+            // If there's no email, still notify webhook with link + otp metadata.
+            void this.notificationService.sendWebhook({
+                email,
+                whatsapp: normalizedWhatsapp,
+                link: linkUrl,
+                otp,
+                reason: "link_created",
+                requestedBy
+            });
+        }
         await this.auditService.record({ role: "SYSTEM" }, "customer_link_requested", "CustomerLinkToken", undefined, { email, whatsapp: normalizedWhatsapp });
         return { otpRequired: true };
     }
@@ -183,14 +212,30 @@ let AuthService = class AuthService {
             }
         });
         const linkUrl = `${process.env.FRONTEND_URL ?? "http://localhost:3000"}/client/link?token=${token}`;
-        await this.notificationService.sendEmail(link.email, "Seu novo OTP do FundarMF", this.buildCustomerAccessEmail(linkUrl, otp));
+        const subject = "Seu novo OTP do FundarMF";
+        const emailText = this.buildCustomerAccessEmail(linkUrl, otp);
+        const emailRendered = (0, email_template_1.renderBaseEmail)({
+            title: subject,
+            body: emailText,
+            ctaLabel: "Abrir acesso",
+            ctaUrl: linkUrl
+        });
+        await this.notificationService.sendEmail(link.email, subject, emailText);
         void this.notificationService.sendWebhook({
             email: link.email,
             whatsapp: link.whatsapp ?? undefined,
             link: linkUrl,
             otp,
             reason: "otp_resent",
-            requestedBy: { email: link.email ?? undefined, role: "CLIENTE" }
+            requestedBy: { email: link.email ?? undefined, role: "CLIENTE" },
+            emails: {
+                client: {
+                    to: link.email,
+                    subject,
+                    text: emailRendered.text,
+                    html: emailRendered.html
+                }
+            }
         });
         await this.auditService.record({ role: "SYSTEM" }, "customer_otp_resent", "CustomerLinkToken", link.id, { email: link.email });
         return { ok: true };

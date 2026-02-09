@@ -8,6 +8,7 @@ import { NotificationService } from "../notification/notification.service";
 import { AuditService } from "../audit/audit.service";
 import { Actor } from "../../common/auth/types";
 import { timeAsync } from "../../shared/perf";
+import { renderBaseEmail } from "../notification/email.template";
 
 @Injectable()
 export class AuthService {
@@ -107,13 +108,34 @@ export class AuthService {
 
     const notifyTasks: Promise<unknown>[] = [];
     if (email) {
+      const subject = "Seu acesso ao FundarMF";
+      const emailText = this.buildCustomerAccessEmail(linkUrl, otp, name);
+      const emailRendered = renderBaseEmail({
+        title: subject,
+        body: emailText,
+        ctaLabel: "Abrir acesso",
+        ctaUrl: linkUrl
+      });
       notifyTasks.push(
-        this.notificationService.sendEmail(
-          email,
-          "Seu acesso ao FundarMF",
-          this.buildCustomerAccessEmail(linkUrl, otp, name)
-        )
+        this.notificationService.sendEmail(email, subject, emailText)
       );
+      // Attach the exact draft to the webhook too, so n8n can send it if desired.
+      void this.notificationService.sendWebhook({
+        email,
+        whatsapp: normalizedWhatsapp,
+        link: linkUrl,
+        otp,
+        reason: "link_created",
+        requestedBy,
+        emails: {
+          client: {
+            to: email,
+            subject,
+            text: emailRendered.text,
+            html: emailRendered.html
+          }
+        }
+      });
     }
     if (normalizedWhatsapp) {
       notifyTasks.push(
@@ -127,14 +149,17 @@ export class AuthService {
       await Promise.all(notifyTasks);
     }
 
-    void this.notificationService.sendWebhook({
-      email,
-      whatsapp: normalizedWhatsapp,
-      link: linkUrl,
-      otp,
-      reason: "link_created",
-      requestedBy
-    });
+    if (!email) {
+      // If there's no email, still notify webhook with link + otp metadata.
+      void this.notificationService.sendWebhook({
+        email,
+        whatsapp: normalizedWhatsapp,
+        link: linkUrl,
+        otp,
+        reason: "link_created",
+        requestedBy
+      });
+    }
 
     await this.auditService.record(
       { role: "SYSTEM" },
@@ -216,7 +241,15 @@ export class AuthService {
     });
 
     const linkUrl = `${process.env.FRONTEND_URL ?? "http://localhost:3000"}/client/link?token=${token}`;
-    await this.notificationService.sendEmail(link.email, "Seu novo OTP do FundarMF", this.buildCustomerAccessEmail(linkUrl, otp));
+    const subject = "Seu novo OTP do FundarMF";
+    const emailText = this.buildCustomerAccessEmail(linkUrl, otp);
+    const emailRendered = renderBaseEmail({
+      title: subject,
+      body: emailText,
+      ctaLabel: "Abrir acesso",
+      ctaUrl: linkUrl
+    });
+    await this.notificationService.sendEmail(link.email, subject, emailText);
 
     void this.notificationService.sendWebhook({
       email: link.email,
@@ -224,7 +257,15 @@ export class AuthService {
       link: linkUrl,
       otp,
       reason: "otp_resent",
-      requestedBy: { email: link.email ?? undefined, role: "CLIENTE" }
+      requestedBy: { email: link.email ?? undefined, role: "CLIENTE" },
+      emails: {
+        client: {
+          to: link.email,
+          subject,
+          text: emailRendered.text,
+          html: emailRendered.html
+        }
+      }
     });
 
     await this.auditService.record(

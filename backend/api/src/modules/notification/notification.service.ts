@@ -14,6 +14,43 @@ export type InAppPayload = {
   processId?: string;
 };
 
+export type WebhookEmailDraft = {
+  to?: string;
+  subject: string;
+  text: string;
+  html: string;
+  from?: string;
+  replyTo?: string;
+};
+
+export type WebhookPayload = {
+  // Generic "link/otp" style payload (AuthService)
+  email?: string;
+  whatsapp?: string;
+  link?: string;
+  otp?: string;
+
+  // Generic notification payload
+  reason: string;
+  channel?: "email" | "whatsapp" | "system";
+  to?: string;
+  subject?: string;
+  body?: string;
+  html?: string;
+  audience?: "client" | "operator" | "unknown";
+  requestedBy?: { email?: string; role?: string };
+
+  // Rich email drafts for n8n to dispatch (ProcessService, AuthService)
+  emails?: {
+    client?: WebhookEmailDraft;
+    operator?: WebhookEmailDraft;
+    both?: WebhookEmailDraft;
+  };
+
+  // Optional structured process metadata (kept flexible on purpose)
+  process?: Record<string, unknown>;
+};
+
 @Injectable()
 export class NotificationService {
   constructor(
@@ -61,13 +98,21 @@ export class NotificationService {
       }
 
       const audience = await this.resolveAudience(to);
+      const emailDraft: WebhookEmailDraft = { to, subject, text, html, from, replyTo };
       void this.sendWebhook({
         channel: "email",
         to,
         subject,
         body: text,
+        html,
         audience,
-        reason: "notification_sent"
+        reason: "notification_sent",
+        emails: {
+          // Mirror the exact message for n8n to be able to send it too.
+          client: audience === "client" ? emailDraft : undefined,
+          operator: audience === "operator" ? emailDraft : undefined,
+          both: audience === "unknown" ? emailDraft : undefined
+        }
       });
     } catch (err) {
       console.error("[notify] sendEmail failed", err);
@@ -96,19 +141,7 @@ export class NotificationService {
     }
   }
 
-  async sendWebhook(payload: {
-    email?: string;
-    whatsapp?: string;
-    link?: string;
-    otp?: string;
-    reason: string;
-    channel?: "email" | "whatsapp" | "system";
-    to?: string;
-    subject?: string;
-    body?: string;
-    audience?: "client" | "operator" | "unknown";
-    requestedBy?: { email?: string; role?: string };
-  }) {
+  async sendWebhook(payload: WebhookPayload) {
     const enabled = (process.env.N8N_WEBHOOK_ENABLED ?? "true") === "true";
     const url = process.env.N8N_WEBHOOK_URL?.trim();
     if (!enabled || !url) return;

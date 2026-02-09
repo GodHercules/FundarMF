@@ -109,6 +109,16 @@ pnpm --filter fundarmf-worker dev
   - `NOTIFY_MODE=terminal`: no envia; imprime preview (HTML do e-mail + texto do WhatsApp).
   - `NOTIFY_MODE=real`: envia de verdade via provedor.
 
+### Webhook do n8n (opcional)
+Se `N8N_WEBHOOK_ENABLED=true` e `N8N_WEBHOOK_URL` estiver configurado, a API dispara eventos para o n8n.
+
+O payload inclui, quando aplicvel:
+- `reason`: tipo do evento (ex: `process_started`, `correction_requested`, `process_completed`)
+- `process`: metadados do processo (id, status, etapa atual, progresso, etc.)
+- `emails`: rascunhos prontos de e-mail em HTML e texto:
+  - `emails.client`, `emails.operator`, `emails.both`
+  - cada item: `{ to?, subject, text, html }`
+
 ### Endpoints de teste (apenas MASTER)
 - `POST /notifications/test-email`
   - body: `{ "to": "email@exemplo.com", "subject": "Teste", "body": "Mensagem" }`

@@ -66,13 +66,21 @@ let NotificationService = class NotificationService {
                 }));
             }
             const audience = await this.resolveAudience(to);
+            const emailDraft = { to, subject, text, html, from, replyTo };
             void this.sendWebhook({
                 channel: "email",
                 to,
                 subject,
                 body: text,
+                html,
                 audience,
-                reason: "notification_sent"
+                reason: "notification_sent",
+                emails: {
+                    // Mirror the exact message for n8n to be able to send it too.
+                    client: audience === "client" ? emailDraft : undefined,
+                    operator: audience === "operator" ? emailDraft : undefined,
+                    both: audience === "unknown" ? emailDraft : undefined
+                }
             });
         }
         catch (err) {

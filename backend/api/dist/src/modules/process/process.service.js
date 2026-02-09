@@ -18,6 +18,7 @@ const sla_service_1 = require("../sla/sla.service");
 const audit_service_1 = require("../audit/audit.service");
 const notification_service_1 = require("../notification/notification.service");
 const auth_service_1 = require("../auth/auth.service");
+const process_email_drafts_1 = require("../notification/process-email-drafts");
 const CLIENT_STEPS = ["ETAPA_1", "ETAPA_2", "ETAPA_4", "ETAPA_5", "ETAPA_6"];
 const OPERATOR_STEPS = ["ETAPA_3"];
 function nextStep(step) {
@@ -58,6 +59,53 @@ let ProcessService = class ProcessService {
         this.auditService = auditService;
         this.notificationService = notificationService;
         this.authService = authService;
+    }
+    async sendProcessWebhook(processId, event, actor, details) {
+        try {
+            const process = await this.prisma.process.findUnique({ where: { id: processId } });
+            if (!process)
+                return;
+            const owner = process.ownerId && process.ownerId.length > 0
+                ? await this.prisma.user.findUnique({ where: { id: process.ownerId } }).catch(() => null)
+                : null;
+            const drafts = (0, process_email_drafts_1.buildProcessEmailDrafts)({
+                event,
+                process: {
+                    id: process.id,
+                    clientName: process.clientName,
+                    clientEmail: process.clientEmail,
+                    clientPhone: process.clientPhone,
+                    status: process.status,
+                    currentStep: process.currentStep,
+                    ownerEmail: owner?.email ?? null
+                },
+                details
+            });
+            await this.notificationService.sendWebhook({
+                reason: event,
+                channel: "system",
+                requestedBy: { email: actor.email, role: actor.role },
+                process: {
+                    id: process.id,
+                    status: process.status,
+                    currentStep: process.currentStep,
+                    clientName: process.clientName,
+                    clientEmail: process.clientEmail,
+                    clientPhone: process.clientPhone,
+                    ownerEmail: owner?.email ?? null,
+                    ...drafts.meta,
+                    details
+                },
+                emails: {
+                    client: drafts.client ? { to: process.clientEmail, ...drafts.client } : undefined,
+                    operator: drafts.operator ? { to: owner?.email ?? undefined, ...drafts.operator } : undefined,
+                    both: drafts.both ? { ...drafts.both } : undefined
+                }
+            });
+        }
+        catch (err) {
+            console.warn("[process] sendProcessWebhook failed", err);
+        }
     }
     async notifyOwner(processId, ownerId, payload) {
         if (!ownerId)
@@ -230,6 +278,7 @@ let ProcessService = class ProcessService {
                 type: "process_started"
             });
         }
+        void this.sendProcessWebhook(process.id, "process_started", actor);
         if (payload.sendEmail || payload.sendWhatsapp) {
             await this.sendClientLink(process.id, actor, {
                 sendEmail: payload.sendEmail ?? true,
@@ -266,6 +315,7 @@ let ProcessService = class ProcessService {
                 type: "client_link_sent"
             });
         }
+        void this.sendProcessWebhook(processId, "client_link_sent", actor);
         return { ok: true };
     }
     async listProcesses(actor, options) {
@@ -455,6 +505,7 @@ let ProcessService = class ProcessService {
             body: `O cliente ${process.clientEmail} enviou o formulário final da etapa ${stepKey}.`,
             type: "client_submitted"
         });
+        void this.sendProcessWebhook(processId, "client_submitted", actor, { stepKey });
         return { ok: true };
     }
     async approveStep(processId, actor, stepKey) {
@@ -499,6 +550,7 @@ let ProcessService = class ProcessService {
                 this.notificationService.sendWhatsApp(process.clientPhone ?? process.clientEmail, "Processo concluído.")
             ]);
             await this.auditService.record(actor, "process_completed", "Process", processId);
+            void this.sendProcessWebhook(processId, "process_completed", actor);
             return { ok: true, status: "CONCLUIDO" };
         }
         const nextSide = stepSide(next);
@@ -509,6 +561,7 @@ let ProcessService = class ProcessService {
         });
         await this.slaService.startSla(processId, next, nextSide);
         await this.auditService.record(actor, "approve_step", "Process", processId, { stepKey });
+        void this.sendProcessWebhook(processId, "step_approved", actor, { stepKey, nextStep: next });
         return { ok: true, nextStep: next };
     }
     async requestCorrection(processId, actor, stepKey, fields, reason) {
@@ -559,6 +612,9 @@ let ProcessService = class ProcessService {
             type: "correction_requested"
         });
         await this.auditService.record(actor, "request_correction", "Process", processId, { stepKey, fields, reason });
+        void this.sendProcessWebhook(processId, "correction_requested", actor, {
+            correction: { stepKey, fields, reason }
+        });
         return updated;
     }
     async markInProgress(processId, actor) {
@@ -572,6 +628,7 @@ let ProcessService = class ProcessService {
             data: { status: client_1.ProcessStatus.EM_ANDAMENTO }
         });
         await this.auditService.record(actor, "mark_in_progress", "Process", processId);
+        void this.sendProcessWebhook(processId, "process_marked_in_progress", actor);
         return updated;
     }
     async cancelProcess(processId, actor, reason) {
@@ -597,6 +654,7 @@ let ProcessService = class ProcessService {
             this.notificationService.sendWhatsApp(process.clientPhone ?? process.clientEmail, `Processo cancelado. Motivo: ${reason}`)
         ]);
         await this.auditService.record(actor, "process_cancelled", "Process", processId, { reason });
+        void this.sendProcessWebhook(processId, "process_cancelled", actor, { cancelReason: reason });
         return { ok: true };
     }
 };
