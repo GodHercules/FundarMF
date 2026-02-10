@@ -24,7 +24,6 @@ type InAppNotification = {
   body: string;
   createdAt: string;
   readAt?: string | null;
-  dismissedAt?: string | null;
   processId?: string | null;
   type: string;
 };
@@ -33,6 +32,8 @@ export default function OperatorDashboard() {
   const [processes, setProcesses] = useState<ProcessSummary[]>([]);
   const [notifications, setNotifications] = useState<InAppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showRead, setShowRead] = useState(false);
+  const [busyNotificationIds, setBusyNotificationIds] = useState<Record<string, true>>({});
   const [creating, setCreating] = useState(false);
   const [loadingProcesses, setLoadingProcesses] = useState(false);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
@@ -119,17 +120,49 @@ export default function OperatorDashboard() {
   }
 
   async function markRead(id: string) {
-    await api(`/notifications/${id}/read`, { method: "PATCH" });
-    setNotifications((prev) => prev.map((item) => (item.id === id ? { ...item, readAt: new Date().toISOString() } : item)));
-    setUnreadCount((prev) => Math.max(0, prev - 1));
+    if (busyNotificationIds[id]) return;
+    setBusyNotificationIds((prev) => ({ ...prev, [id]: true }));
+    try {
+      await api(`/notifications/${id}/read`, { method: "PATCH" });
+      setNotifications((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, readAt: new Date().toISOString() } : item))
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } finally {
+      setBusyNotificationIds((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
   }
 
   async function dismiss(id: string) {
-    await api(`/notifications/${id}/dismiss`, { method: "PATCH" });
+    if (busyNotificationIds[id]) return;
+    setBusyNotificationIds((prev) => ({ ...prev, [id]: true }));
     const removed = notifications.find((n) => n.id === id);
+    // Optimistic UI: remove immediately.
     setNotifications((prev) => prev.filter((item) => item.id !== id));
     if (removed && !removed.readAt) {
       setUnreadCount((prev) => Math.max(0, prev - 1));
+    }
+    try {
+      await api(`/notifications/${id}/dismiss`, { method: "PATCH" });
+    } catch (err) {
+      // Put it back if the API failed.
+      if (removed) {
+        setNotifications((prev) => [removed, ...prev]);
+        if (!removed.readAt) {
+          setUnreadCount((prev) => prev + 1);
+        }
+      }
+      throw err;
+    } finally {
+      setBusyNotificationIds((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
     }
   }
 
@@ -137,9 +170,7 @@ export default function OperatorDashboard() {
   const readCutoffMs = nowMs - READ_HIDE_AFTER_DAYS * MS_DAY;
   const unreadPinMs = nowMs - UNREAD_PIN_AFTER_DAYS * MS_DAY;
 
-  const visibleNotifications = notifications.filter((item) => !item.dismissedAt);
-
-  const unreadNotifications = [...visibleNotifications]
+  const unreadNotifications = [...notifications]
     .filter((item) => !item.readAt)
     .sort((a, b) => {
       const aMs = new Date(a.createdAt).getTime();
@@ -150,7 +181,7 @@ export default function OperatorDashboard() {
       return bMs - aMs;
     });
 
-  const readNotifications = [...visibleNotifications]
+  const readNotifications = [...notifications]
     .filter((item) => item.readAt && new Date(item.createdAt).getTime() >= readCutoffMs)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
@@ -172,8 +203,8 @@ export default function OperatorDashboard() {
             <h2 className="text-lg font-semibold">Notificações</h2>
             <span className="badge bg-ink text-white">{unreadCount} não lidas</span>
           </div>
-          <div className="mt-4 space-y-3">
-            {visibleNotifications.length === 0 && <p className="text-sm text-slate">Nenhuma notificação recente.</p>}
+          <div className="mt-4 max-h-[520px] space-y-3 overflow-auto pr-2">
+            {notifications.length === 0 && <p className="text-sm text-slate">Nenhuma notificação recente.</p>}
 
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">Não lidas</span>
@@ -186,6 +217,7 @@ export default function OperatorDashboard() {
 
             {unreadNotifications.map((item) => {
               const pinned = new Date(item.createdAt).getTime() <= unreadPinMs;
+              const busy = Boolean(busyNotificationIds[item.id]);
               return (
                 <div key={item.id} className="rounded-xl border border-ink/10 bg-brass/10 p-3 text-sm text-ink">
                   <div className="flex items-start justify-between gap-3">
@@ -194,7 +226,7 @@ export default function OperatorDashboard() {
                         <p className="font-semibold">{item.title}</p>
                         {pinned && <span className="badge bg-rose-500/15 text-rose-700">Atrasada</span>}
                       </div>
-                      <p className="mt-1">{item.body}</p>
+                      <p className="mt-1 whitespace-pre-line text-slate">{item.body}</p>
                     </div>
                     <button
                       type="button"
@@ -202,13 +234,18 @@ export default function OperatorDashboard() {
                       onClick={() => dismiss(item.id)}
                       aria-label="Fechar notificação"
                       title="Fechar"
+                      disabled={busy}
                     >
                       x
                     </button>
                   </div>
                   <div className="mt-2 flex items-center justify-between text-xs text-slate">
                     <span>{new Date(item.createdAt).toLocaleString("pt-BR")}</span>
-                    <button className="font-semibold text-brass" onClick={() => markRead(item.id)}>
+                    <button
+                      className="font-semibold text-brass disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => markRead(item.id)}
+                      disabled={busy}
+                    >
                       Marcar como lida
                     </button>
                   </div>
@@ -217,20 +254,39 @@ export default function OperatorDashboard() {
             })}
 
             <div className="mt-5 flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">Lidas (últimos {READ_HIDE_AFTER_DAYS} dias)</span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">
+                  Lidas (últimos {READ_HIDE_AFTER_DAYS} dias)
+                </span>
+                <button
+                  type="button"
+                  className="rounded-full border border-ink/15 px-3 py-1 text-[11px] font-semibold text-ink hover:border-brass"
+                  onClick={() => setShowRead((prev) => !prev)}
+                >
+                  {showRead ? "Ocultar" : "Mostrar"}
+                </button>
+              </div>
               <span className="text-xs text-slate">{readNotifications.length}</span>
             </div>
 
-            {readNotifications.length === 0 && (
+            {!showRead && readNotifications.length > 0 && (
+              <p className="rounded-xl border border-ink/10 bg-white/60 p-3 text-sm text-slate">
+                Lidas ocultas. Clique em Mostrar para ver.
+              </p>
+            )}
+
+            {showRead && readNotifications.length === 0 && (
               <p className="rounded-xl border border-ink/10 bg-white/60 p-3 text-sm text-slate">Sem notificações lidas recentes.</p>
             )}
 
-            {readNotifications.map((item) => (
+            {showRead && readNotifications.map((item) => {
+              const busy = Boolean(busyNotificationIds[item.id]);
+              return (
               <div key={item.id} className="rounded-xl border border-ink/10 bg-white/60 p-3 text-sm text-slate">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold">{item.title}</p>
-                    <p className="mt-1">{item.body}</p>
+                    <p className="mt-1 whitespace-pre-line">{item.body}</p>
                   </div>
                   <button
                     type="button"
@@ -238,6 +294,7 @@ export default function OperatorDashboard() {
                     onClick={() => dismiss(item.id)}
                     aria-label="Fechar notificação"
                     title="Fechar"
+                    disabled={busy}
                   >
                     x
                   </button>
@@ -251,10 +308,11 @@ export default function OperatorDashboard() {
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate">
-            <span>Mostrando {visibleNotifications.length} notificações</span>
+            <span>Mostrando {notifications.length} notificações</span>
             <button
               type="button"
               className="rounded-full border border-ink/15 px-3 py-1.5 text-xs font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-50"

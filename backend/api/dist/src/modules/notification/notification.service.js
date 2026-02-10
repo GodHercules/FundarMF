@@ -246,13 +246,13 @@ let NotificationService = class NotificationService {
         //
         // Sorting/pinning rules are handled client-side; the server just guarantees visibility.
         const unread = await this.prisma.userNotification.findMany({
-            where: { userId, dismissedAt: null, readAt: null },
+            where: { userId, readAt: null },
             orderBy: { createdAt: "desc" },
             take: 200
         });
         const readCutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
         const readRecent = await this.prisma.userNotification.findMany({
-            where: { userId, dismissedAt: null, readAt: { not: null }, createdAt: { gte: readCutoff } },
+            where: { userId, readAt: { not: null }, createdAt: { gte: readCutoff } },
             orderBy: { createdAt: "desc" },
             take: 200
         });
@@ -261,20 +261,19 @@ let NotificationService = class NotificationService {
     }
     async unreadCount(userId) {
         return this.prisma.userNotification.count({
-            where: { userId, readAt: null, dismissedAt: null }
+            where: { userId, readAt: null }
         });
     }
     async markRead(userId, notificationId) {
         const result = await this.prisma.userNotification.updateMany({
-            where: { id: notificationId, userId, dismissedAt: null },
+            where: { id: notificationId, userId },
             data: { readAt: new Date() }
         });
         return { ok: result.count > 0 };
     }
     async dismiss(userId, notificationId) {
-        const result = await this.prisma.userNotification.updateMany({
-            where: { id: notificationId, userId, dismissedAt: null },
-            data: { dismissedAt: new Date() }
+        const result = await this.prisma.userNotification.deleteMany({
+            where: { id: notificationId, userId }
         });
         return { ok: result.count > 0 };
     }

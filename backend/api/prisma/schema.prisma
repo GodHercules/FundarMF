@@ -316,12 +316,10 @@ model UserNotification {
   title     String
   body      String
   readAt    DateTime?
-  dismissedAt DateTime?
   createdAt DateTime @default(now())
 
   user    User    @relation(fields: [userId], references: [id])
   process Process? @relation(fields: [processId], references: [id])
 
   @@index([userId, readAt])
-  @@index([userId, dismissedAt])
 }
