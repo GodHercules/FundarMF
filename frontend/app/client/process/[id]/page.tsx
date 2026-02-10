@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { API_BASE, api } from "@/lib/api";
@@ -156,6 +156,7 @@ function findDocumentItem(process: any, itemKey: string, socioId?: string) {
 export default function ClientProcess() {
   const params = useParams();
   const processId = params?.id as string;
+  const submitStartRef = useRef<number>(0);
   const [process, setProcess] = useState<any>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [step2, setStep2] = useState(defaultStep2);
@@ -172,41 +173,6 @@ export default function ClientProcess() {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-
-  if (submittedAll) {
-    return (
-      <main className="app-container flex min-h-screen flex-col gap-8 py-12">
-        <div className="flex flex-col gap-3">
-          <Logo withText />
-          <span className="badge bg-emerald/15 text-ink">Envio concluído</span>
-          <h1 className="text-3xl font-semibold">Recebemos os seus dados</h1>
-          <p className="text-slate">
-            Seu processo foi iniciado e está em análise. Aguarde o contato por e-mail ou WhatsApp.
-          </p>
-        </div>
-        <Card className="p-6">
-          <p className="text-sm text-slate">
-            Se precisar complementar alguma informação, aguarde a orientação do operador responsável.
-          </p>
-        </Card>
-      </main>
-    );
-  }
-
-  if (submittingAll) {
-    return (
-      <main className="app-container flex min-h-screen flex-col items-center justify-center gap-6 py-12 text-center">
-        <span className="badge bg-emerald/15 text-ink">Enviando</span>
-        <h1 className="text-3xl font-semibold">Recebendo seus dados</h1>
-        <p className="max-w-xl text-slate">
-          Obrigado por enviar as informações e documentos. Estamos iniciando o seu processo. Aguarde o contato do nosso
-          time por e-mail ou WhatsApp.
-        </p>
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-ink/10 border-t-brass" />
-        <p className="text-xs text-slate">Não feche esta página até finalizar.</p>
-      </main>
-    );
-  }
 
   async function load() {
     const [processData, chatData] = await Promise.all([
@@ -279,6 +245,40 @@ export default function ClientProcess() {
       active = false;
     };
   }, []);
+
+  // IMPORTANT: do not return before hooks (useEffect) or React will throw hook-order errors in production.
+  if (submittedAll) {
+    return (
+      <main className="app-container flex min-h-screen flex-col gap-8 py-12">
+        <div className="flex flex-col gap-3">
+          <Logo withText />
+          <span className="badge bg-emerald/15 text-ink">Envio concluído</span>
+          <h1 className="text-3xl font-semibold">Recebemos os seus dados</h1>
+          <p className="text-slate">Seu processo foi iniciado e está em análise. Aguarde o contato por e-mail ou WhatsApp.</p>
+        </div>
+        <Card className="p-6">
+          <p className="text-sm text-slate">
+            Se precisar complementar alguma informação, aguarde a orientação do operador responsável.
+          </p>
+        </Card>
+      </main>
+    );
+  }
+
+  if (submittingAll) {
+    return (
+      <main className="app-container flex min-h-screen flex-col items-center justify-center gap-6 py-12 text-center">
+        <span className="badge bg-emerald/15 text-ink">Enviando</span>
+        <h1 className="text-3xl font-semibold">Recebendo seus dados</h1>
+        <p className="max-w-xl text-slate">
+          Obrigado por enviar as informações e documentos. Estamos iniciando o seu processo. Aguarde o contato do nosso time
+          por e-mail ou WhatsApp.
+        </p>
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-ink/10 border-t-brass" />
+        <p className="text-xs text-slate">Não feche esta página até finalizar.</p>
+      </main>
+    );
+  }
 
   function buildPayload(correctionFields?: string[], correctionActive?: boolean) {
     const payload = {
@@ -443,6 +443,7 @@ export default function ClientProcess() {
     if (!validateClientForm()) return;
     if (!validateClientDocuments()) return;
     setMessage(null);
+    submitStartRef.current = Date.now();
     setSubmittingAll(true);
     try {
       await api(`/processes/${processId}/steps`, {
@@ -456,6 +457,12 @@ export default function ClientProcess() {
       });
       setMessage("Dados enviados para validação.");
       notifySuccess("Dados enviados para validação.");
+      // Ensure the "sending" screen is visible (avoid a flash straight to success on fast responses).
+      const minSendingMs = 700;
+      const elapsed = Date.now() - submitStartRef.current;
+      if (elapsed < minSendingMs) {
+        await new Promise((resolve) => setTimeout(resolve, minSendingMs - elapsed));
+      }
       setSubmittedAll(true);
     } finally {
       setSubmittingAll(false);
