@@ -254,7 +254,7 @@ export default function MasterDashboard() {
             ))}
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate">
-            <span>Mostrando {users.length} usuarios</span>
+            <span>Mostrando {users.length} usuários</span>
             <button
               type="button"
               className="rounded-full border border-ink/15 px-3 py-1.5 text-xs font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-50"
@@ -267,56 +267,78 @@ export default function MasterDashboard() {
         </Card>
       </section>
 
-      <section className="grid gap-6 md:grid-cols-2">
-        {processes.map((process) => (
-          <Card key={process.id} className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold">{process.clientName ?? "Processo"}</h3>
-                <p className="text-sm text-slate">Etapa atual: {process.currentStep}</p>
-              </div>
-              <StatusBadge status={process.status} />
-            </div>
-            <div className="mt-4 flex flex-col gap-3">
-              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">Responsável</label>
-              <select
-                className="w-full rounded-xl border border-ink/15 bg-white px-4 py-2 text-sm text-ink shadow-sm focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass/30"
-                value={process.ownerId ?? ""}
-                onChange={(event) => handleAssign(process.id, event.target.value)}
-                disabled={assigning === process.id}
-              >
-                <option value="">Selecione</option>
-                {users
-                  .filter((user) => user.role === "OPERATOR")
-                  .map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.name}
-                    </option>
-                  ))}
-              </select>
-              <button
-                type="button"
-                className="rounded-xl border border-ink/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink hover:border-brass"
-                onClick={() => setProcessToDelete(process)}
-              >
-                Excluir processo
-              </button>
-            </div>
-          </Card>
-        ))}
-      </section>
+      <Card className="p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Processos</h2>
+            <p className="text-sm text-slate">Atribuição de responsáveis e operações administrativas.</p>
+          </div>
+          <div className="flex items-center gap-3 text-sm text-slate">
+            <span>Mostrando {processes.length}</span>
+            <button
+              type="button"
+              className="rounded-full border border-ink/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => loadProcesses(processOffset, true)}
+              disabled={!hasMoreProcesses || loadingProcesses}
+            >
+              {loadingProcesses ? "Carregando..." : hasMoreProcesses ? "Carregar mais" : "Fim da lista"}
+            </button>
+          </div>
+        </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate">
-        <span>Mostrando {processes.length} processos</span>
-        <button
-          type="button"
-          className="rounded-full border border-ink/15 px-4 py-2 font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={() => loadProcesses(processOffset, true)}
-          disabled={!hasMoreProcesses || loadingProcesses}
-        >
-          {loadingProcesses ? "Carregando..." : hasMoreProcesses ? "Carregar mais" : "Fim da lista"}
-        </button>
-      </div>
+        <div className="mt-4 space-y-3">
+          {processes.length === 0 && <p className="text-sm text-slate">Nenhum processo encontrado.</p>}
+          {processes.map((process) => (
+            <div
+              key={process.id}
+              className="rounded-2xl border border-ink/10 bg-white/70 p-4 shadow-soft transition hover:-translate-y-0.5 hover:bg-white/90"
+            >
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold text-ink">{process.clientName ?? "Processo"}</p>
+                  <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate">
+                    <span className="font-mono">{process.id}</span>
+                    <span>·</span>
+                    <span>Etapa: {process.currentStep}</span>
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:justify-end">
+                  <StatusBadge status={process.status} />
+
+                  <div className="min-w-[260px]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate">Responsável</p>
+                    <select
+                      className="mt-1 w-full rounded-xl border border-ink/15 bg-white px-3 py-2 text-sm text-ink shadow-sm focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass/30"
+                      value={process.ownerId ?? ""}
+                      onChange={(event) => handleAssign(process.id, event.target.value)}
+                      disabled={assigning === process.id}
+                      aria-label="Responsável"
+                    >
+                      <option value="">Selecione</option>
+                      {users
+                        .filter((user) => user.role === "OPERATOR")
+                        .map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="rounded-xl border border-clay/30 bg-clay/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink hover:border-clay"
+                    onClick={() => setProcessToDelete(process)}
+                  >
+                    Excluir caso
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       {showCreateUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4 py-6">

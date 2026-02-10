@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { API_BASE, api } from "@/lib/api";
 import { Card } from "@/components/Card";
@@ -155,6 +155,7 @@ function findDocumentItem(process: any, itemKey: string, socioId?: string) {
 
 export default function ClientProcess() {
   const params = useParams();
+  const router = useRouter();
   const processId = params?.id as string;
   const [process, setProcess] = useState<any>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -171,6 +172,21 @@ export default function ClientProcess() {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+
+  if (submittingAll) {
+    return (
+      <main className="app-container flex min-h-screen flex-col items-center justify-center gap-6 py-12 text-center">
+        <span className="badge bg-emerald/15 text-ink">Enviando</span>
+        <h1 className="text-3xl font-semibold">Recebendo seus dados</h1>
+        <p className="max-w-xl text-slate">
+          Obrigado por enviar as informações e documentos. Estamos iniciando o seu processo. Aguarde o contato do nosso
+          time por e-mail ou WhatsApp.
+        </p>
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-ink/10 border-t-brass" />
+        <p className="text-xs text-slate">Não feche esta página até finalizar.</p>
+      </main>
+    );
+  }
 
   async function load() {
     const [processData, chatData] = await Promise.all([
@@ -421,6 +437,7 @@ export default function ClientProcess() {
       setMessage("Dados enviados para validação.");
       notifySuccess("Dados enviados para validação.");
       load();
+      router.replace("/client/submitted");
     } finally {
       setSubmittingAll(false);
       setUploadingItem(null);

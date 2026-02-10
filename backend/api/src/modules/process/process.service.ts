@@ -583,6 +583,17 @@ export class ProcessService {
       throw new BadRequestException("Etapa inválida.");
     }
 
+    const current = await this.prisma.processStep.findUnique({
+      where: { processId_stepKey: { processId, stepKey } }
+    });
+    if (!current) {
+      throw new BadRequestException("Etapa ainda não preenchida.");
+    }
+    // Idempotency: avoid double delivery if the client retries the submit request.
+    if (current.locked && current.status === ProcessStatus.AGUARDANDO_OPERADOR) {
+      return { ok: true, alreadySubmitted: true };
+    }
+
     await this.prisma.processStep.update({
       where: { processId_stepKey: { processId, stepKey } },
       data: { status: ProcessStatus.AGUARDANDO_OPERADOR, locked: true }
@@ -603,6 +614,19 @@ export class ProcessService {
       body: `O cliente ${process.clientEmail} enviou o formulário final da etapa ${stepKey}.`,
       type: "client_submitted"
     });
+
+    await this.notificationService.sendEmail(
+      process.clientEmail,
+      "Recebemos seus dados - Processo iniciado",
+      [
+        "Recebemos suas informações e documentos.",
+        "Seu processo foi iniciado e está em análise pela nossa equipe.",
+        "Aguarde o contato por e-mail ou WhatsApp para acompanhar o andamento.",
+        "",
+        `Processo: ${process.id}`,
+        `Etapa enviada: ${stepKey}`
+      ].join("\n")
+    );
 
     void this.sendProcessWebhook(processId, "client_submitted", actor, { stepKey });
 

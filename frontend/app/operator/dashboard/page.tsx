@@ -370,34 +370,56 @@ export default function OperatorDashboard() {
         </Card>
       </section>
 
-      <section className="grid gap-6 md:grid-cols-2">
-        {processes.map((process) => (
-          <Card key={process.id} className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold">{process.clientName ?? "Processo"}</h3>
-                <p className="text-sm text-slate">Etapa atual: {process.currentStep}</p>
-              </div>
-              <StatusBadge status={process.status} />
-            </div>
-            <Link href={`/operator/process/${process.id}`} className="mt-4 inline-flex text-sm font-semibold text-brass">
-              Abrir caso {"->"}
-            </Link>
-          </Card>
-        ))}
-      </section>
+      <Card className="p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Processos</h2>
+            <p className="text-sm text-slate">Lista dos seus casos em andamento e pendências.</p>
+          </div>
+          <div className="flex items-center gap-3 text-sm text-slate">
+            <span>Mostrando {processes.length}</span>
+            <button
+              type="button"
+              className="rounded-full border border-ink/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => loadProcesses(processOffset, true)}
+              disabled={!hasMoreProcesses || loadingProcesses}
+            >
+              {loadingProcesses ? "Carregando..." : hasMoreProcesses ? "Carregar mais" : "Fim da lista"}
+            </button>
+          </div>
+        </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate">
-        <span>Mostrando {processes.length} processos</span>
-        <button
-          type="button"
-          className="rounded-full border border-ink/15 px-4 py-2 font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={() => loadProcesses(processOffset, true)}
-          disabled={!hasMoreProcesses || loadingProcesses}
-        >
-          {loadingProcesses ? "Carregando..." : hasMoreProcesses ? "Carregar mais" : "Fim da lista"}
-        </button>
-      </div>
+        <div className="mt-4 space-y-3">
+          {processes.length === 0 && <p className="text-sm text-slate">Nenhum processo encontrado.</p>}
+          {processes.map((process) => (
+            <div
+              key={process.id}
+              className="rounded-2xl border border-ink/10 bg-white/70 p-4 shadow-soft transition hover:-translate-y-0.5 hover:bg-white/90"
+            >
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold text-ink">{process.clientName ?? "Processo"}</p>
+                  <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate">
+                    <span className="font-mono">{process.id}</span>
+                    <span>·</span>
+                    <span>Etapa: {process.currentStep}</span>
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 md:justify-end">
+                  <StatusBadge status={process.status} />
+                  <Link
+                    href={`/operator/process/${process.id}`}
+                    className="rounded-xl border border-brass/30 bg-brass/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink hover:border-brass"
+                  >
+                    Abrir caso
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
     </main>
   );
 }
