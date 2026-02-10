@@ -412,8 +412,19 @@ export default function ClientProcess() {
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || "Erro ao enviar documentos.");
+        const errorText = await response.text();
+        let message = errorText || "Erro ao enviar documentos.";
+        try {
+          const parsed = JSON.parse(errorText);
+          if (Array.isArray(parsed?.message)) message = parsed.message.join(" ");
+          else if (typeof parsed?.message === "string") message = parsed.message;
+        } catch {
+          // ignore
+        }
+        if (response.status === 401 || response.status === 403) {
+          message = "Sessão expirada. Recarregue a página e tente novamente.";
+        }
+        throw new Error(message);
       }
 
       setMessage("Arquivos enviados com sucesso.");

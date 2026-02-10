@@ -90,7 +90,7 @@ describe("OperatorProcess", () => {
     await user.click(btn);
 
     await screen.findByRole("heading", { name: /dados do cliente/i });
-    expect(screen.getByText(/razão social 1:/i)).toBeInTheDocument();
+    expect(screen.getByText(/razão social 1/i)).toBeInTheDocument();
     expect(screen.getAllByText(/empresa teste/i).length).toBeGreaterThan(0);
   });
 

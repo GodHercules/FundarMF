@@ -19,6 +19,16 @@ export class AuthService {
     private readonly auditService: AuditService
   ) {}
 
+  private shouldSendAuthWebhook() {
+    return (process.env.N8N_WEBHOOK_AUTH_ENABLED ?? "false").trim().toLowerCase() === "true";
+  }
+
+  private linkDedupSeconds() {
+    const raw = Number(process.env.LINK_REQUEST_DEDUP_SECONDS ?? 30);
+    if (!Number.isFinite(raw) || raw <= 0) return 0;
+    return Math.min(raw, 10 * 60);
+  }
+
   private hash(value: string) {
     return crypto.createHash("sha256").update(value).digest("hex");
   }
@@ -83,6 +93,38 @@ export class AuthService {
 
     const normalizedWhatsapp = whatsapp ? this.normalizeWhatsApp(whatsapp) : undefined;
 
+    // Deduplicate near-simultaneous requests (double-clicks, retries, accidental double submits).
+    // This ensures the client receives only one link+OTP unless an explicit resend is requested.
+    const dedupSeconds = this.linkDedupSeconds();
+    if (dedupSeconds > 0) {
+      const since = dayjs().subtract(dedupSeconds, "second").toDate();
+      const existing = await this.prisma.customerLinkToken.findFirst({
+        where: {
+          usedAt: null,
+          tokenExpiresAt: { gt: new Date() },
+          createdAt: { gt: since },
+          ...(email && normalizedWhatsapp
+            ? { email, whatsapp: normalizedWhatsapp }
+            : email
+              ? { email }
+              : normalizedWhatsapp
+                ? { whatsapp: normalizedWhatsapp }
+                : {})
+        },
+        orderBy: { createdAt: "desc" }
+      });
+      if (existing) {
+        await this.auditService.record(
+          { role: "SYSTEM" },
+          "customer_link_requested_deduped",
+          "CustomerLinkToken",
+          existing.id,
+          { email, whatsapp: normalizedWhatsapp, dedupSeconds }
+        );
+        return { otpRequired: true, deduped: true };
+      }
+    }
+
     const token = crypto.randomBytes(24).toString("hex");
     const tokenHash = this.hash(token);
     const tokenExpiresAt = dayjs().add(Number(process.env.LINK_TTL_HOURS ?? 120), "hour").toDate();
@@ -119,24 +161,27 @@ export class AuthService {
       notifyTasks.push(
         this.notificationService.sendEmail(email, subject, emailText)
       );
-      // Attach the exact draft to the webhook too, so n8n can send it if desired.
-      void this.notificationService.sendWebhook({
-        email,
-        whatsapp: normalizedWhatsapp,
-        link: linkUrl,
-        otp,
-        reason: "link_created",
-        requestedBy,
-        emails: {
-          client: {
-            target: "client",
-            to: email,
-            subject,
-            text: emailRendered.text,
-            html: emailRendered.html
+      // Avoid double-delivery: in some setups n8n also sends the email/whatsapp when it receives the webhook.
+      // Enable this only if you want webhook mirroring for auth events.
+      if (this.shouldSendAuthWebhook()) {
+        void this.notificationService.sendWebhook({
+          email,
+          whatsapp: normalizedWhatsapp,
+          link: linkUrl,
+          otp,
+          reason: "link_created",
+          requestedBy,
+          emails: {
+            client: {
+              target: "client",
+              to: email,
+              subject,
+              text: emailRendered.text,
+              html: emailRendered.html
+            }
           }
-        }
-      });
+        });
+      }
     }
     if (normalizedWhatsapp) {
       notifyTasks.push(
@@ -152,14 +197,16 @@ export class AuthService {
 
     if (!email) {
       // If there's no email, still notify webhook with link + otp metadata.
-      void this.notificationService.sendWebhook({
-        email,
-        whatsapp: normalizedWhatsapp,
-        link: linkUrl,
-        otp,
-        reason: "link_created",
-        requestedBy
-      });
+      if (this.shouldSendAuthWebhook()) {
+        void this.notificationService.sendWebhook({
+          email,
+          whatsapp: normalizedWhatsapp,
+          link: linkUrl,
+          otp,
+          reason: "link_created",
+          requestedBy
+        });
+      }
     }
 
     await this.auditService.record(
@@ -252,23 +299,25 @@ export class AuthService {
     });
     await this.notificationService.sendEmail(link.email, subject, emailText);
 
-    void this.notificationService.sendWebhook({
-      email: link.email,
-      whatsapp: link.whatsapp ?? undefined,
-      link: linkUrl,
-      otp,
-      reason: "otp_resent",
-      requestedBy: { email: link.email ?? undefined, role: "CLIENTE" },
-      emails: {
-        client: {
-          target: "client",
-          to: link.email,
-          subject,
-          text: emailRendered.text,
-          html: emailRendered.html
+    if (this.shouldSendAuthWebhook()) {
+      void this.notificationService.sendWebhook({
+        email: link.email,
+        whatsapp: link.whatsapp ?? undefined,
+        link: linkUrl,
+        otp,
+        reason: "otp_resent",
+        requestedBy: { email: link.email ?? undefined, role: "CLIENTE" },
+        emails: {
+          client: {
+            target: "client",
+            to: link.email,
+            subject,
+            text: emailRendered.text,
+            html: emailRendered.html
+          }
         }
-      }
-    });
+      });
+    }
 
     await this.auditService.record(
       { role: "SYSTEM" },

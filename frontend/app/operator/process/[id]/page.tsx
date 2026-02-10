@@ -509,245 +509,414 @@ export default function OperatorProcess() {
       </Card>
 
       {showDetails && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 px-4 py-6">
-          <div className="w-full max-w-screen-2xl rounded-2xl bg-white p-6 shadow-soft">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Dados do cliente</h2>
-              <button
-                type="button"
-                className="rounded-full bg-slate/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate"
-                onClick={() => setShowDetails(false)}
-              >
-                Fechar
-              </button>
-            </div>
-            <div className="mt-4 grid gap-6 md:grid-cols-2">
-              <div>
-                <h3 className="text-sm font-semibold text-ink">Dados empresariais</h3>
-                <ul className="mt-2 space-y-2 text-sm text-slate">
-                  <li>Razão social 1: {formatValue(step2.razaoSocial1)}</li>
-                  <li>Razão social 2: {formatValue(step2.razaoSocial2)}</li>
-                  <li>Razão social 3: {formatValue(step2.razaoSocial3)}</li>
-                  <li>Município: {formatValue(step2.municipio)}</li>
-                  <li>E-mail CNPJ: {formatValue(step2.emailCnpj)}</li>
-                  <li>Telefone CNPJ: {formatValue(step2.telefoneCnpj)}</li>
-                </ul>
+        <div className="fixed inset-0 z-50 bg-ink/40 px-4 py-6">
+          <div className="mx-auto flex h-[calc(100vh-48px)] w-full max-w-screen-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-soft">
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-ink/10 bg-white/95 px-6 py-4 backdrop-blur">
+              <div className="min-w-0">
+                <h2 className="truncate text-lg font-semibold">Dados do cliente</h2>
+                <p className="mt-0.5 text-xs text-slate">Processo {process.id} ? Etapa {process.currentStep}</p>
               </div>
-              <div>
-                <h3 className="text-sm font-semibold text-ink">Endereço</h3>
-                <ul className="mt-2 space-y-2 text-sm text-slate">
-                  <li>CEP: {formatValue(step2.endereco?.cep)}</li>
-                  <li>Endereço: {formatValue(step2.endereco?.endereco)}</li>
-                  <li>Número: {formatValue(step2.endereco?.numero)}</li>
-                  <li>Complemento: {formatValue(step2.endereco?.complemento)}</li>
-                  <li>Bairro: {formatValue(step2.endereco?.bairro)}</li>
-                  <li>Cidade: {formatValue(step2.endereco?.cidade)}</li>
-                  <li>UF: {formatValue(step2.endereco?.uf)}</li>
-                  <li>IPTU: {formatValue(step2.endereco?.iptu)}</li>
-                  <li>Endereço virtual: {formatValue(step2.endereco?.escritorioVirtual)}</li>
-                </ul>
-              </div>
-            </div>
-            <div className="mt-6">
-              <h3 className="text-sm font-semibold text-ink">Quadro societário</h3>
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                {sociosList.map((socio: any, index: number) => (
-                  <div key={index} className="rounded-xl border border-ink/10 bg-white/80 p-3 text-sm text-slate">
-                    <p className="text-sm font-semibold text-ink">Scio {index + 1}</p>
-                    <p>Nome: {formatValue(socio?.socioNome)}</p>
-                    <p>CPF: {formatValue(socio?.socioCpf)}</p>
-                    <p>E-mail: {formatValue(socio?.socioEmail)}</p>
-                    <p>Telefone: {formatValue(socio?.socioTelefone)}</p>
-                    <p>Participação: {formatValue(socio?.socioPercentual)}</p>
-                    <p>Estado civil: {formatValue(socio?.socioEstadoCivil)}</p>
-                    <p>Profissão: {formatValue(socio?.socioProfissao)}</p>
-                    <p>Regime de casamento: {formatValue(socio?.socioRegimeCasamento)}</p>
-                    <p>Administrador: {formatValue(socio?.socioAdministrador)}</p>
-                    <p>Resp. CNPJ: {formatValue(socio?.responsavelCnpj)}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="mt-6">
-              <h3 className="text-sm font-semibold text-ink">Aprovação dos campos do cliente</h3>
-              <p className="mt-1 text-xs text-slate">
-                Use <FiCheck className="inline h-4 w-4 align-[-2px]" /> para aprovar e{" "}
-                <FiX className="inline h-4 w-4 align-[-2px]" /> para reprovar.
-              </p>
-              <div className="mt-3 space-y-3">
-                {approvalFields.map((field) => (
-                  <div key={field.key} className="flex items-center justify-between rounded-xl border border-ink/10 bg-white/80 px-4 py-3">
-                    <div>
-                      <p className="text-sm font-semibold text-ink">{field.label}</p>
-                      <p className="text-xs text-slate">{formatValue(field.value)}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className={clsx(
-                          "inline-flex h-9 w-9 items-center justify-center rounded-full text-lg",
-                          fieldDecisions[field.key] === "approved" ? "bg-emerald text-white" : "bg-emerald/10 text-emerald"
-                        )}
-                        onClick={() => setDecision(field.key, "approved")}
-                        disabled={!step2Enabled}
-                        aria-label="Aprovar campo"
-                      >
-                        <FiCheck />
-                      </button>
-                      <button
-                        type="button"
-                        className={clsx(
-                          "inline-flex h-9 w-9 items-center justify-center rounded-full text-lg",
-                          fieldDecisions[field.key] === "rejected" ? "bg-clay text-white" : "bg-clay/10 text-clay"
-                        )}
-                        onClick={() => {
-                          setDecision(field.key, "rejected");
-                          setRejectReason("");
-                          setRejectModal({ type: "fields", fields: [field.key] });
-                        }}
-                        disabled={!step2Enabled}
-                        aria-label="Reprovar campo"
-                      >
-                        <FiX />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Button
-                  className="bg-emerald"
-                  onClick={() => setFieldDecisions(Object.fromEntries(approvalFields.map((f) => [f.key, "approved"])))}
-                  disabled={!step2Enabled}
-                >
-                  Aprovar todos
+              <div className="flex items-center gap-2">
+                <Button variant="primary" onClick={resendLink} disabled={sendingLink}>
+                  {sendingLink ? "Enviando..." : "Reenviar link"}
                 </Button>
-                <Button
-                  className="bg-clay"
-                  onClick={() => {
-                    setFieldDecisions(Object.fromEntries(approvalFields.map((f) => [f.key, "rejected"])));
-                    setRejectReason("");
-                    setRejectModal({ type: "fields", fields: approvalFields.map((f) => f.key) });
-                  }}
-                  disabled={!step2Enabled}
+                <button
+                  type="button"
+                  className="rounded-full bg-slate/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate"
+                  onClick={() => setShowDetails(false)}
                 >
-                  Reprovar todos
-                </Button>
-                <Button
-                  className="bg-ink"
-                  onClick={() => {
-                    const rejected = getRejectedFields(approvalFields.map((f) => f.key));
-                    if (rejected.length === 0) {
-                      notifySuccess("Nenhum campo reprovado.");
-                      return;
-                    }
-                    setRejectReason("");
-                    setRejectModal({ type: "fields", fields: rejected });
-                  }}
-                  disabled={!step2Enabled}
-                >
-                  Enviar reprovaes
-                </Button>
+                  Fechar
+                </button>
               </div>
             </div>
 
-            <div className="mt-6">
-              <h3 className="text-sm font-semibold text-ink">Documentos anexados</h3>
-              <p className="mt-1 text-xs text-slate">
-                Aprove com <FiCheck className="inline h-4 w-4 align-[-2px]" /> e reprove com{" "}
-                <FiX className="inline h-4 w-4 align-[-2px]" />. Se reprovar, informe o motivo.
-              </p>
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                {documentos.map((doc: any) => (
-                  <div key={doc.id} className="rounded-xl border border-ink/10 bg-white/80 p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-ink">
-                          {doc.itemKey}
-                          {doc.socioId ? `  ${socioMap.get(doc.socioId) ?? "Scio"}` : ""}
+            <div className="flex-1 overflow-y-auto px-6 py-6">
+              <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+                <aside className="space-y-4">
+                  <div className="rounded-2xl border border-ink/10 bg-white/80 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">Resumo</p>
+                    <div className="mt-3 grid gap-3">
+                      <div className="rounded-xl border border-ink/10 bg-white/80 p-3">
+                        <p className="text-xs text-slate">Campos do cliente</p>
+                        <p className="mt-0.5 text-sm font-semibold text-ink">
+                          {fieldsApprovedCount}/{approvalFields.length} aprovados
                         </p>
-                        <p className="text-xs text-slate">Status: {doc.status}</p>
+                        {fieldsRejectedCount > 0 && <p className="text-xs text-clay">{fieldsRejectedCount} reprovados</p>}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          className={clsx(
-                            "inline-flex h-9 w-9 items-center justify-center rounded-full text-lg",
-                            resolveDocStatus(doc) === "APROVADO"
-                              ? "bg-emerald text-white"
-                              : "bg-emerald/10 text-emerald"
-                          )}
-                          onClick={() => validateDocument(doc.itemKey, doc.socioId, "APROVADO")}
-                          disabled={docLoading === buildDocumentKey(doc.itemKey, doc.socioId)}
-                          aria-label="Aprovar documento"
-                        >
-                          <FiCheck />
-                        </button>
-                        <button
-                          type="button"
-                          className={clsx(
-                            "inline-flex h-9 w-9 items-center justify-center rounded-full text-lg",
-                            resolveDocStatus(doc) === "REPROVADO"
-                              ? "bg-clay text-white"
-                              : "bg-clay/10 text-clay"
-                          )}
-                          onClick={() => {
-                            setRejectReason("");
-                            setRejectModal({ type: "document", documentKey: doc.itemKey, documentSocioId: doc.socioId });
-                          }}
-                          disabled={docLoading === buildDocumentKey(doc.itemKey, doc.socioId)}
-                          aria-label="Reprovar documento"
-                        >
-                          <FiX />
-                        </button>
+                      <div className="rounded-xl border border-ink/10 bg-white/80 p-3">
+                        <p className="text-xs text-slate">Documentos</p>
+                        <p className="mt-0.5 text-sm font-semibold text-ink">
+                          {docsApprovedCount}/{documentos.length} aprovados
+                        </p>
+                        {docsRejectedCount > 0 && <p className="text-xs text-clay">{docsRejectedCount} reprovados</p>}
                       </div>
                     </div>
+                    {!approvalsComplete && (
+                      <p className="mt-3 text-xs text-slate">
+                        Para avan?ar, aprove todos os campos e documentos (ou solicite corre??o quando necess?rio).
+                      </p>
+                    )}
+                  </div>
 
-                    <div className="mt-3 space-y-2">
-                      {(doc.files ?? []).length === 0 && <p className="text-xs text-slate">Sem anexos</p>}
-                      {(doc.files ?? []).map((file: any) => (
-                        <div key={file.id} className="flex items-center justify-between gap-3">
-                          <span className="text-xs text-slate">{file.fileName}</span>
-                          <Button variant="primary" onClick={() => setSelectedFile({ itemKey: doc.itemKey, file })}>
-                            Visualizar
-                          </Button>
+                  <div className="rounded-2xl border border-ink/10 bg-white/80 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">A??es r?pidas</p>
+                    <div className="mt-3 flex flex-col gap-2">
+                      <Button
+                        className="bg-emerald"
+                        onClick={() =>
+                          setFieldDecisions(Object.fromEntries(approvalFields.map((f) => [f.key, "approved"])))
+                        }
+                        disabled={!step2Enabled}
+                      >
+                        Aprovar campos
+                      </Button>
+                      <Button variant="accent" onClick={approveAllDocs} disabled={docLoading === "ALL"}>
+                        Aprovar documentos
+                      </Button>
+                      <Button className="bg-ink" onClick={() => setShowDetails(false)}>
+                        Voltar ao processo
+                      </Button>
+                    </div>
+                  </div>
+                </aside>
+
+                <div className="space-y-8">
+                  <section className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-2xl border border-ink/10 bg-white/80 p-4">
+                      <h3 className="text-sm font-semibold text-ink">Dados empresariais</h3>
+                      <dl className="mt-3 grid gap-3 text-sm text-slate">
+                        <div>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Raz?o social 1</dt>
+                          <dd className="mt-1 text-ink">{formatValue(step2.razaoSocial1)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Raz?o social 2</dt>
+                          <dd className="mt-1 text-ink">{formatValue(step2.razaoSocial2)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Raz?o social 3</dt>
+                          <dd className="mt-1 text-ink">{formatValue(step2.razaoSocial3)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Munic?pio</dt>
+                          <dd className="mt-1 text-ink">{formatValue(step2.municipio)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">E-mail CNPJ</dt>
+                          <dd className="mt-1 break-all text-ink">{formatValue(step2.emailCnpj)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Telefone CNPJ</dt>
+                          <dd className="mt-1 text-ink">{formatValue(step2.telefoneCnpj)}</dd>
+                        </div>
+                      </dl>
+                    </div>
+
+                    <div className="rounded-2xl border border-ink/10 bg-white/80 p-4">
+                      <h3 className="text-sm font-semibold text-ink">Endere?o</h3>
+                      <dl className="mt-3 grid gap-3 text-sm text-slate">
+                        <div>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">CEP</dt>
+                          <dd className="mt-1 text-ink">{formatValue(step2.endereco?.cep)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Logradouro</dt>
+                          <dd className="mt-1 text-ink">{formatValue(step2.endereco?.endereco)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">N?mero</dt>
+                          <dd className="mt-1 text-ink">{formatValue(step2.endereco?.numero)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Complemento</dt>
+                          <dd className="mt-1 text-ink">{formatValue(step2.endereco?.complemento)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Bairro</dt>
+                          <dd className="mt-1 text-ink">{formatValue(step2.endereco?.bairro)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Cidade/UF</dt>
+                          <dd className="mt-1 text-ink">
+                            {formatValue(step2.endereco?.cidade)} / {formatValue(step2.endereco?.uf)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">IPTU</dt>
+                          <dd className="mt-1 text-ink">{formatValue(step2.endereco?.iptu)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Endere?o virtual</dt>
+                          <dd className="mt-1 text-ink">{formatValue(step2.endereco?.escritorioVirtual)}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </section>
+
+                  <section>
+                    <h3 className="text-sm font-semibold text-ink">Quadro societ?rio</h3>
+                    <p className="mt-1 text-xs text-slate">Confer?ncia r?pida dos dados informados.</p>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      {sociosList.map((socio: any, index: number) => (
+                        <div key={index} className="rounded-2xl border border-ink/10 bg-white/80 p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-semibold text-ink">S?cio {index + 1}</p>
+                            <span className="rounded-full bg-brass/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink">
+                              {formatValue(socio?.socioPercentual)}
+                            </span>
+                          </div>
+                          <dl className="mt-3 grid gap-3 text-sm text-slate sm:grid-cols-2">
+                            <div className="sm:col-span-2">
+                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Nome</dt>
+                              <dd className="mt-1 text-ink">{formatValue(socio?.socioNome)}</dd>
+                            </div>
+                            <div>
+                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">CPF</dt>
+                              <dd className="mt-1 text-ink">{formatValue(socio?.socioCpf)}</dd>
+                            </div>
+                            <div>
+                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Administrador</dt>
+                              <dd className="mt-1 text-ink">{formatValue(socio?.socioAdministrador)}</dd>
+                            </div>
+                            <div>
+                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">E-mail</dt>
+                              <dd className="mt-1 break-all text-ink">{formatValue(socio?.socioEmail)}</dd>
+                            </div>
+                            <div>
+                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Telefone</dt>
+                              <dd className="mt-1 text-ink">{formatValue(socio?.socioTelefone)}</dd>
+                            </div>
+                            <div>
+                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Estado civil</dt>
+                              <dd className="mt-1 text-ink">{formatValue(socio?.socioEstadoCivil)}</dd>
+                            </div>
+                            <div>
+                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Profiss?o</dt>
+                              <dd className="mt-1 text-ink">{formatValue(socio?.socioProfissao)}</dd>
+                            </div>
+                            <div className="sm:col-span-2">
+                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Regime de casamento</dt>
+                              <dd className="mt-1 text-ink">{formatValue(socio?.socioRegimeCasamento)}</dd>
+                            </div>
+                            <div className="sm:col-span-2">
+                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Respons?vel CNPJ</dt>
+                              <dd className="mt-1 text-ink">{formatValue(socio?.responsavelCnpj)}</dd>
+                            </div>
+                          </dl>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section>
+                    <h3 className="text-sm font-semibold text-ink">Aprova??o dos campos do cliente</h3>
+                    <p className="mt-1 text-xs text-slate">
+                      Use <FiCheck className="inline h-4 w-4 align-[-2px]" /> para aprovar e{" "}
+                      <FiX className="inline h-4 w-4 align-[-2px]" /> para reprovar.
+                    </p>
+
+                    <div className="mt-3 space-y-3">
+                      {approvalFields.map((field) => (
+                        <div
+                          key={field.key}
+                          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink/10 bg-white/80 px-4 py-3"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-ink">{field.label}</p>
+                            <p className="truncate text-xs text-slate">{formatValue(field.value)}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className={clsx(
+                                "inline-flex h-9 w-9 items-center justify-center rounded-full text-lg",
+                                fieldDecisions[field.key] === "approved" ? "bg-emerald text-white" : "bg-emerald/10 text-emerald"
+                              )}
+                              onClick={() => setDecision(field.key, "approved")}
+                              disabled={!step2Enabled}
+                              aria-label="Aprovar campo"
+                            >
+                              <FiCheck />
+                            </button>
+                            <button
+                              type="button"
+                              className={clsx(
+                                "inline-flex h-9 w-9 items-center justify-center rounded-full text-lg",
+                                fieldDecisions[field.key] === "rejected" ? "bg-clay text-white" : "bg-clay/10 text-clay"
+                              )}
+                              onClick={() => {
+                                setDecision(field.key, "rejected");
+                                setRejectReason("");
+                                setRejectModal({ type: "fields", fields: [field.key] });
+                              }}
+                              disabled={!step2Enabled}
+                              aria-label="Reprovar campo"
+                            >
+                              <FiX />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
 
-                  </div>
-                ))}
-              </div>
-              {isVirtual && (
-                <div className="mt-4 rounded-xl border border-emerald/30 bg-emerald/5 p-3">
-                  <p className="text-sm font-semibold text-ink">Foto da fachada (endereço virtual)</p>
-                  <p className="text-xs text-slate">Anexe a fachada após a submissão do cliente.</p>
-                  <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center">
-                    <Input
-                      type="file"
-                      multiple
-                      accept=".jpg,.jpeg,.png,.pdf"
-                      onChange={(event) => {
-                        const files = event.target.files ? Array.from(event.target.files) : [];
-                        setFachadaFiles(files);
-                      }}
-                    />
-                    <Button
-                      className="bg-emerald"
-                      onClick={uploadFachada}
-                      disabled={docLoading === "FOTO_FACHADA_UPLOAD"}
-                    >
-                      {docLoading === "FOTO_FACHADA_UPLOAD" ? "Enviando..." : "Enviar foto"}
-                    </Button>
-                  </div>
-                  {fachadaError && <p className="mt-2 text-xs text-clay">{fachadaError}</p>}
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <Button
+                        className="bg-emerald"
+                        onClick={() => setFieldDecisions(Object.fromEntries(approvalFields.map((f) => [f.key, "approved"])))}
+                        disabled={!step2Enabled}
+                      >
+                        Aprovar todos
+                      </Button>
+                      <Button
+                        className="bg-clay"
+                        onClick={() => {
+                          setFieldDecisions(Object.fromEntries(approvalFields.map((f) => [f.key, "rejected"])));
+                          setRejectReason("");
+                          setRejectModal({ type: "fields", fields: approvalFields.map((f) => f.key) });
+                        }}
+                        disabled={!step2Enabled}
+                      >
+                        Reprovar todos
+                      </Button>
+                      <Button
+                        className="bg-ink"
+                        onClick={() => {
+                          const rejected = getRejectedFields(approvalFields.map((f) => f.key));
+                          if (rejected.length === 0) {
+                            notifySuccess("Nenhum campo reprovado.");
+                            return;
+                          }
+                          setRejectReason("");
+                          setRejectModal({ type: "fields", fields: rejected });
+                        }}
+                        disabled={!step2Enabled}
+                      >
+                        Enviar reprova??es
+                      </Button>
+                    </div>
+                  </section>
+
+                  <section>
+                    <h3 className="text-sm font-semibold text-ink">Documentos anexados</h3>
+                    <p className="mt-1 text-xs text-slate">
+                      Aprove com <FiCheck className="inline h-4 w-4 align-[-2px]" /> e reprove com{" "}
+                      <FiX className="inline h-4 w-4 align-[-2px]" />. Se reprovar, informe o motivo.
+                    </p>
+
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      {documentos.map((doc: any) => {
+                        const status = resolveDocStatus(doc);
+                        const badge =
+                          status === "APROVADO"
+                            ? "bg-emerald/15 text-emerald"
+                            : status === "REPROVADO"
+                              ? "bg-clay/15 text-clay"
+                              : status === "AGUARDANDO_VALIDACAO"
+                                ? "bg-brass/15 text-ink"
+                                : "bg-slate/10 text-slate";
+
+                        return (
+                          <div key={doc.id} className="rounded-2xl border border-ink/10 bg-white/80 p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-ink">
+                                  {doc.itemKey}
+                                  {doc.socioId ? ` ? ${socioMap.get(doc.socioId) ?? "S?cio"}` : ""}
+                                </p>
+                                <span
+                                  className={clsx(
+                                    "mt-2 inline-flex w-fit rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]",
+                                    badge
+                                  )}
+                                >
+                                  {status || "PENDENTE"}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  className={clsx(
+                                    "inline-flex h-9 w-9 items-center justify-center rounded-full text-lg",
+                                    status === "APROVADO" ? "bg-emerald text-white" : "bg-emerald/10 text-emerald"
+                                  )}
+                                  onClick={() => validateDocument(doc.itemKey, doc.socioId, "APROVADO")}
+                                  disabled={docLoading === buildDocumentKey(doc.itemKey, doc.socioId)}
+                                  aria-label="Aprovar documento"
+                                >
+                                  <FiCheck />
+                                </button>
+                                <button
+                                  type="button"
+                                  className={clsx(
+                                    "inline-flex h-9 w-9 items-center justify-center rounded-full text-lg",
+                                    status === "REPROVADO" ? "bg-clay text-white" : "bg-clay/10 text-clay"
+                                  )}
+                                  onClick={() => {
+                                    setRejectReason("");
+                                    setRejectModal({ type: "document", documentKey: doc.itemKey, documentSocioId: doc.socioId });
+                                  }}
+                                  disabled={docLoading === buildDocumentKey(doc.itemKey, doc.socioId)}
+                                  aria-label="Reprovar documento"
+                                >
+                                  <FiX />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 space-y-2">
+                              {(doc.files ?? []).length === 0 && (
+                                <div className="rounded-xl border border-ink/10 bg-slate/5 p-3 text-xs text-slate">
+                                  <p className="font-semibold text-ink">Nenhum anexo encontrado</p>
+                                  <p className="mt-1">
+                                    Se o cliente disse que enviou, pe?a para atualizar a p?gina e reenviar. Se persistir,
+                                    verifique se a sess?o do cliente expirou (cookie em HTTP) ou se o PDF foi enviado como
+                                    tipo gen?rico.
+                                  </p>
+                                </div>
+                              )}
+                              {(doc.files ?? []).map((file: any) => (
+                                <div key={file.id} className="flex items-center justify-between gap-3">
+                                  <span className="truncate text-xs text-slate">{file.fileName}</span>
+                                  <Button variant="primary" onClick={() => setSelectedFile({ itemKey: doc.itemKey, file })}>
+                                    Visualizar
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {isVirtual && (
+                      <div className="mt-4 rounded-2xl border border-emerald/30 bg-emerald/5 p-4">
+                        <p className="text-sm font-semibold text-ink">Foto da fachada (endere?o virtual)</p>
+                        <p className="mt-1 text-xs text-slate">Anexe a fachada ap?s a submiss?o do cliente.</p>
+                        <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center">
+                          <Input
+                            type="file"
+                            multiple
+                            accept=".jpg,.jpeg,.png,.pdf"
+                            onChange={(event) => {
+                              const files = event.target.files ? Array.from(event.target.files) : [];
+                              setFachadaFiles(files);
+                            }}
+                          />
+                          <Button className="bg-emerald" onClick={uploadFachada} disabled={docLoading === "FOTO_FACHADA_UPLOAD"}>
+                            {docLoading === "FOTO_FACHADA_UPLOAD" ? "Enviando..." : "Enviar foto"}
+                          </Button>
+                        </div>
+                        {fachadaError && <p className="mt-2 text-xs text-clay">{fachadaError}</p>}
+                      </div>
+                    )}
+
+                    <div className="mt-4">
+                      <Button variant="accent" onClick={approveAllDocs} disabled={docLoading === "ALL"}>
+                        Aprovar todos os documentos
+                      </Button>
+                    </div>
+                  </section>
                 </div>
-              )}
-              <div className="mt-4">
-                <Button variant="accent" onClick={approveAllDocs} disabled={docLoading === "ALL"}>
-                  Aprovar todos os documentos
-                </Button>
               </div>
             </div>
           </div>
