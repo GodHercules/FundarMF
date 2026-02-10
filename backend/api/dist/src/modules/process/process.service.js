@@ -60,6 +60,52 @@ let ProcessService = class ProcessService {
         this.notificationService = notificationService;
         this.authService = authService;
     }
+    async sendProcessEventEmails(processId, event, details) {
+        try {
+            const process = await this.prisma.process.findUnique({ where: { id: processId } });
+            if (!process)
+                return;
+            const owner = process.ownerId && process.ownerId.length > 0
+                ? await this.prisma.user.findUnique({ where: { id: process.ownerId } }).catch(() => null)
+                : null;
+            const drafts = (0, process_email_drafts_1.buildProcessEmailDrafts)({
+                event,
+                process: {
+                    id: process.id,
+                    clientName: process.clientName,
+                    clientEmail: process.clientEmail,
+                    clientPhone: process.clientPhone,
+                    status: process.status,
+                    currentStep: process.currentStep,
+                    ownerEmail: owner?.email ?? null
+                },
+                details
+            });
+            const clientTo = process.clientEmail?.trim() || "";
+            const operatorTo = owner?.email?.trim() || "";
+            const tasks = [];
+            const hasSpecific = Boolean(drafts.client || drafts.operator);
+            // Prefer role-specific drafts. Use `both` only as a fallback when no specific draft exists.
+            if (drafts.client && clientTo) {
+                tasks.push(this.notificationService.sendEmailDraft(clientTo, drafts.client));
+            }
+            else if (!hasSpecific && drafts.both && clientTo) {
+                tasks.push(this.notificationService.sendEmailDraft(clientTo, drafts.both));
+            }
+            if (drafts.operator && operatorTo) {
+                tasks.push(this.notificationService.sendEmailDraft(operatorTo, drafts.operator));
+            }
+            else if (!hasSpecific && drafts.both && operatorTo) {
+                tasks.push(this.notificationService.sendEmailDraft(operatorTo, drafts.both));
+            }
+            if (tasks.length > 0) {
+                await Promise.all(tasks);
+            }
+        }
+        catch (err) {
+            console.warn("[process] sendProcessEventEmails failed", err);
+        }
+    }
     async sendProcessWebhook(processId, event, actor, details) {
         try {
             const process = await this.prisma.process.findUnique({ where: { id: processId } });
@@ -538,8 +584,8 @@ let ProcessService = class ProcessService {
             });
             await this.slaService.stopAll(processId);
             await Promise.all([
-                this.notificationService.sendEmail(process.clientEmail, "Processo concluído", "Seu processo foi concluído com sucesso."),
-                this.notificationService.sendWhatsApp(process.clientPhone ?? process.clientEmail, "Processo concluído.")
+                this.sendProcessEventEmails(processId, "process_completed"),
+                this.notificationService.sendWhatsApp(process.clientPhone ?? process.clientEmail, "Processo concluido.")
             ]);
             await this.auditService.record(actor, "process_completed", "Process", processId);
             void this.sendProcessWebhook(processId, "process_completed", actor);
@@ -553,6 +599,7 @@ let ProcessService = class ProcessService {
         });
         await this.slaService.startSla(processId, next, nextSide);
         await this.auditService.record(actor, "approve_step", "Process", processId, { stepKey });
+        void this.sendProcessEventEmails(processId, "step_approved", { stepKey, nextStep: next });
         void this.sendProcessWebhook(processId, "step_approved", actor, { stepKey, nextStep: next });
         return { ok: true, nextStep: next };
     }
@@ -595,7 +642,7 @@ let ProcessService = class ProcessService {
         await this.slaService.stopSla(processId, stepKey, "OPERADOR");
         await this.slaService.startSla(processId, stepKey, "CLIENTE");
         await Promise.all([
-            this.notificationService.sendEmail(process.clientEmail, "Correção solicitada", `Correção solicitada na ${stepKey}: ${reason}`),
+            this.notificationService.sendEmail(process.clientEmail, "Correcao solicitada", `Correcao solicitada na ${stepKey}: ${reason}`),
             this.notificationService.sendWhatsApp(process.clientPhone ?? process.clientEmail, `Correção solicitada na ${stepKey}: ${reason}`)
         ]);
         await this.notifyOwner(processId, process.ownerId ?? null, {
@@ -620,6 +667,7 @@ let ProcessService = class ProcessService {
             data: { status: client_1.ProcessStatus.EM_ANDAMENTO }
         });
         await this.auditService.record(actor, "mark_in_progress", "Process", processId);
+        void this.sendProcessEventEmails(processId, "process_marked_in_progress");
         void this.sendProcessWebhook(processId, "process_marked_in_progress", actor);
         return updated;
     }
@@ -642,7 +690,7 @@ let ProcessService = class ProcessService {
         });
         await this.slaService.stopAll(processId);
         await Promise.all([
-            this.notificationService.sendEmail(process.clientEmail, "Processo cancelado", `Seu processo foi cancelado. Motivo: ${reason}`),
+            this.sendProcessEventEmails(processId, "process_cancelled", { cancelReason: reason }),
             this.notificationService.sendWhatsApp(process.clientPhone ?? process.clientEmail, `Processo cancelado. Motivo: ${reason}`)
         ]);
         await this.auditService.record(actor, "process_cancelled", "Process", processId, { reason });
