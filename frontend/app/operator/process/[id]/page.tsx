@@ -12,7 +12,7 @@ import { Input } from "@/components/Input";
 import { Logo } from "@/components/Logo";
 import { Select } from "@/components/Select";
 import { Field } from "@/components/Field";
-import { notifySuccess } from "@/lib/notify";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import { maskCnae, maskCurrency } from "@/lib/masks";
 import { FiCheck, FiCheckCircle, FiX, FiXCircle } from "react-icons/fi";
 
@@ -53,6 +53,9 @@ export default function OperatorProcess() {
   const [step3, setStep3] = useState(defaultStep3);
   const [showDetails, setShowDetails] = useState(false);
   const [selectedFile, setSelectedFile] = useState<{ itemKey: string; file: any } | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [docLoading, setDocLoading] = useState<string | null>(null);
   const [fieldDecisions, setFieldDecisions] = useState<Record<string, "approved" | "rejected" | undefined>>({});
   const [docDecisions, setDocDecisions] = useState<Record<string, "APROVADO" | "REPROVADO" | undefined>>({});
@@ -99,6 +102,52 @@ export default function OperatorProcess() {
       )
     );
   }, [process]);
+
+  // Fetch preview as a blob with credentials. This avoids iframe auth edge cases in some browsers/environments.
+  useEffect(() => {
+    let active = true;
+    let objectUrlToRevoke: string | null = null;
+
+    async function loadPreview() {
+      if (!selectedFile) return;
+      setPreviewLoading(true);
+      setPreviewError(null);
+      setPreviewUrl(null);
+      try {
+        const endpoint = `${API_BASE}/documents/${processId}/items/${selectedFile.itemKey}/preview/${selectedFile.file.id}`;
+        const response = await fetch(endpoint, { credentials: "include" });
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || `Erro ao carregar documento (${response.status}).`);
+        }
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        objectUrlToRevoke = objectUrl;
+        if (!active) return;
+        setPreviewUrl(objectUrl);
+      } catch (err: any) {
+        if (!active) return;
+        const msg = err?.message || "Erro ao carregar documento.";
+        setPreviewError(msg);
+        notifyError(msg);
+      } finally {
+        if (active) setPreviewLoading(false);
+      }
+    }
+
+    if (!selectedFile) {
+      setPreviewLoading(false);
+      setPreviewError(null);
+      setPreviewUrl(null);
+      return () => {};
+    }
+
+    void loadPreview();
+    return () => {
+      active = false;
+      if (objectUrlToRevoke) URL.revokeObjectURL(objectUrlToRevoke);
+    };
+  }, [API_BASE, processId, selectedFile?.itemKey, selectedFile?.file?.id]);
 
   async function validateDocument(itemKey: string, socioId: string | undefined, status: "APROVADO" | "REPROVADO", reason = "") {
     if (status === "REPROVADO" && !reason.trim()) {
@@ -1025,17 +1074,36 @@ export default function OperatorProcess() {
               </button>
             </div>
             <div className="mt-4 h-[72vh] w-full overflow-hidden rounded-xl border border-ink/10 bg-white xl:h-[78vh] 2xl:h-[82vh]">
-              {selectedFile.file.mimeType === "application/pdf" ? (
-                <iframe
-                  className="h-full w-full"
-                  src={`${API_BASE}/documents/${processId}/items/${selectedFile.itemKey}/preview/${selectedFile.file.id}`}
-                />
-              ) : (
-                <img
-                  alt={selectedFile.file.fileName}
-                  className="h-full w-full object-contain"
-                  src={`${API_BASE}/documents/${processId}/items/${selectedFile.itemKey}/preview/${selectedFile.file.id}`}
-                />
+              {previewLoading && <div className="grid h-full w-full place-items-center text-sm text-slate">Carregando...</div>}
+              {!previewLoading && previewError && (
+                <div className="grid h-full w-full place-items-center p-6 text-center">
+                  <div>
+                    <p className="text-sm font-semibold text-ink">Não foi possível abrir o documento.</p>
+                    <p className="mt-1 text-xs text-slate">{previewError}</p>
+                    <div className="mt-4 flex justify-center gap-3">
+                      <Button variant="primary" onClick={() => setSelectedFile(null)}>
+                        Fechar
+                      </Button>
+                      <a
+                        className="inline-flex items-center justify-center rounded-xl border border-ink/15 px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.14em] text-ink shadow-lift transition hover:-translate-y-0.5 hover:border-brass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass/40"
+                        href={`${API_BASE}/documents/${processId}/items/${selectedFile.itemKey}/download/${selectedFile.file.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Baixar
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {!previewLoading && !previewError && previewUrl && (
+                <>
+                  {selectedFile.file.mimeType === "application/pdf" ? (
+                    <iframe className="h-full w-full" src={previewUrl} />
+                  ) : (
+                    <img alt={selectedFile.file.fileName} className="h-full w-full object-contain" src={previewUrl} />
+                  )}
+                </>
               )}
             </div>
           </div>

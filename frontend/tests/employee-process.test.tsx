@@ -3,6 +3,8 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const pushMock = vi.fn();
+const fetchMock = vi.fn();
+
 vi.mock("next/navigation", () => ({
   useParams: () => ({ id: "process-123" }),
   useRouter: () => ({ push: pushMock })
@@ -73,6 +75,11 @@ const processPayload = {
 describe("OperatorProcess", () => {
   beforeEach(() => {
     apiMock.mockReset();
+    fetchMock.mockReset();
+    (globalThis as any).fetch = fetchMock;
+    (globalThis as any).URL.createObjectURL = vi.fn(() => "blob:preview");
+    (globalThis as any).URL.revokeObjectURL = vi.fn();
+
     apiMock.mockImplementation((path: string) => {
       if (path === "/processes/process-123") return Promise.resolve(processPayload);
       if (path === "/documents/process-123/items") return Promise.resolve(processPayload.documents);
@@ -99,6 +106,12 @@ describe("OperatorProcess", () => {
     const user = userEvent.setup();
     render(<EmployeeProcess />);
 
+    fetchMock.mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(["%PDF-1.7"], { type: "application/pdf" }),
+      text: async () => ""
+    });
+
     const btn = await screen.findByRole("button", { name: /ver dados do cliente/i });
     await user.click(btn);
 
@@ -108,9 +121,7 @@ describe("OperatorProcess", () => {
     await waitFor(() => {
       const iframe = document.querySelector("iframe");
       expect(iframe).toBeTruthy();
-      expect(iframe?.getAttribute("src")).toContain(
-        "/api/documents/process-123/items/IDENTIFICACAO_SOCIOS/preview/file-1"
-      );
+      expect(iframe?.getAttribute("src")).toBe("blob:preview");
     });
   });
 
