@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { API_BASE, api } from "@/lib/api";
 import { Card } from "@/components/Card";
@@ -155,7 +155,6 @@ function findDocumentItem(process: any, itemKey: string, socioId?: string) {
 
 export default function ClientProcess() {
   const params = useParams();
-  const router = useRouter();
   const processId = params?.id as string;
   const [process, setProcess] = useState<any>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -168,10 +167,31 @@ export default function ClientProcess() {
   const [uploadingItem, setUploadingItem] = useState<string | null>(null);
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
   const [submittingAll, setSubmittingAll] = useState(false);
+  const [submittedAll, setSubmittedAll] = useState(false);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+
+  if (submittedAll) {
+    return (
+      <main className="app-container flex min-h-screen flex-col gap-8 py-12">
+        <div className="flex flex-col gap-3">
+          <Logo withText />
+          <span className="badge bg-emerald/15 text-ink">Envio concluído</span>
+          <h1 className="text-3xl font-semibold">Recebemos os seus dados</h1>
+          <p className="text-slate">
+            Seu processo foi iniciado e está em análise. Aguarde o contato por e-mail ou WhatsApp.
+          </p>
+        </div>
+        <Card className="p-6">
+          <p className="text-sm text-slate">
+            Se precisar complementar alguma informação, aguarde a orientação do operador responsável.
+          </p>
+        </Card>
+      </main>
+    );
+  }
 
   if (submittingAll) {
     return (
@@ -436,8 +456,7 @@ export default function ClientProcess() {
       });
       setMessage("Dados enviados para validação.");
       notifySuccess("Dados enviados para validação.");
-      load();
-      router.replace("/client/submitted");
+      setSubmittedAll(true);
     } finally {
       setSubmittingAll(false);
       setUploadingItem(null);
