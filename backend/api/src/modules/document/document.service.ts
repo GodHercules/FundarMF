@@ -332,7 +332,8 @@ export class DocumentService {
             fileName: true,
             mimeType: true,
             size: true,
-            createdAt: true
+            createdAt: true,
+            uploadedByRole: true
           }
         }
       },

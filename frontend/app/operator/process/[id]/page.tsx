@@ -121,7 +121,7 @@ export default function OperatorProcess() {
   }
 
   async function approveAllDocs() {
-    const items = (process?.documents ?? []).map((doc: any) => ({ itemKey: doc.itemKey, socioId: doc.socioId }));
+    const items = docsForChecklist.map((doc: any) => ({ itemKey: doc.itemKey, socioId: doc.socioId }));
     if (items.length === 0) return;
     setDocLoading("ALL");
     try {
@@ -160,8 +160,8 @@ export default function OperatorProcess() {
       body: JSON.stringify({ stepKey: "ETAPA_3", data: step3 })
     });
     setStep3Saved(true);
-    setMessage("Estrutura jurdica salva.");
-    notifySuccess("Estrutura jurdica salva.");
+    setMessage("Estrutura jurídica salva.");
+    notifySuccess("Estrutura jurídica salva.");
     load();
   }
 
@@ -238,7 +238,7 @@ export default function OperatorProcess() {
 
   async function sendCorrection(fields: string[], reason: string) {
     if (!step2Enabled) {
-      setMessage("Correes s podem ser enviadas quando a etapa atual  ETAPA_2.");
+      setMessage("Correções só podem ser enviadas quando a etapa atual é ETAPA_2.");
       return;
     }
     if (!reason.trim()) {
@@ -249,7 +249,7 @@ export default function OperatorProcess() {
       method: "POST",
       body: JSON.stringify({ stepKey: "ETAPA_2", fields, reason })
     });
-    notifySuccess("Correo solicitada.");
+    notifySuccess("Correção solicitada.");
     load();
   }
 
@@ -297,13 +297,28 @@ export default function OperatorProcess() {
     String(docDecisions[buildDocumentKey(doc.itemKey, doc.socioId)] ?? doc.status ?? "")
       .trim()
       .toUpperCase();
+  // When the address is virtual, `FOTO_FACHADA` is an internal attachment and should not block
+  // client checklist completion (and should not be shown as "sent by the client").
+  const docsForChecklist = isVirtual ? documentos.filter((doc: any) => doc.itemKey !== "FOTO_FACHADA") : documentos;
+
   const approvalsComplete =
     approvalFields.every((field) => fieldDecisions[field.key] === "approved") &&
-    documentos.every((doc: any) => resolveDocStatus(doc) === "APROVADO");
+    docsForChecklist.every((doc: any) => resolveDocStatus(doc) === "APROVADO");
   const fieldsApprovedCount = approvalFields.filter((field) => fieldDecisions[field.key] === "approved").length;
   const fieldsRejectedCount = approvalFields.filter((field) => fieldDecisions[field.key] === "rejected").length;
-  const docsApprovedCount = documentos.filter((doc: any) => resolveDocStatus(doc) === "APROVADO").length;
-  const docsRejectedCount = documentos.filter((doc: any) => resolveDocStatus(doc) === "REPROVADO").length;
+  const docsApprovedCount = docsForChecklist.filter((doc: any) => resolveDocStatus(doc) === "APROVADO").length;
+  const docsRejectedCount = docsForChecklist.filter((doc: any) => resolveDocStatus(doc) === "REPROVADO").length;
+
+  const getClientFiles = (doc: any) =>
+    (doc.files ?? []).filter((file: any) => !file.uploadedByRole || file.uploadedByRole === "CLIENTE");
+
+  const docsWithClientFiles = docsForChecklist.map((doc: any) => ({
+    ...doc,
+    clientFiles: getClientFiles(doc)
+  }));
+
+  const clientSentDocs = docsWithClientFiles.filter((doc: any) => (doc.clientFiles ?? []).length > 0);
+  const clientMissingDocs = docsWithClientFiles.filter((doc: any) => (doc.clientFiles ?? []).length === 0);
   const step3Enabled = process.currentStep === "ETAPA_3" || (step2Enabled && approvalsComplete);
   const canReviewForReceita = approvalsComplete && step3Saved;
   const chatDisabled = ["CANCELADO", "CONCLUIDO"].includes(process.status);
@@ -359,7 +374,7 @@ export default function OperatorProcess() {
             <div className="flex items-start gap-3">
               {docsRejectedCount > 0 ? (
                 <FiXCircle className="mt-0.5 h-5 w-5 text-clay" />
-              ) : documentos.length > 0 && docsApprovedCount === documentos.length ? (
+              ) : docsForChecklist.length > 0 && docsApprovedCount === docsForChecklist.length ? (
                 <FiCheckCircle className="mt-0.5 h-5 w-5 text-emerald" />
               ) : (
                 <FiCheckCircle className="mt-0.5 h-5 w-5 text-slate/50" />
@@ -367,7 +382,7 @@ export default function OperatorProcess() {
               <div>
                 <p className="text-sm font-semibold text-ink">Documentos</p>
                 <p className="text-xs text-slate">
-                  {docsApprovedCount}/{documentos.length} aprovados
+                  {docsApprovedCount}/{docsForChecklist.length} aprovados
                   {docsRejectedCount > 0 ? ` · ${docsRejectedCount} reprovados` : ""}
                 </p>
               </div>
@@ -402,9 +417,9 @@ export default function OperatorProcess() {
               disabled={!step3Enabled}
             >
               <option value="">Selecione</option>
-              <option value="Comrcio">Comrcio</option>
-              <option value="Servio">Servio</option>
-              <option value="Comrcio e Servio">Comrcio e Servio</option>
+              <option value="Comrcio">Comércio</option>
+              <option value="Servio">Serviço</option>
+              <option value="Comrcio e Servio">Comércio e Serviço</option>
             </Select>
           </Field>
           <Field label="Natureza Jurídica" required>
@@ -415,10 +430,10 @@ export default function OperatorProcess() {
             >
               <option value="">Selecione</option>
               <option value="Sociedade Unipessoal">Sociedade Unipessoal</option>
-              <option value="Sociedade empresaria Ltda">Sociedade empresria Ltda</option>
-              <option value="Empresario individual">Empresrio individual</option>
+              <option value="Sociedade empresaria Ltda">Sociedade empresária Ltda</option>
+              <option value="Empresario individual">Empresário individual</option>
               <option value="Sociedade individual de Advocacia">Sociedade individual de Advocacia</option>
-              <option value="Sociedade Propsito Especfico - SPE">Sociedade Propsito Especfico - SPE</option>
+              <option value="Sociedade Propsito Especfico - SPE">Sociedade Propósito Específico - SPE</option>
               <option value="Sociedade por Conta de Participação - SCP">Sociedade por Conta de Participação - SCP</option>
             </Select>
           </Field>
@@ -514,7 +529,7 @@ export default function OperatorProcess() {
             <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-ink/10 bg-white/95 px-6 py-4 backdrop-blur">
               <div className="min-w-0">
                 <h2 className="truncate text-lg font-semibold">Dados do cliente</h2>
-                <p className="mt-0.5 text-xs text-slate">Processo {process.id} ? Etapa {process.currentStep}</p>
+                <p className="mt-0.5 text-xs text-slate">Processo {process.id} · Etapa {process.currentStep}</p>
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="primary" onClick={resendLink} disabled={sendingLink}>
@@ -546,20 +561,20 @@ export default function OperatorProcess() {
                       <div className="rounded-xl border border-ink/10 bg-white/80 p-3">
                         <p className="text-xs text-slate">Documentos</p>
                         <p className="mt-0.5 text-sm font-semibold text-ink">
-                          {docsApprovedCount}/{documentos.length} aprovados
+                          {docsApprovedCount}/{docsForChecklist.length} aprovados
                         </p>
                         {docsRejectedCount > 0 && <p className="text-xs text-clay">{docsRejectedCount} reprovados</p>}
                       </div>
                     </div>
                     {!approvalsComplete && (
                       <p className="mt-3 text-xs text-slate">
-                        Para avan?ar, aprove todos os campos e documentos (ou solicite corre??o quando necess?rio).
+                        Para avançar, aprove todos os campos e documentos (ou solicite correção quando necessário).
                       </p>
                     )}
                   </div>
 
                   <div className="rounded-2xl border border-ink/10 bg-white/80 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">A??es r?pidas</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">Ações rápidas</p>
                     <div className="mt-3 flex flex-col gap-2">
                       <Button
                         className="bg-emerald"
@@ -586,19 +601,19 @@ export default function OperatorProcess() {
                       <h3 className="text-sm font-semibold text-ink">Dados empresariais</h3>
                       <dl className="mt-3 grid gap-3 text-sm text-slate">
                         <div>
-                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Raz?o social 1</dt>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Razão social 1</dt>
                           <dd className="mt-1 text-ink">{formatValue(step2.razaoSocial1)}</dd>
                         </div>
                         <div>
-                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Raz?o social 2</dt>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Razão social 2</dt>
                           <dd className="mt-1 text-ink">{formatValue(step2.razaoSocial2)}</dd>
                         </div>
                         <div>
-                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Raz?o social 3</dt>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Razão social 3</dt>
                           <dd className="mt-1 text-ink">{formatValue(step2.razaoSocial3)}</dd>
                         </div>
                         <div>
-                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Munic?pio</dt>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Município</dt>
                           <dd className="mt-1 text-ink">{formatValue(step2.municipio)}</dd>
                         </div>
                         <div>
@@ -613,7 +628,7 @@ export default function OperatorProcess() {
                     </div>
 
                     <div className="rounded-2xl border border-ink/10 bg-white/80 p-4">
-                      <h3 className="text-sm font-semibold text-ink">Endere?o</h3>
+                      <h3 className="text-sm font-semibold text-ink">Endereço</h3>
                       <dl className="mt-3 grid gap-3 text-sm text-slate">
                         <div>
                           <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">CEP</dt>
@@ -624,7 +639,7 @@ export default function OperatorProcess() {
                           <dd className="mt-1 text-ink">{formatValue(step2.endereco?.endereco)}</dd>
                         </div>
                         <div>
-                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">N?mero</dt>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Número</dt>
                           <dd className="mt-1 text-ink">{formatValue(step2.endereco?.numero)}</dd>
                         </div>
                         <div>
@@ -646,7 +661,7 @@ export default function OperatorProcess() {
                           <dd className="mt-1 text-ink">{formatValue(step2.endereco?.iptu)}</dd>
                         </div>
                         <div>
-                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Endere?o virtual</dt>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Endereço virtual</dt>
                           <dd className="mt-1 text-ink">{formatValue(step2.endereco?.escritorioVirtual)}</dd>
                         </div>
                       </dl>
@@ -654,13 +669,13 @@ export default function OperatorProcess() {
                   </section>
 
                   <section>
-                    <h3 className="text-sm font-semibold text-ink">Quadro societ?rio</h3>
-                    <p className="mt-1 text-xs text-slate">Confer?ncia r?pida dos dados informados.</p>
+                    <h3 className="text-sm font-semibold text-ink">Quadro societário</h3>
+                    <p className="mt-1 text-xs text-slate">Conferência rápida dos dados informados.</p>
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
                       {sociosList.map((socio: any, index: number) => (
                         <div key={index} className="rounded-2xl border border-ink/10 bg-white/80 p-4">
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-sm font-semibold text-ink">S?cio {index + 1}</p>
+                            <p className="text-sm font-semibold text-ink">Sócio {index + 1}</p>
                             <span className="rounded-full bg-brass/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink">
                               {formatValue(socio?.socioPercentual)}
                             </span>
@@ -691,7 +706,7 @@ export default function OperatorProcess() {
                               <dd className="mt-1 text-ink">{formatValue(socio?.socioEstadoCivil)}</dd>
                             </div>
                             <div>
-                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Profiss?o</dt>
+                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Profissão</dt>
                               <dd className="mt-1 text-ink">{formatValue(socio?.socioProfissao)}</dd>
                             </div>
                             <div className="sm:col-span-2">
@@ -699,7 +714,7 @@ export default function OperatorProcess() {
                               <dd className="mt-1 text-ink">{formatValue(socio?.socioRegimeCasamento)}</dd>
                             </div>
                             <div className="sm:col-span-2">
-                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Respons?vel CNPJ</dt>
+                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Responsável CNPJ</dt>
                               <dd className="mt-1 text-ink">{formatValue(socio?.responsavelCnpj)}</dd>
                             </div>
                           </dl>
@@ -709,7 +724,7 @@ export default function OperatorProcess() {
                   </section>
 
                   <section>
-                    <h3 className="text-sm font-semibold text-ink">Aprova??o dos campos do cliente</h3>
+                    <h3 className="text-sm font-semibold text-ink">Aprovação dos campos do cliente</h3>
                     <p className="mt-1 text-xs text-slate">
                       Use <FiCheck className="inline h-4 w-4 align-[-2px]" /> para aprovar e{" "}
                       <FiX className="inline h-4 w-4 align-[-2px]" /> para reprovar.
@@ -791,7 +806,7 @@ export default function OperatorProcess() {
                         }}
                         disabled={!step2Enabled}
                       >
-                        Enviar reprova??es
+                        Enviar reprovações
                       </Button>
                     </div>
                   </section>
@@ -804,7 +819,7 @@ export default function OperatorProcess() {
                     </p>
 
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
-                      {documentos.map((doc: any) => {
+                      {clientSentDocs.map((doc: any) => {
                         const status = resolveDocStatus(doc);
                         const badge =
                           status === "APROVADO"
@@ -821,7 +836,7 @@ export default function OperatorProcess() {
                               <div className="min-w-0">
                                 <p className="truncate text-sm font-semibold text-ink">
                                   {doc.itemKey}
-                                  {doc.socioId ? ` ? ${socioMap.get(doc.socioId) ?? "S?cio"}` : ""}
+                                  {doc.socioId ? ` · ${socioMap.get(doc.socioId) ?? "Sócio"}` : ""}
                                 </p>
                                 <span
                                   className={clsx(
@@ -864,17 +879,7 @@ export default function OperatorProcess() {
                             </div>
 
                             <div className="mt-4 space-y-2">
-                              {(doc.files ?? []).length === 0 && (
-                                <div className="rounded-xl border border-ink/10 bg-slate/5 p-3 text-xs text-slate">
-                                  <p className="font-semibold text-ink">Nenhum anexo encontrado</p>
-                                  <p className="mt-1">
-                                    Se o cliente disse que enviou, pe?a para atualizar a p?gina e reenviar. Se persistir,
-                                    verifique se a sess?o do cliente expirou (cookie em HTTP) ou se o PDF foi enviado como
-                                    tipo gen?rico.
-                                  </p>
-                                </div>
-                              )}
-                              {(doc.files ?? []).map((file: any) => (
+                              {(doc.clientFiles ?? []).map((file: any) => (
                                 <div key={file.id} className="flex items-center justify-between gap-3">
                                   <span className="truncate text-xs text-slate">{file.fileName}</span>
                                   <Button variant="primary" onClick={() => setSelectedFile({ itemKey: doc.itemKey, file })}>
@@ -888,10 +893,39 @@ export default function OperatorProcess() {
                       })}
                     </div>
 
+                    {clientSentDocs.length === 0 && (
+                      <div className="mt-3 rounded-2xl border border-ink/10 bg-slate/5 p-4 text-sm text-slate">
+                        <p className="font-semibold text-ink">Nenhum documento enviado pelo cliente apareceu aqui.</p>
+                        <p className="mt-1 text-xs">
+                          Se o cliente disse que enviou, o mais comum é a sessão ter expirado ou o upload ter falhado.
+                          Peça para ele recarregar a página e reenviar.
+                        </p>
+                      </div>
+                    )}
+
+                    {clientMissingDocs.length > 0 && (
+                      <div className="mt-3 rounded-2xl border border-ink/10 bg-white/80 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">Pendências</p>
+                        <ul className="mt-2 space-y-1 text-sm text-slate">
+                          {clientMissingDocs.map((doc: any) => (
+                            <li key={doc.id} className="flex items-center justify-between gap-3">
+                              <span className="truncate">
+                                {doc.itemKey}
+                                {doc.socioId ? ` · ${socioMap.get(doc.socioId) ?? "Sócio"}` : ""}
+                              </span>
+                              <span className="rounded-full bg-brass/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink">
+                                Sem anexo
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
                     {isVirtual && (
                       <div className="mt-4 rounded-2xl border border-emerald/30 bg-emerald/5 p-4">
-                        <p className="text-sm font-semibold text-ink">Foto da fachada (endere?o virtual)</p>
-                        <p className="mt-1 text-xs text-slate">Anexe a fachada ap?s a submiss?o do cliente.</p>
+                        <p className="text-sm font-semibold text-ink">Foto da fachada (endereço virtual)</p>
+                        <p className="mt-1 text-xs text-slate">Anexe a fachada após a submissão do cliente.</p>
                         <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center">
                           <Input
                             type="file"
@@ -936,7 +970,7 @@ export default function OperatorProcess() {
                 Fechar
               </button>
             </div>
-            <p className="mt-2 text-sm text-slate">Esse motivo ser enviado ao cliente.</p>
+            <p className="mt-2 text-sm text-slate">Esse motivo será enviado ao cliente.</p>
             <div className="mt-4">
               <Input
                 value={rejectReason}

@@ -90,7 +90,7 @@ describe("OperatorProcess", () => {
     await user.click(btn);
 
     await screen.findByRole("heading", { name: /dados do cliente/i });
-    expect(screen.getByText(/razão social 1/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/razão social 1/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/empresa teste/i).length).toBeGreaterThan(0);
   });
 
@@ -127,7 +127,7 @@ describe("OperatorProcess", () => {
 
     expect(await screen.findByText(/motivo da reprova/i)).toBeInTheDocument();
     await user.type(screen.getByPlaceholderText(/descreva o motivo/i), "Documento incorreto");
-    await user.click(screen.getByRole("button", { name: /enviar reprovaç/i }));
+    await user.click(screen.getByRole("button", { name: /^enviar reprovação$/i }));
 
     await waitFor(() => {
       expect(apiMock).toHaveBeenCalledWith("/processes/process-123/request-correction", expect.any(Object));
