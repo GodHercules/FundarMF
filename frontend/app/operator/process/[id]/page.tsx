@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import clsx from "clsx";
 import { API_BASE, api } from "@/lib/api";
@@ -14,6 +14,7 @@ import { Select } from "@/components/Select";
 import { Field } from "@/components/Field";
 import { notifySuccess } from "@/lib/notify";
 import { maskCnae, maskCurrency } from "@/lib/masks";
+import { FiCheck, FiCheckCircle, FiX, FiXCircle } from "react-icons/fi";
 
 const defaultStep3 = {
   tipoAtividade: "",
@@ -45,6 +46,7 @@ function normalizeStep<T extends Record<string, string>>(defaults: T, data: Reco
 
 export default function OperatorProcess() {
   const params = useParams();
+  const router = useRouter();
   const processId = params?.id as string;
   const [process, setProcess] = useState<any>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -163,14 +165,9 @@ export default function OperatorProcess() {
     load();
   }
 
-  async function markInProgress() {
+  function goToReceitaReview() {
     setMessage(null);
-    await api(`/processes/${processId}/mark-in-progress`, {
-      method: "POST"
-    });
-    setMessage("Processo enviado para Receita.");
-    notifySuccess("Processo enviado para Receita.");
-    load();
+    router.push(`/operator/process/${processId}/review`);
   }
 
   async function sendChatMessage() {
@@ -303,7 +300,12 @@ export default function OperatorProcess() {
   const approvalsComplete =
     approvalFields.every((field) => fieldDecisions[field.key] === "approved") &&
     documentos.every((doc: any) => resolveDocStatus(doc) === "APROVADO");
+  const fieldsApprovedCount = approvalFields.filter((field) => fieldDecisions[field.key] === "approved").length;
+  const fieldsRejectedCount = approvalFields.filter((field) => fieldDecisions[field.key] === "rejected").length;
+  const docsApprovedCount = documentos.filter((doc: any) => resolveDocStatus(doc) === "APROVADO").length;
+  const docsRejectedCount = documentos.filter((doc: any) => resolveDocStatus(doc) === "REPROVADO").length;
   const step3Enabled = process.currentStep === "ETAPA_3" || (step2Enabled && approvalsComplete);
+  const canReviewForReceita = approvalsComplete && step3Saved;
   const chatDisabled = ["CANCELADO", "CONCLUIDO"].includes(process.status);
 
   return (
@@ -336,7 +338,41 @@ export default function OperatorProcess() {
       <section className="grid gap-6 md:grid-cols-2">
         <Card className="p-6">
           <h2 className="text-lg font-semibold">Checklist</h2>
-          <p className="text-sm text-slate">Marque itens e aprove quando tudo estiver completo.</p>
+          <p className="text-sm text-slate">Aprove campos e documentos. Envie para Receita quando tudo estiver OK.</p>
+          <div className="mt-4 grid gap-3 rounded-2xl border border-ink/10 bg-white/70 p-4 text-sm text-slate sm:grid-cols-2">
+            <div className="flex items-start gap-3">
+              {fieldsRejectedCount > 0 ? (
+                <FiXCircle className="mt-0.5 h-5 w-5 text-clay" />
+              ) : fieldsApprovedCount === approvalFields.length ? (
+                <FiCheckCircle className="mt-0.5 h-5 w-5 text-emerald" />
+              ) : (
+                <FiCheckCircle className="mt-0.5 h-5 w-5 text-slate/50" />
+              )}
+              <div>
+                <p className="text-sm font-semibold text-ink">Campos do cliente</p>
+                <p className="text-xs text-slate">
+                  {fieldsApprovedCount}/{approvalFields.length} aprovados
+                  {fieldsRejectedCount > 0 ? ` · ${fieldsRejectedCount} reprovados` : ""}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              {docsRejectedCount > 0 ? (
+                <FiXCircle className="mt-0.5 h-5 w-5 text-clay" />
+              ) : documentos.length > 0 && docsApprovedCount === documentos.length ? (
+                <FiCheckCircle className="mt-0.5 h-5 w-5 text-emerald" />
+              ) : (
+                <FiCheckCircle className="mt-0.5 h-5 w-5 text-slate/50" />
+              )}
+              <div>
+                <p className="text-sm font-semibold text-ink">Documentos</p>
+                <p className="text-xs text-slate">
+                  {docsApprovedCount}/{documentos.length} aprovados
+                  {docsRejectedCount > 0 ? ` · ${docsRejectedCount} reprovados` : ""}
+                </p>
+              </div>
+            </div>
+          </div>
           <div className="mt-4 flex flex-wrap gap-3">
             <Button variant="primary" onClick={() => setShowDetails(true)}>
               Ver dados do cliente
@@ -427,9 +463,9 @@ export default function OperatorProcess() {
           <Button onClick={updateStep3} disabled={!step3Enabled}>
             Salvar
           </Button>
-          {step3Saved && (
-            <Button variant="accent" onClick={markInProgress}>
-              Enviar para Receita
+          {canReviewForReceita && (
+            <Button variant="accent" onClick={goToReceitaReview}>
+              Revisar e enviar para Receita
             </Button>
           )}
         </div>
@@ -534,7 +570,10 @@ export default function OperatorProcess() {
             </div>
             <div className="mt-6">
               <h3 className="text-sm font-semibold text-ink">Aprovação dos campos do cliente</h3>
-              <p className="mt-1 text-xs text-slate">Use  para aprovar e  para reprovar.</p>
+              <p className="mt-1 text-xs text-slate">
+                Use <FiCheck className="inline h-4 w-4 align-[-2px]" /> para aprovar e{" "}
+                <FiX className="inline h-4 w-4 align-[-2px]" /> para reprovar.
+              </p>
               <div className="mt-3 space-y-3">
                 {approvalFields.map((field) => (
                   <div key={field.key} className="flex items-center justify-between rounded-xl border border-ink/10 bg-white/80 px-4 py-3">
@@ -553,7 +592,7 @@ export default function OperatorProcess() {
                         disabled={!step2Enabled}
                         aria-label="Aprovar campo"
                       >
-                        
+                        <FiCheck />
                       </button>
                       <button
                         type="button"
@@ -569,7 +608,7 @@ export default function OperatorProcess() {
                         disabled={!step2Enabled}
                         aria-label="Reprovar campo"
                       >
-                        
+                        <FiX />
                       </button>
                     </div>
                   </div>
@@ -615,7 +654,10 @@ export default function OperatorProcess() {
 
             <div className="mt-6">
               <h3 className="text-sm font-semibold text-ink">Documentos anexados</h3>
-              <p className="mt-1 text-xs text-slate">Aprove/reprove com / e informe o motivo.</p>
+              <p className="mt-1 text-xs text-slate">
+                Aprove com <FiCheck className="inline h-4 w-4 align-[-2px]" /> e reprove com{" "}
+                <FiX className="inline h-4 w-4 align-[-2px]" />. Se reprovar, informe o motivo.
+              </p>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 {documentos.map((doc: any) => (
                   <div key={doc.id} className="rounded-xl border border-ink/10 bg-white/80 p-3">
@@ -640,7 +682,7 @@ export default function OperatorProcess() {
                           disabled={docLoading === buildDocumentKey(doc.itemKey, doc.socioId)}
                           aria-label="Aprovar documento"
                         >
-                          
+                          <FiCheck />
                         </button>
                         <button
                           type="button"
@@ -657,7 +699,7 @@ export default function OperatorProcess() {
                           disabled={docLoading === buildDocumentKey(doc.itemKey, doc.socioId)}
                           aria-label="Reprovar documento"
                         >
-                          
+                          <FiX />
                         </button>
                       </div>
                     </div>

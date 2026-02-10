@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+const pushMock = vi.fn();
 vi.mock("next/navigation", () => ({
-  useParams: () => ({ id: "process-123" })
+  useParams: () => ({ id: "process-123" }),
+  useRouter: () => ({ push: pushMock })
 }));
 
 vi.mock("next/link", () => ({
@@ -123,9 +125,9 @@ describe("OperatorProcess", () => {
     const dislikes = await screen.findAllByRole("button", { name: /reprovar campo/i });
     await user.click(dislikes[0]);
 
-    expect(await screen.findByText(/motivo da reprovao/i)).toBeInTheDocument();
+    expect(await screen.findByText(/motivo da reprova/i)).toBeInTheDocument();
     await user.type(screen.getByPlaceholderText(/descreva o motivo/i), "Documento incorreto");
-    await user.click(screen.getByRole("button", { name: /enviar reprovao/i }));
+    await user.click(screen.getByRole("button", { name: /enviar reprovaç/i }));
 
     await waitFor(() => {
       expect(apiMock).toHaveBeenCalledWith("/processes/process-123/request-correction", expect.any(Object));

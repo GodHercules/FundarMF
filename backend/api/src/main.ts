@@ -13,15 +13,18 @@ import { requestContextMiddleware } from "./shared/request-context";
 import { RequestLoggingInterceptor } from "./shared/request-logging.interceptor";
 
 async function bootstrap() {
-  const backendEnv = path.join(process.cwd(), ".env");
-  const apiEnv = path.join(process.cwd(), "api", ".env");
-  if (fs.existsSync(backendEnv)) {
-    dotenv.config({ path: backendEnv });
-  } else if (fs.existsSync(apiEnv)) {
-    dotenv.config({ path: apiEnv });
-  } else {
-    dotenv.config();
-  }
+  // Support running the API from different working directories (repo root, `backend`, `backend/api`, etc).
+  // pnpm/nest often execute with `cwd` set to the package folder, so we search upwards for `.env`.
+  const candidates = [
+    path.resolve(process.cwd(), ".env"),
+    path.resolve(process.cwd(), "..", ".env"),
+    path.resolve(process.cwd(), "..", "..", ".env"),
+    path.resolve(process.cwd(), "api", ".env"),
+    path.resolve(process.cwd(), "..", "api", ".env")
+  ];
+  const envPath = candidates.find((p) => fs.existsSync(p));
+  if (envPath) dotenv.config({ path: envPath });
+  else dotenv.config();
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
