@@ -166,6 +166,7 @@ export default function ClientProcess() {
   const [documentFiles, setDocumentFiles] = useState<Record<string, File[]>>({});
   const [uploadingItem, setUploadingItem] = useState<string | null>(null);
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
+  const [submittingAll, setSubmittingAll] = useState(false);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -304,6 +305,91 @@ export default function ClientProcess() {
     return true;
   }
 
+  function parseDocumentKey(key: string) {
+    const idx = key.indexOf(":");
+    if (idx === -1) return { itemKey: key, socioId: undefined as string | undefined };
+    return { itemKey: key.slice(0, idx), socioId: key.slice(idx + 1) };
+  }
+
+  function validateClientDocuments() {
+    const missing: string[] = [];
+    const hasUploaded = (itemKey: string, socioId?: string) => {
+      const item = findDocumentItem(process, itemKey, socioId);
+      return Boolean((item?.files ?? []).length > 0);
+    };
+    const hasSelected = (itemKey: string, socioId?: string) => {
+      const key = buildDocumentKey(itemKey, socioId);
+      return Boolean((documentFiles[key] ?? []).length > 0);
+    };
+
+    socios.forEach((socio, index) => {
+      documentTypes.forEach((docType) => {
+        if (!hasUploaded(docType.key, socio.socioId) && !hasSelected(docType.key, socio.socioId)) {
+          missing.push(`Sócio ${index + 1}: ${docType.title}`);
+        }
+      });
+    });
+
+    if (!isVirtual) {
+      if (!hasUploaded("FOTO_FACHADA") && !hasSelected("FOTO_FACHADA")) {
+        missing.push("Foto da fachada");
+      }
+    }
+
+    if (missing.length > 0) {
+      setMessage(
+        `Envie os documentos obrigatórios antes de enviar para validação: ${missing.slice(0, 4).join(", ")}${
+          missing.length > 4 ? "..." : ""
+        }`
+      );
+      return false;
+    }
+    return true;
+  }
+
+  async function uploadSelectedDocuments() {
+    const entries = Object.entries(documentFiles).filter(([, files]) => (files ?? []).length > 0);
+    if (entries.length === 0) return;
+
+    for (const [key, files] of entries) {
+      const { itemKey, socioId } = parseDocumentKey(key);
+      const formData = new FormData();
+      (files ?? []).forEach((file) => formData.append("files", file));
+
+      setUploadingItem(key);
+      setUploadErrors((prev) => ({ ...prev, [key]: "" }));
+
+      const query = socioId ? `?socioId=${encodeURIComponent(socioId)}` : "";
+      const response = await fetch(`${API_BASE}/documents/${processId}/items/${itemKey}/upload${query}`, {
+        method: "POST",
+        credentials: "include",
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let msg = errorText || "Erro ao enviar documentos.";
+        try {
+          const parsed = JSON.parse(errorText);
+          if (Array.isArray(parsed?.message)) msg = parsed.message.join(" ");
+          else if (typeof parsed?.message === "string") msg = parsed.message;
+        } catch {
+          // ignore
+        }
+        if (response.status === 401 || response.status === 403) {
+          msg = "Sessão expirada. Recarregue a página e tente novamente.";
+        }
+        setUploadErrors((prev) => ({ ...prev, [key]: msg }));
+        throw new Error(msg);
+      }
+
+      setDocumentFiles((prev) => ({ ...prev, [key]: [] }));
+    }
+
+    setUploadingItem(null);
+    await load();
+  }
+
   async function saveAll() {
     if (!formEditable) return;
     setMessage(null);
@@ -319,18 +405,26 @@ export default function ClientProcess() {
   async function submitAll() {
     if (!formEditable) return;
     if (!validateClientForm()) return;
+    if (!validateClientDocuments()) return;
     setMessage(null);
-    await api(`/processes/${processId}/steps`, {
-      method: "PUT",
-      body: JSON.stringify({ stepKey: "ETAPA_2", data: buildPayload(correctionFields, correctionActive) })
-    });
-    await api(`/processes/${processId}/submit-step`, {
-      method: "POST",
-      body: JSON.stringify({ stepKey: "ETAPA_2" })
-    });
-    setMessage("Dados enviados para validação.");
-    notifySuccess("Dados enviados para validação.");
-    load();
+    setSubmittingAll(true);
+    try {
+      await api(`/processes/${processId}/steps`, {
+        method: "PUT",
+        body: JSON.stringify({ stepKey: "ETAPA_2", data: buildPayload(correctionFields, correctionActive) })
+      });
+      await uploadSelectedDocuments();
+      await api(`/processes/${processId}/submit-step`, {
+        method: "POST",
+        body: JSON.stringify({ stepKey: "ETAPA_2" })
+      });
+      setMessage("Dados enviados para validação.");
+      notifySuccess("Dados enviados para validação.");
+      load();
+    } finally {
+      setSubmittingAll(false);
+      setUploadingItem(null);
+    }
   }
 
   async function cancelProcess() {
@@ -981,8 +1075,8 @@ export default function ClientProcess() {
                   <Button onClick={saveAll} disabled={!formEditable}>
                     Salvar rascunho
                   </Button>
-                  <Button className="bg-emerald" onClick={submitAll} disabled={!formEditable}>
-                    Enviar tudo para validação
+                  <Button className="bg-emerald" onClick={submitAll} disabled={!formEditable || submittingAll}>
+                    {submittingAll ? "Enviando..." : "Enviar tudo para validação"}
                   </Button>
                 </div>
               </Card>
