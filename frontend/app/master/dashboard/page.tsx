@@ -12,6 +12,7 @@ import { PhoneInput } from "@/components/PhoneInput";
 import { PasswordField } from "@/components/PasswordField";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { logClientPerf } from "@/lib/perf";
+import { FiAlertTriangle, FiTrash2, FiUserX, FiX } from "react-icons/fi";
 
 export default function MasterDashboard() {
   const [processes, setProcesses] = useState<any[]>([]);
@@ -403,78 +404,198 @@ export default function MasterDashboard() {
       )}
 
       {processToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4 py-6">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-soft md:max-w-xl">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Excluir processo</h2>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 px-4 py-6"
+          onClick={() => {
+            setProcessToDelete(null);
+            setConfirmProcessText("");
+            setDeleteReason("");
+          }}
+        >
+          <div
+            className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-soft"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-ink/10 bg-white/95 px-6 py-5 backdrop-blur">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-clay/10 text-clay">
+                  <FiTrash2 className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-semibold text-ink">Excluir processo</h2>
+                  <p className="mt-1 text-sm text-slate">
+                    Esta ação é permanente e remove também documentos, etapas e histórico do processo.
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
-                className="rounded-full bg-slate/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate/10 text-slate hover:bg-slate/15"
+                aria-label="Fechar"
                 onClick={() => {
                   setProcessToDelete(null);
                   setConfirmProcessText("");
                   setDeleteReason("");
                 }}
               >
-                Fechar
+                <FiX className="h-5 w-5" />
               </button>
             </div>
-            <p className="mt-2 text-sm text-slate">
-              Esta ação é permanente. Digite <strong>EXCLUIR</strong> para confirmar.
-            </p>
-            <div className="mt-4 grid gap-4">
-              <Input
-                placeholder="Motivo (opcional)"
-                value={deleteReason}
-                onChange={(event) => setDeleteReason(event.target.value)}
-              />
-              <Input
-                placeholder="Digite EXCLUIR para confirmar"
-                value={confirmProcessText}
-                onChange={(event) => setConfirmProcessText(event.target.value)}
-              />
-            </div>
-            <div className="mt-5 flex items-center justify-between">
-              <Button className="bg-ink" onClick={handleDeleteProcess} disabled={deleting}>
-                {deleting ? "Excluindo..." : "Excluir definitivamente"}
-              </Button>
-              <span className="text-xs text-slate">Processo: {processToDelete.id}</span>
+
+            <div className="grid gap-6 px-6 py-6 md:grid-cols-[1.2fr_1fr]">
+              <div className="rounded-2xl border border-clay/20 bg-clay/5 p-4">
+                <div className="flex items-start gap-3">
+                  <FiAlertTriangle className="mt-0.5 h-5 w-5 text-clay" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-ink">Atenção</p>
+                    <p className="mt-1 text-xs text-slate">
+                      Para confirmar, digite <span className="font-semibold text-ink">EXCLUIR</span>. Se clicar por engano,
+                      use Cancelar.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-xl border border-ink/10 bg-white/80 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate">Processo</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-ink">{processToDelete.clientName ?? "Cliente"}</p>
+                  <p className="mt-1 break-all font-mono text-[11px] text-slate">{processToDelete.id}</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate">Motivo (opcional)</p>
+                  <Input
+                    className="mt-2"
+                    placeholder="Ex: cadastro duplicado, solicitação do cliente..."
+                    value={deleteReason}
+                    onChange={(event) => setDeleteReason(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate">Confirmação</p>
+                  <Input
+                    className="mt-2"
+                    placeholder="Digite EXCLUIR para confirmar"
+                    value={confirmProcessText}
+                    onChange={(event) => setConfirmProcessText(event.target.value)}
+                  />
+                  <p className="mt-2 text-xs text-slate">
+                    {confirmProcessText.trim().toUpperCase() === "EXCLUIR"
+                      ? "Confirmado. Você pode excluir."
+                      : "Digite EXCLUIR para habilitar o botão."}
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      setProcessToDelete(null);
+                      setConfirmProcessText("");
+                      setDeleteReason("");
+                    }}
+                    disabled={deleting}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="bg-clay"
+                    onClick={handleDeleteProcess}
+                    disabled={deleting || confirmProcessText.trim().toUpperCase() !== "EXCLUIR"}
+                  >
+                    {deleting ? "Excluindo..." : "Excluir definitivamente"}
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {operatorToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4 py-6">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-soft md:max-w-xl">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Excluir operador</h2>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 px-4 py-6"
+          onClick={() => {
+            setOperatorToDelete(null);
+            setConfirmOperatorText("");
+          }}
+        >
+          <div
+            className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-soft"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-ink/10 bg-white/95 px-6 py-5 backdrop-blur">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-clay/10 text-clay">
+                  <FiUserX className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-semibold text-ink">Excluir operador</h2>
+                  <p className="mt-1 text-sm text-slate">
+                    Esta ação é permanente. Operadores com processos em andamento não podem ser removidos.
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
-                className="rounded-full bg-slate/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate/10 text-slate hover:bg-slate/15"
+                aria-label="Fechar"
                 onClick={() => {
                   setOperatorToDelete(null);
                   setConfirmOperatorText("");
                 }}
               >
-                Fechar
+                <FiX className="h-5 w-5" />
               </button>
             </div>
-            <p className="mt-2 text-sm text-slate">
-              Esta ação é permanente. Digite <strong>EXCLUIR</strong> para confirmar.
-            </p>
-            <div className="mt-4 grid gap-4">
-              <Input
-                placeholder="Digite EXCLUIR para confirmar"
-                value={confirmOperatorText}
-                onChange={(event) => setConfirmOperatorText(event.target.value)}
-              />
-            </div>
-            <div className="mt-5 flex items-center justify-between">
-              <Button className="bg-ink" onClick={handleDeleteOperator} disabled={deleting}>
-                {deleting ? "Excluindo..." : "Excluir definitivamente"}
-              </Button>
-              <span className="text-xs text-slate">{operatorToDelete.name}</span>
+
+            <div className="grid gap-6 px-6 py-6 md:grid-cols-[1.2fr_1fr]">
+              <div className="rounded-2xl border border-ink/10 bg-white/80 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate">Operador</p>
+                <p className="mt-1 truncate text-sm font-semibold text-ink">{operatorToDelete.name}</p>
+                {operatorToDelete.email && <p className="mt-1 break-all text-xs text-slate">{operatorToDelete.email}</p>}
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-clay/20 bg-clay/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <FiAlertTriangle className="mt-0.5 h-5 w-5 text-clay" />
+                    <div>
+                      <p className="text-sm font-semibold text-ink">Confirmação</p>
+                      <p className="mt-1 text-xs text-slate">
+                        Digite <span className="font-semibold text-ink">EXCLUIR</span> para habilitar o botão.
+                      </p>
+                    </div>
+                  </div>
+                  <Input
+                    className="mt-3"
+                    placeholder="Digite EXCLUIR para confirmar"
+                    value={confirmOperatorText}
+                    onChange={(event) => setConfirmOperatorText(event.target.value)}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      setOperatorToDelete(null);
+                      setConfirmOperatorText("");
+                    }}
+                    disabled={deleting}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="bg-clay"
+                    onClick={handleDeleteOperator}
+                    disabled={deleting || confirmOperatorText.trim().toUpperCase() !== "EXCLUIR"}
+                  >
+                    {deleting ? "Excluindo..." : "Excluir definitivamente"}
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
