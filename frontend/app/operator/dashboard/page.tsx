@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -24,6 +24,7 @@ type InAppNotification = {
   body: string;
   createdAt: string;
   readAt?: string | null;
+  dismissedAt?: string | null;
   processId?: string | null;
   type: string;
 };
@@ -48,7 +49,11 @@ export default function OperatorDashboard() {
   });
 
   const processPageSize = 8;
-  const notificationPageSize = 6;
+  const notificationPageSize = 20;
+
+  const MS_DAY = 24 * 60 * 60 * 1000;
+  const READ_HIDE_AFTER_DAYS = 2;
+  const UNREAD_PIN_AFTER_DAYS = 5;
 
   async function loadUnreadCount() {
     const unread = await api<{ count: number }>("/notifications/unread-count");
@@ -119,6 +124,36 @@ export default function OperatorDashboard() {
     setUnreadCount((prev) => Math.max(0, prev - 1));
   }
 
+  async function dismiss(id: string) {
+    await api(`/notifications/${id}/dismiss`, { method: "PATCH" });
+    const removed = notifications.find((n) => n.id === id);
+    setNotifications((prev) => prev.filter((item) => item.id !== id));
+    if (removed && !removed.readAt) {
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    }
+  }
+
+  const nowMs = Date.now();
+  const readCutoffMs = nowMs - READ_HIDE_AFTER_DAYS * MS_DAY;
+  const unreadPinMs = nowMs - UNREAD_PIN_AFTER_DAYS * MS_DAY;
+
+  const visibleNotifications = notifications.filter((item) => !item.dismissedAt);
+
+  const unreadNotifications = [...visibleNotifications]
+    .filter((item) => !item.readAt)
+    .sort((a, b) => {
+      const aMs = new Date(a.createdAt).getTime();
+      const bMs = new Date(b.createdAt).getTime();
+      const aPinned = aMs <= unreadPinMs;
+      const bPinned = bMs <= unreadPinMs;
+      if (aPinned !== bPinned) return aPinned ? -1 : 1;
+      return bMs - aMs;
+    });
+
+  const readNotifications = [...visibleNotifications]
+    .filter((item) => item.readAt && new Date(item.createdAt).getTime() >= readCutoffMs)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
   return (
     <main className="app-container flex min-h-screen flex-col gap-8 py-12">
       <Link href="/" className="text-sm font-semibold text-slate">
@@ -138,29 +173,88 @@ export default function OperatorDashboard() {
             <span className="badge bg-ink text-white">{unreadCount} não lidas</span>
           </div>
           <div className="mt-4 space-y-3">
-            {notifications.length === 0 && <p className="text-sm text-slate">Nenhuma notificação recente.</p>}
-            {notifications.map((item) => (
-              <div
-                key={item.id}
-                className={`rounded-xl border border-ink/10 p-3 text-sm ${
-                  item.readAt ? "bg-white/60 text-slate" : "bg-brass/10 text-ink"
-                }`}
-              >
-                <p className="font-semibold">{item.title}</p>
-                <p className="mt-1">{item.body}</p>
-                <div className="mt-2 flex items-center justify-between text-xs text-slate">
-                  <span>{new Date(item.createdAt).toLocaleString("pt-BR")}</span>
-                  {!item.readAt && (
+            {visibleNotifications.length === 0 && <p className="text-sm text-slate">Nenhuma notificação recente.</p>}
+
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">Não lidas</span>
+              <span className="text-xs text-slate">{unreadNotifications.length}</span>
+            </div>
+
+            {unreadNotifications.length === 0 && (
+              <p className="rounded-xl border border-ink/10 bg-white/60 p-3 text-sm text-slate">Sem notificações não lidas.</p>
+            )}
+
+            {unreadNotifications.map((item) => {
+              const pinned = new Date(item.createdAt).getTime() <= unreadPinMs;
+              return (
+                <div key={item.id} className="rounded-xl border border-ink/10 bg-brass/10 p-3 text-sm text-ink">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold">{item.title}</p>
+                        {pinned && <span className="badge bg-rose-500/15 text-rose-700">Atrasada</span>}
+                      </div>
+                      <p className="mt-1">{item.body}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-full border border-ink/15 px-2 py-1 text-xs font-semibold text-ink hover:border-brass"
+                      onClick={() => dismiss(item.id)}
+                      aria-label="Fechar notificação"
+                      title="Fechar"
+                    >
+                      x
+                    </button>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-xs text-slate">
+                    <span>{new Date(item.createdAt).toLocaleString("pt-BR")}</span>
                     <button className="font-semibold text-brass" onClick={() => markRead(item.id)}>
                       Marcar como lida
                     </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            <div className="mt-5 flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">Lidas (últimos {READ_HIDE_AFTER_DAYS} dias)</span>
+              <span className="text-xs text-slate">{readNotifications.length}</span>
+            </div>
+
+            {readNotifications.length === 0 && (
+              <p className="rounded-xl border border-ink/10 bg-white/60 p-3 text-sm text-slate">Sem notificações lidas recentes.</p>
+            )}
+
+            {readNotifications.map((item) => (
+              <div key={item.id} className="rounded-xl border border-ink/10 bg-white/60 p-3 text-sm text-slate">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold">{item.title}</p>
+                    <p className="mt-1">{item.body}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="rounded-full border border-ink/15 px-2 py-1 text-xs font-semibold text-ink hover:border-brass"
+                    onClick={() => dismiss(item.id)}
+                    aria-label="Fechar notificação"
+                    title="Fechar"
+                  >
+                    x
+                  </button>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-xs text-slate">
+                  <span>{new Date(item.createdAt).toLocaleString("pt-BR")}</span>
+                  {item.processId && (
+                    <Link href={`/operator/process/${item.processId}`} className="font-semibold text-brass">
+                      Abrir caso {"->"}
+                    </Link>
                   )}
                 </div>
               </div>
             ))}
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate">
-            <span>Mostrando {notifications.length} notificações</span>
+            <span>Mostrando {visibleNotifications.length} notificações</span>
             <button
               type="button"
               className="rounded-full border border-ink/15 px-3 py-1.5 text-xs font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-50"
@@ -249,5 +343,7 @@ export default function OperatorDashboard() {
     </main>
   );
 }
+
+
 
 

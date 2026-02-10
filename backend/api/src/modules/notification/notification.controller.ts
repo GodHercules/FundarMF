@@ -30,6 +30,11 @@ export class NotificationController {
     return this.notificationService.markRead(req.actor!.userId!, id);
   }
 
+  @Patch(":id/dismiss")
+  async dismiss(@Param("id") id: string, @Req() req: Request) {
+    return this.notificationService.dismiss(req.actor!.userId!, id);
+  }
+
   @Post("test-email")
   @Roles("MASTER")
   async sendTestEmail(@Body() dto: TestEmailDto) {

@@ -36,6 +36,9 @@ let NotificationController = class NotificationController {
     async markRead(id, req) {
         return this.notificationService.markRead(req.actor.userId, id);
     }
+    async dismiss(id, req) {
+        return this.notificationService.dismiss(req.actor.userId, id);
+    }
     async sendTestEmail(dto) {
         await this.notificationService.sendEmail(dto.to, dto.subject, dto.body);
         return { ok: true };
@@ -70,6 +73,14 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], NotificationController.prototype, "markRead", null);
+__decorate([
+    (0, common_1.Patch)(":id/dismiss"),
+    __param(0, (0, common_1.Param)("id")),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], NotificationController.prototype, "dismiss", null);
 __decorate([
     (0, common_1.Post)("test-email"),
     (0, roles_decorator_1.Roles)("MASTER"),
