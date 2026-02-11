@@ -59,13 +59,15 @@ export default function OperatorProcess() {
   const [docLoading, setDocLoading] = useState<string | null>(null);
   const [fieldDecisions, setFieldDecisions] = useState<Record<string, "approved" | "rejected" | undefined>>({});
   const [docDecisions, setDocDecisions] = useState<Record<string, "APROVADO" | "REPROVADO" | undefined>>({});
-  const [step3Saved, setStep3Saved] = useState(false);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [fachadaFiles, setFachadaFiles] = useState<File[]>([]);
   const [fachadaError, setFachadaError] = useState<string | null>(null);
   const [sendingLink, setSendingLink] = useState(false);
+  const [sendingOtpOnly, setSendingOtpOnly] = useState(false);
+  const [statusUpdate, setStatusUpdate] = useState("");
+  const [sendingStatusUpdate, setSendingStatusUpdate] = useState(false);
   const [rejectModal, setRejectModal] = useState<{
     type: "fields" | "document";
     fields?: string[];
@@ -92,8 +94,7 @@ export default function OperatorProcess() {
     if (!process) return;
     const step3Data = getStepData(process, "ETAPA_3");
     setStep3(normalizeStep(defaultStep3, step3Data));
-    const hasStep3Data = Object.values(step3Data ?? {}).some((value) => String(value ?? "").trim().length > 0);
-    setStep3Saved(hasStep3Data);
+    setStatusUpdate(process.operatorStatusNote ?? "");
     setDocDecisions(
       Object.fromEntries(
         (process.documents ?? [])
@@ -198,9 +199,13 @@ export default function OperatorProcess() {
     }
   }
 
+  function step3IsComplete() {
+    return Boolean(step3.tipoAtividade && step3.naturezaJuridica && step3.capitalSocial && step3.cnae && step3.tributacao);
+  }
+
   async function updateStep3() {
     setMessage(null);
-    if (!step3.tipoAtividade || !step3.naturezaJuridica || !step3.capitalSocial || !step3.cnae || !step3.tributacao) {
+    if (!step3IsComplete()) {
       setMessage("Preencha todos os campos obrigatórios da estrutura jurídica.");
       return;
     }
@@ -208,14 +213,21 @@ export default function OperatorProcess() {
       method: "PUT",
       body: JSON.stringify({ stepKey: "ETAPA_3", data: step3 })
     });
-    setStep3Saved(true);
     setMessage("Estrutura jurídica salva.");
     notifySuccess("Estrutura jurídica salva.");
     load();
   }
 
-  function goToReceitaReview() {
+  async function goToReceitaReview() {
     setMessage(null);
+    if (!step3IsComplete()) {
+      setMessage("Preencha todos os campos obrigatórios da estrutura jurídica antes da revisão.");
+      return;
+    }
+    await api(`/processes/${processId}/steps`, {
+      method: "PUT",
+      body: JSON.stringify({ stepKey: "ETAPA_3", data: step3 })
+    });
     router.push(`/operator/process/${processId}/review`);
   }
 
@@ -245,6 +257,37 @@ export default function OperatorProcess() {
       notifySuccess("Link reenviado ao cliente.");
     } finally {
       setSendingLink(false);
+    }
+  }
+
+  async function resendOtpOnly() {
+    setSendingOtpOnly(true);
+    try {
+      await api(`/processes/${processId}/send-otp`, {
+        method: "POST"
+      });
+      notifySuccess("Novo OTP enviado ao e-mail do cliente.");
+    } finally {
+      setSendingOtpOnly(false);
+    }
+  }
+
+  async function sendStatusUpdate() {
+    const text = statusUpdate.trim();
+    if (!text) {
+      setMessage("Informe uma atualização de status para o cliente.");
+      return;
+    }
+    setSendingStatusUpdate(true);
+    setMessage(null);
+    try {
+      await api(`/processes/${processId}/status-update`, {
+        method: "POST",
+        body: JSON.stringify({ message: text })
+      });
+      notifySuccess("Status enviado ao cliente por e-mail.");
+    } finally {
+      setSendingStatusUpdate(false);
     }
   }
 
@@ -369,7 +412,7 @@ export default function OperatorProcess() {
   const clientSentDocs = docsWithClientFiles.filter((doc: any) => (doc.clientFiles ?? []).length > 0);
   const clientMissingDocs = docsWithClientFiles.filter((doc: any) => (doc.clientFiles ?? []).length === 0);
   const step3Enabled = process.currentStep === "ETAPA_3" || (step2Enabled && approvalsComplete);
-  const canReviewForReceita = approvalsComplete && step3Saved;
+  const canReviewForReceita = approvalsComplete;
   const chatDisabled = ["CANCELADO", "CONCLUIDO"].includes(process.status);
 
   return (
@@ -388,7 +431,10 @@ export default function OperatorProcess() {
         <div>
           <div className="flex flex-wrap gap-3">
             <Button variant="primary" onClick={resendLink} disabled={sendingLink}>
-              {sendingLink ? "Enviando link..." : "Enviar link ao cliente"}
+              {sendingLink ? "Enviando link..." : "Enviar novo link + OTP"}
+            </Button>
+            <Button variant="primary" onClick={resendOtpOnly} disabled={sendingOtpOnly}>
+              {sendingOtpOnly ? "Enviando OTP..." : "Enviar apenas novo OTP"}
             </Button>
             <Button variant="danger" onClick={cancelProcess}>
               Cancelar processo
@@ -449,6 +495,24 @@ export default function OperatorProcess() {
           <p className="text-sm text-slate">A reprovação acontece dentro de Ver dados do cliente.</p>
         </Card>
       </section>
+
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold">Atualização de status para cliente</h2>
+        <p className="text-sm text-slate">Sempre que enviar, o cliente recebe este status por e-mail e WhatsApp.</p>
+        <div className="mt-4 flex flex-col gap-3">
+          <textarea
+            value={statusUpdate}
+            onChange={(event) => setStatusUpdate(event.target.value)}
+            className="min-h-24 w-full rounded-xl border border-ink/15 bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-brass focus:ring-2 focus:ring-brass/30"
+            placeholder="Ex: Estamos validando os documentos e retornaremos hoje."
+          />
+          <div>
+            <Button onClick={sendStatusUpdate} disabled={sendingStatusUpdate}>
+              {sendingStatusUpdate ? "Enviando atualização..." : "Enviar atualização ao cliente"}
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       <Card className="p-6">
         <h2 className="text-lg font-semibold">Estrutura Jurídica e Financeira</h2>
@@ -528,7 +592,7 @@ export default function OperatorProcess() {
             Salvar
           </Button>
           {canReviewForReceita && (
-            <Button variant="accent" onClick={goToReceitaReview}>
+            <Button variant="accent" onClick={goToReceitaReview} disabled={!step3IsComplete()}>
               Revisar e enviar para Receita
             </Button>
           )}

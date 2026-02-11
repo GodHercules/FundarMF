@@ -1,5 +1,6 @@
-﻿import { Card } from "@/components/Card";
+import { Card } from "@/components/Card";
 import { Logo } from "@/components/Logo";
+import { SupportChat } from "@/components/SupportChat";
 
 export default function ClientSubmitted() {
   return (
@@ -13,10 +14,9 @@ export default function ClientSubmitted() {
         </p>
       </div>
       <Card className="p-6">
-        <p className="text-sm text-slate">
-          Em caso de dúvidas, responda ao contato enviado pelo operador.
-        </p>
+        <p className="text-sm text-slate">Em caso de dúvidas, responda ao contato enviado pelo operador.</p>
       </Card>
+      <SupportChat />
     </main>
   );
 }

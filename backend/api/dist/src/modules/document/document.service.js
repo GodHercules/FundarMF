@@ -22,6 +22,49 @@ const SOCIO_ITEM_KEYS = [
     client_1.DocumentItemKey.IDENTIFICACAO_SOCIOS,
     client_1.DocumentItemKey.COMPROVANTE_RESIDENCIA
 ];
+function looksLikePdf(buffer) {
+    if (!buffer || buffer.length < 5)
+        return false;
+    return buffer.subarray(0, 5).toString("ascii") === "%PDF-";
+}
+function looksLikePng(buffer) {
+    if (!buffer || buffer.length < 8)
+        return false;
+    return (buffer[0] === 0x89 &&
+        buffer[1] === 0x50 &&
+        buffer[2] === 0x4e &&
+        buffer[3] === 0x47 &&
+        buffer[4] === 0x0d &&
+        buffer[5] === 0x0a &&
+        buffer[6] === 0x1a &&
+        buffer[7] === 0x0a);
+}
+function looksLikeJpeg(buffer) {
+    if (!buffer || buffer.length < 2)
+        return false;
+    return buffer[0] === 0xff && buffer[1] === 0xd8;
+}
+function normalizeMimeType(file) {
+    const raw = String(file.mimetype ?? "").trim().toLowerCase();
+    if (raw === "application/pdf" || raw === "application/x-pdf")
+        return "application/pdf";
+    if (raw === "image/jpeg" || raw === "image/jpg")
+        return "image/jpeg";
+    if (raw === "image/png")
+        return "image/png";
+    const name = String(file.originalname ?? "").trim().toLowerCase();
+    const ext = name.includes(".") ? name.slice(name.lastIndexOf(".")) : "";
+    const buf = file.buffer;
+    // Some devices upload PDFs as `application/octet-stream`.
+    if ((raw === "application/octet-stream" || raw === "") && ext === ".pdf" && looksLikePdf(buf))
+        return "application/pdf";
+    if ((raw === "application/octet-stream" || raw === "") && (ext === ".png" || looksLikePng(buf)))
+        return "image/png";
+    if ((raw === "application/octet-stream" || raw === "") &&
+        (ext === ".jpg" || ext === ".jpeg" || looksLikeJpeg(buf)))
+        return "image/jpeg";
+    return raw;
+}
 let DocumentService = class DocumentService {
     prisma;
     auditService;
@@ -84,7 +127,7 @@ let DocumentService = class DocumentService {
                 throw new common_1.BadRequestException("Foto de fachada ser anexada pelo operador.");
             }
             if (SOCIO_ITEM_KEYS.includes(itemKey) && !socioId) {
-                throw new common_1.BadRequestException("Selecione o scio para enviar o documento.");
+                throw new common_1.BadRequestException("Selecione o sócio para enviar o documento.");
             }
         }
         else {
@@ -117,7 +160,8 @@ let DocumentService = class DocumentService {
             if (sizeMb > maxFileMb) {
                 throw new common_1.BadRequestException(`Arquivo ${file.originalname} excede ${maxFileMb}MB.`);
             }
-            if (!ALLOWED_MIME.includes(file.mimetype)) {
+            const normalizedMime = normalizeMimeType(file);
+            if (!ALLOWED_MIME.includes(normalizedMime)) {
                 throw new common_1.BadRequestException("Tipo de arquivo não permitido.");
             }
         }
@@ -144,10 +188,11 @@ let DocumentService = class DocumentService {
             }
         });
         for (const file of files) {
+            const normalizedMime = normalizeMimeType(file);
             await this.storageService.saveFile({
                 itemId: item.id,
                 fileName: file.originalname,
-                mimeType: file.mimetype,
+                mimeType: normalizedMime,
                 size: file.size,
                 data: file.buffer,
                 uploadedByRole: actor.role === "CLIENTE" ? "CLIENTE" : actor.role
@@ -234,7 +279,8 @@ let DocumentService = class DocumentService {
                         fileName: true,
                         mimeType: true,
                         size: true,
-                        createdAt: true
+                        createdAt: true,
+                        uploadedByRole: true
                     }
                 }
             },

@@ -3,12 +3,26 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-require("dotenv/config");
+const node_fs_1 = __importDefault(require("node:fs"));
+const node_path_1 = __importDefault(require("node:path"));
+const dotenv_1 = __importDefault(require("dotenv"));
 const pg_boss_1 = __importDefault(require("pg-boss"));
 const client_1 = require("@prisma/client");
 const jobs_1 = require("./jobs");
 const shared_1 = require("@fundarmf/shared");
 const dispatcher_1 = require("./notify/dispatcher");
+const candidateEnvPaths = [
+    node_path_1.default.join(process.cwd(), ".env"),
+    node_path_1.default.join(process.cwd(), "api", ".env"),
+    node_path_1.default.join(process.cwd(), "..", ".env")
+];
+const envPath = candidateEnvPaths.find((candidate) => node_fs_1.default.existsSync(candidate));
+if (envPath) {
+    dotenv_1.default.config({ path: envPath });
+}
+else {
+    dotenv_1.default.config();
+}
 const toPositiveMs = (value, fallback) => {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;

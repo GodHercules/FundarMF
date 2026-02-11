@@ -102,6 +102,7 @@ model Process {
   cancelledByRole AuditActorRole?
   cancelledById   String?
   cancelReason    String?
+  operatorStatusNote String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 

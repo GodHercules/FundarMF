@@ -11,6 +11,7 @@ import { SubmitStepDto } from "./dto/submit-step.dto";
 import { ApproveStepDto } from "./dto/approve-step.dto";
 import { RequestCorrectionDto } from "./dto/request-correction.dto";
 import { CancelDto } from "./dto/cancel.dto";
+import { UpdateStatusDto } from "./dto/update-status.dto";
 
 @Controller("processes")
 @UseGuards(AuthGuard, RolesGuard)
@@ -36,6 +37,12 @@ export class ProcessController {
       sendEmail: dto.sendEmail,
       sendWhatsapp: dto.sendWhatsapp
     });
+  }
+
+  @Post(":id/send-otp")
+  @Roles("OPERADOR", "MASTER")
+  async sendOtp(@Param("id") id: string, @Req() req: Request) {
+    return this.processService.sendClientOtp(id, req.actor!);
   }
 
   @Get()
@@ -78,6 +85,12 @@ export class ProcessController {
   @Post(":id/mark-in-progress")
   async markInProgress(@Param("id") id: string, @Req() req: Request) {
     return this.processService.markInProgress(id, req.actor!);
+  }
+
+  @Post(":id/status-update")
+  @Roles("OPERADOR", "MASTER")
+  async updateClientStatus(@Param("id") id: string, @Body() dto: UpdateStatusDto, @Req() req: Request) {
+    return this.processService.updateClientStatus(id, req.actor!, dto.message);
   }
 
   @Post(":id/cancel")

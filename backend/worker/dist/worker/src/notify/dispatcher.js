@@ -65,6 +65,14 @@ class NotificationDispatcher {
         const startedAt = Date.now();
         const payload = job.data;
         const timeoutMs = (0, config_1.getNotifyTimeoutMs)();
+        console.log("[notify] worker received email", JSON.stringify({
+            correlationId: payload.correlationId,
+            jobId: job.id,
+            attempt,
+            mode,
+            to: payload.to,
+            subject: payload.subject
+        }));
         if (!(0, config_1.isEmailEnabled)()) {
             logAttempt({
                 level: "info",
@@ -144,6 +152,13 @@ class NotificationDispatcher {
         const startedAt = Date.now();
         const payload = job.data;
         const timeoutMs = (0, config_1.getNotifyTimeoutMs)();
+        console.log("[notify] worker received whatsapp", JSON.stringify({
+            correlationId: payload.correlationId,
+            jobId: job.id,
+            attempt,
+            mode,
+            to: payload.to
+        }));
         if (!(0, config_1.isWhatsAppEnabled)()) {
             logAttempt({
                 level: "info",

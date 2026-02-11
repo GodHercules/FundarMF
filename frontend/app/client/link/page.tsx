@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
 import { Card } from "@/components/Card";
 import { Logo } from "@/components/Logo";
+import { SupportChat } from "@/components/SupportChat";
 import { notifySuccess } from "@/lib/notify";
 import Link from "next/link";
 
@@ -147,6 +148,7 @@ function ClientLinkInner() {
         </Button>
         {message && <p className="text-sm text-slate">{message}</p>}
       </Card>
+      <SupportChat />
     </main>
   );
 }

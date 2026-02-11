@@ -16,17 +16,20 @@ const app_module_1 = require("./modules/app.module");
 const request_context_1 = require("./shared/request-context");
 const request_logging_interceptor_1 = require("./shared/request-logging.interceptor");
 async function bootstrap() {
-    const backendEnv = node_path_1.default.join(process.cwd(), ".env");
-    const apiEnv = node_path_1.default.join(process.cwd(), "api", ".env");
-    if (node_fs_1.default.existsSync(backendEnv)) {
-        dotenv_1.default.config({ path: backendEnv });
-    }
-    else if (node_fs_1.default.existsSync(apiEnv)) {
-        dotenv_1.default.config({ path: apiEnv });
-    }
-    else {
+    // Support running the API from different working directories (repo root, `backend`, `backend/api`, etc).
+    // pnpm/nest often execute with `cwd` set to the package folder, so we search upwards for `.env`.
+    const candidates = [
+        node_path_1.default.resolve(process.cwd(), ".env"),
+        node_path_1.default.resolve(process.cwd(), "..", ".env"),
+        node_path_1.default.resolve(process.cwd(), "..", "..", ".env"),
+        node_path_1.default.resolve(process.cwd(), "api", ".env"),
+        node_path_1.default.resolve(process.cwd(), "..", "api", ".env")
+    ];
+    const envPath = candidates.find((p) => node_fs_1.default.existsSync(p));
+    if (envPath)
+        dotenv_1.default.config({ path: envPath });
+    else
         dotenv_1.default.config();
-    }
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
     // Render (and most hosted platforms) run Node behind a reverse proxy and will set X-Forwarded-For.
     // express-rate-limit validates this header and requires trust proxy to be enabled to avoid IP spoofing.

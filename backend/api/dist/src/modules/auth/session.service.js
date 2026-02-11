@@ -75,9 +75,14 @@ let SessionService = class SessionService {
         });
     }
     buildCookieOptions() {
+        const cookieSecureRaw = process.env.COOKIE_SECURE?.trim();
+        const defaultSecure = process.env.NODE_ENV === "production" || Boolean(process.env.RENDER);
+        const secure = cookieSecureRaw === undefined || cookieSecureRaw.length === 0
+            ? defaultSecure
+            : cookieSecureRaw.toLowerCase() === "true";
         return {
             httpOnly: true,
-            secure: (process.env.COOKIE_SECURE ?? "true") === "true",
+            secure,
             sameSite: "lax",
             maxAge: Number(process.env.SESSION_TTL_HOURS ?? 48) * 60 * 60 * 1000,
             path: "/"

@@ -349,7 +349,7 @@ let ProcessService = class ProcessService {
         if (!sendEmail && !sendWhatsapp) {
             throw new common_1.BadRequestException("Selecione ao menos um canal para envio.");
         }
-        await this.authService.requestCustomerLink(sendEmail ? process.clientEmail : undefined, sendWhatsapp ? process.clientPhone ?? undefined : undefined, process.clientName ?? undefined);
+        await this.authService.requestCustomerLink(sendEmail ? process.clientEmail : undefined, sendWhatsapp ? process.clientPhone ?? undefined : undefined, process.clientName ?? undefined, { email: actor.email, role: actor.role }, { forceNew: true });
         await this.auditService.record(actor, "client_link_sent", "Process", processId, {
             sendEmail,
             sendWhatsapp
@@ -527,6 +527,16 @@ let ProcessService = class ProcessService {
         if (process.currentStep !== stepKey) {
             throw new common_1.BadRequestException("Etapa inválida.");
         }
+        const current = await this.prisma.processStep.findUnique({
+            where: { processId_stepKey: { processId, stepKey } }
+        });
+        if (!current) {
+            throw new common_1.BadRequestException("Etapa ainda não preenchida.");
+        }
+        // Idempotency: avoid double delivery if the client retries the submit request.
+        if (current.locked && current.status === client_1.ProcessStatus.AGUARDANDO_OPERADOR) {
+            return { ok: true, alreadySubmitted: true };
+        }
         await this.prisma.processStep.update({
             where: { processId_stepKey: { processId, stepKey } },
             data: { status: client_1.ProcessStatus.AGUARDANDO_OPERADOR, locked: true }
@@ -543,7 +553,32 @@ let ProcessService = class ProcessService {
             body: `O cliente ${process.clientEmail} enviou o formulário final da etapa ${stepKey}.`,
             type: "client_submitted"
         });
+        await this.notificationService.sendEmail(process.clientEmail, "Recebemos seus dados - Processo iniciado", [
+            "Recebemos suas informações e documentos.",
+            "Seu processo foi iniciado e está em análise pela nossa equipe.",
+            "Aguarde o contato por e-mail ou WhatsApp para acompanhar o andamento.",
+            "",
+            `Processo: ${process.id}`,
+            `Etapa enviada: ${stepKey}`
+        ].join("\n"));
         void this.sendProcessWebhook(processId, "client_submitted", actor, { stepKey });
+        return { ok: true };
+    }
+    async sendClientOtp(processId, actor) {
+        if (actor.role !== "OPERADOR" && actor.role !== "MASTER") {
+            throw new common_1.ForbiddenException();
+        }
+        const process = await this.prisma.process.findUnique({ where: { id: processId } });
+        if (!process) {
+            throw new common_1.NotFoundException("Processo não encontrado.");
+        }
+        if (actor.role === "OPERADOR" && process.ownerId !== actor.userId) {
+            throw new common_1.ForbiddenException();
+        }
+        await this.authService.resendCustomerOtpByEmail(process.clientEmail, { email: actor.email, role: actor.role });
+        await this.auditService.record(actor, "client_otp_sent", "Process", processId, {
+            email: process.clientEmail
+        });
         return { ok: true };
     }
     async approveStep(processId, actor, stepKey) {
@@ -670,6 +705,46 @@ let ProcessService = class ProcessService {
         void this.sendProcessEventEmails(processId, "process_marked_in_progress");
         void this.sendProcessWebhook(processId, "process_marked_in_progress", actor);
         return updated;
+    }
+    async updateClientStatus(processId, actor, message) {
+        const text = message.trim();
+        if (!text) {
+            throw new common_1.BadRequestException("Informe uma mensagem de status.");
+        }
+        if (actor.role !== "OPERADOR" && actor.role !== "MASTER") {
+            throw new common_1.ForbiddenException();
+        }
+        const process = await this.prisma.process.findUnique({ where: { id: processId } });
+        if (!process) {
+            throw new common_1.NotFoundException("Processo não encontrado.");
+        }
+        this.ensureNotReadOnly(process);
+        if (actor.role === "OPERADOR" && process.ownerId !== actor.userId) {
+            throw new common_1.ForbiddenException();
+        }
+        const updated = await this.prisma.process.update({
+            where: { id: processId },
+            data: { operatorStatusNote: text }
+        });
+        const statusBody = [
+            "Atualização do seu processo FundarMF",
+            "",
+            `Processo: ${process.id}`,
+            `Status atual: ${process.status}`,
+            `Etapa atual: ${process.currentStep}`,
+            "",
+            `Mensagem do operador: ${text}`,
+            "",
+            "Acompanhe as próximas atualizações pelo portal."
+        ].join("\n");
+        await Promise.all([
+            this.notificationService.sendEmail(process.clientEmail, `Atualização do processo ${process.id}`, statusBody),
+            this.notificationService.sendWhatsApp(process.clientPhone ?? process.clientEmail, statusBody)
+        ]);
+        await this.auditService.record(actor, "client_status_update", "Process", processId, {
+            message: text
+        });
+        return { ok: true, message: text, process: updated };
     }
     async cancelProcess(processId, actor, reason) {
         const process = await this.getProcess(processId, actor);

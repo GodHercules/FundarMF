@@ -12,6 +12,7 @@ import { Select } from "@/components/Select";
 import { Field } from "@/components/Field";
 import { Stepper, StatusBadge } from "@/components/Stepper";
 import { Logo } from "@/components/Logo";
+import { SupportChat } from "@/components/SupportChat";
 import { notifySuccess } from "@/lib/notify";
 import { maskCep, maskCpf, maskIptu, maskPercent } from "@/lib/masks";
 
@@ -165,7 +166,6 @@ export default function ClientProcess() {
   const [municipalities, setMunicipalities] = useState<string[]>([]);
   const [municipalityNote, setMunicipalityNote] = useState<string | null>(null);
   const [documentFiles, setDocumentFiles] = useState<Record<string, File[]>>({});
-  const [uploadingItem, setUploadingItem] = useState<string | null>(null);
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
   const [submittingAll, setSubmittingAll] = useState(false);
   const [submittedAll, setSubmittedAll] = useState(false);
@@ -261,6 +261,7 @@ export default function ClientProcess() {
             Se precisar complementar alguma informação, aguarde a orientação do operador responsável.
           </p>
         </Card>
+        <SupportChat />
       </main>
     );
   }
@@ -276,6 +277,7 @@ export default function ClientProcess() {
         </p>
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-ink/10 border-t-brass" />
         <p className="text-xs text-slate">Não feche esta página até finalizar.</p>
+        <SupportChat />
       </main>
     );
   }
@@ -392,7 +394,6 @@ export default function ClientProcess() {
       const formData = new FormData();
       (files ?? []).forEach((file) => formData.append("files", file));
 
-      setUploadingItem(key);
       setUploadErrors((prev) => ({ ...prev, [key]: "" }));
 
       const query = socioId ? `?socioId=${encodeURIComponent(socioId)}` : "";
@@ -422,7 +423,6 @@ export default function ClientProcess() {
       setDocumentFiles((prev) => ({ ...prev, [key]: [] }));
     }
 
-    setUploadingItem(null);
     await load();
   }
 
@@ -466,7 +466,6 @@ export default function ClientProcess() {
       setSubmittedAll(true);
     } finally {
       setSubmittingAll(false);
-      setUploadingItem(null);
     }
   }
 
@@ -524,58 +523,6 @@ export default function ClientProcess() {
 
   function removeSocio(index: number) {
     setSocios((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  async function uploadDocuments(itemKey: string, socioId?: string) {
-    const key = buildDocumentKey(itemKey, socioId);
-    const files = documentFiles[key] ?? [];
-    if (files.length === 0) {
-      setUploadErrors((prev) => ({ ...prev, [key]: "Selecione ao menos um arquivo." }));
-      return;
-    }
-
-    const formData = new FormData();
-    files.forEach((file) => formData.append("files", file));
-
-    setUploadingItem(key);
-    setUploadErrors((prev) => ({ ...prev, [key]: "" }));
-
-    try {
-      const query = socioId ? `?socioId=${encodeURIComponent(socioId)}` : "";
-      const response = await fetch(`${API_BASE}/documents/${processId}/items/${itemKey}/upload${query}`, {
-        method: "POST",
-        credentials: "include",
-        body: formData
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let message = errorText || "Erro ao enviar documentos.";
-        try {
-          const parsed = JSON.parse(errorText);
-          if (Array.isArray(parsed?.message)) message = parsed.message.join(" ");
-          else if (typeof parsed?.message === "string") message = parsed.message;
-        } catch {
-          // ignore
-        }
-        if (response.status === 401 || response.status === 403) {
-          message = "Sessão expirada. Recarregue a página e tente novamente.";
-        }
-        throw new Error(message);
-      }
-
-      setMessage("Arquivos enviados com sucesso.");
-      notifySuccess("Arquivos enviados com sucesso.");
-      setDocumentFiles((prev) => ({ ...prev, [key]: [] }));
-      load();
-    } catch (error) {
-      setUploadErrors((prev) => ({
-        ...prev,
-        [key]: error instanceof Error ? error.message : "Erro ao enviar documentos."
-      }));
-    } finally {
-      setUploadingItem(null);
-    }
   }
 
   if (!process) {
@@ -1037,13 +984,6 @@ export default function ClientProcess() {
                                   <p className="text-xs text-slate">Nenhum arquivo selecionado</p>
                                 )}
                                 {uploadErrors[key] && <p className="text-xs text-clay">{uploadErrors[key]}</p>}
-                                <Button
-                                  className="bg-emerald"
-                                  onClick={() => uploadDocuments(item.key, socio.socioId)}
-                                  disabled={!formEditable || uploadingItem === key}
-                                >
-                                  {uploadingItem === key ? "Enviando..." : "Enviar arquivos"}
-                                </Button>
                               </div>
                             </div>
                           );
@@ -1084,13 +1024,6 @@ export default function ClientProcess() {
                         {uploadErrors["FOTO_FACHADA"] && (
                           <p className="text-xs text-clay">{uploadErrors["FOTO_FACHADA"]}</p>
                         )}
-                        <Button
-                          className="bg-emerald"
-                          onClick={() => uploadDocuments("FOTO_FACHADA")}
-                          disabled={!formEditable || uploadingItem === "FOTO_FACHADA"}
-                        >
-                          {uploadingItem === "FOTO_FACHADA" ? "Enviando..." : "Enviar foto da fachada"}
-                        </Button>
                       </div>
                     </div>
                   )}

@@ -85,7 +85,8 @@ export class AuthService {
     email?: string,
     whatsapp?: string,
     name?: string,
-    requestedBy?: { email?: string; role?: string }
+    requestedBy?: { email?: string; role?: string },
+    options?: { forceNew?: boolean }
   ) {
     if (!email && !whatsapp) {
       throw new BadRequestException("Informe e-mail ou WhatsApp.");
@@ -96,7 +97,7 @@ export class AuthService {
     // Deduplicate near-simultaneous requests (double-clicks, retries, accidental double submits).
     // This ensures the client receives only one link+OTP unless an explicit resend is requested.
     const dedupSeconds = this.linkDedupSeconds();
-    if (dedupSeconds > 0) {
+    if (!options?.forceNew && dedupSeconds > 0) {
       const since = dayjs().subtract(dedupSeconds, "second").toDate();
       const existing = await this.prisma.customerLinkToken.findFirst({
         where: {
@@ -218,6 +219,79 @@ export class AuthService {
     );
 
     return { otpRequired: true };
+  }
+
+  async resendCustomerOtpByEmail(email: string, requestedBy?: { email?: string; role?: string }) {
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      throw new BadRequestException("E-mail inválido para reenvio do OTP.");
+    }
+
+    const link = await this.prisma.customerLinkToken.findFirst({
+      where: {
+        email: normalizedEmail,
+        usedAt: null,
+        tokenExpiresAt: { gt: new Date() }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    if (!link) {
+      throw new BadRequestException({ code: "LINK_INVALID" });
+    }
+    if (link.otpSentCount >= 5) {
+      throw new BadRequestException({ code: "OTP_LIMIT_REACHED" });
+    }
+    if (link.lastOtpSentAt && dayjs().diff(dayjs(link.lastOtpSentAt), "hour") < 24) {
+      throw new BadRequestException({ code: "OTP_TOO_SOON" });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = this.hash(otp);
+    const otpExpiresAt = dayjs().add(Number(process.env.OTP_TTL_MINUTES ?? 1440), "minute").toDate();
+
+    await this.prisma.customerLinkToken.update({
+      where: { id: link.id },
+      data: {
+        otpHash,
+        otpExpiresAt,
+        otpSentCount: link.otpSentCount + 1,
+        lastOtpSentAt: new Date()
+      }
+    });
+
+    const subject = "Seu novo OTP do FundarMF";
+    const emailText = [
+      "Olá,",
+      "",
+      "Seu novo código de acesso (OTP) foi gerado.",
+      `Código (OTP): ${otp}`,
+      "",
+      "Use o mesmo link recebido anteriormente para entrar no portal.",
+      "Se você não solicitou este código, ignore este e-mail."
+    ].join("\n");
+
+    await this.notificationService.sendEmail(link.email!, subject, emailText);
+
+    if (this.shouldSendAuthWebhook()) {
+      void this.notificationService.sendWebhook({
+        email: link.email ?? undefined,
+        whatsapp: link.whatsapp ?? undefined,
+        otp,
+        reason: "otp_resent_by_operator",
+        requestedBy
+      });
+    }
+
+    await this.auditService.record(
+      { role: "SYSTEM" },
+      "customer_otp_resent_by_operator",
+      "CustomerLinkToken",
+      link.id,
+      { email: link.email, requestedBy }
+    );
+
+    return { ok: true };
   }
 
   async verifyCustomerLink(token: string, otp?: string) {

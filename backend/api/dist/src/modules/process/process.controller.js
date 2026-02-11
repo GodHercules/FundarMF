@@ -25,6 +25,7 @@ const submit_step_dto_1 = require("./dto/submit-step.dto");
 const approve_step_dto_1 = require("./dto/approve-step.dto");
 const request_correction_dto_1 = require("./dto/request-correction.dto");
 const cancel_dto_1 = require("./dto/cancel.dto");
+const update_status_dto_1 = require("./dto/update-status.dto");
 let ProcessController = class ProcessController {
     processService;
     constructor(processService) {
@@ -44,6 +45,9 @@ let ProcessController = class ProcessController {
             sendEmail: dto.sendEmail,
             sendWhatsapp: dto.sendWhatsapp
         });
+    }
+    async sendOtp(id, req) {
+        return this.processService.sendClientOtp(id, req.actor);
     }
     async list(req, limit, offset) {
         return this.processService.listProcesses(req.actor, {
@@ -69,6 +73,9 @@ let ProcessController = class ProcessController {
     async markInProgress(id, req) {
         return this.processService.markInProgress(id, req.actor);
     }
+    async updateClientStatus(id, dto, req) {
+        return this.processService.updateClientStatus(id, req.actor, dto.message);
+    }
     async cancel(id, dto, req) {
         return this.processService.cancelProcess(id, req.actor, dto.reason);
     }
@@ -93,6 +100,15 @@ __decorate([
     __metadata("design:paramtypes", [String, send_link_dto_1.SendLinkDto, Object]),
     __metadata("design:returntype", Promise)
 ], ProcessController.prototype, "sendLink", null);
+__decorate([
+    (0, common_1.Post)(":id/send-otp"),
+    (0, roles_decorator_1.Roles)("OPERADOR", "MASTER"),
+    __param(0, (0, common_1.Param)("id")),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], ProcessController.prototype, "sendOtp", null);
 __decorate([
     (0, common_1.Get)(),
     __param(0, (0, common_1.Req)()),
@@ -154,6 +170,16 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], ProcessController.prototype, "markInProgress", null);
+__decorate([
+    (0, common_1.Post)(":id/status-update"),
+    (0, roles_decorator_1.Roles)("OPERADOR", "MASTER"),
+    __param(0, (0, common_1.Param)("id")),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, update_status_dto_1.UpdateStatusDto, Object]),
+    __metadata("design:returntype", Promise)
+], ProcessController.prototype, "updateClientStatus", null);
 __decorate([
     (0, common_1.Post)(":id/cancel"),
     __param(0, (0, common_1.Param)("id")),
