@@ -76,7 +76,7 @@ function SortableProcessCard({ process, disabled }: { process: ProcessCard; disa
       >
         <div className="flex items-start justify-between gap-2">
           <p className="line-clamp-2 text-sm font-semibold text-ink">{process.clientName ?? "Processo sem nome"}</p>
-          <StatusBadge status={process.status} />
+          <StatusBadge status={process.status} label={KANBAN_STAGE_LABELS[process.kanbanStage]} />
         </div>
         <p className="mt-2 break-all font-mono text-[11px] text-slate">{process.id}</p>
         <p className="mt-1 text-xs text-slate">Etapa técnica: {process.currentStep}</p>
