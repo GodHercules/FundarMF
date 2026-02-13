@@ -94,6 +94,12 @@ export default function OperatorDashboard() {
     await Promise.all([loadProcesses(0, false), loadNotifications(0, false), loadUnreadCount()]);
   }
 
+  function syncProcessKanbanStage(processId: string, stage: KanbanStage) {
+    setProcesses((prev) =>
+      prev.map((process) => (process.id === processId ? { ...process, kanbanStage: stage } : process))
+    );
+  }
+
   useEffect(() => {
     loadAll();
   }, []);
@@ -210,7 +216,7 @@ export default function OperatorDashboard() {
           <h2 className="text-lg font-semibold">Kanban</h2>
           <p className="text-sm text-slate">Gerencie as etapas arrastando os cards entre as colunas.</p>
         </div>
-        <OperatorKanbanBoard />
+        <OperatorKanbanBoard onStageChange={syncProcessKanbanStage} />
       </Card>
 
       <section className="grid gap-6 md:grid-cols-2">

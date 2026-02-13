@@ -32,6 +32,10 @@ type StagePatchResponse = {
   process: ProcessCard;
 };
 
+type OperatorKanbanBoardProps = {
+  onStageChange?: (processId: string, stage: KanbanStage) => void;
+};
+
 function processDragId(processId: string) {
   return `process:${processId}`;
 }
@@ -123,7 +127,7 @@ function KanbanColumn({
   );
 }
 
-export function OperatorKanbanBoard() {
+export function OperatorKanbanBoard({ onStageChange }: OperatorKanbanBoardProps) {
   const [processes, setProcesses] = useState<ProcessCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -205,6 +209,7 @@ export function OperatorKanbanBoard() {
     );
 
     setProcesses(optimistic);
+    onStageChange?.(activeId, targetStage);
     setBusyProcessId(activeId);
 
     try {
@@ -218,6 +223,7 @@ export function OperatorKanbanBoard() {
       );
     } catch {
       setProcesses(previous);
+      onStageChange?.(activeId, sourceProcess.kanbanStage);
     } finally {
       setBusyProcessId(null);
     }
