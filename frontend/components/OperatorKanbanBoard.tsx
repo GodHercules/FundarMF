@@ -11,7 +11,12 @@ import {
   useSensor,
   useSensors
 } from "@dnd-kit/core";
-import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import {
+  SortableContext,
+  defaultAnimateLayoutChanges,
+  useSortable,
+  verticalListSortingStrategy
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { api } from "@/lib/api";
 import { Card } from "@/components/Card";
@@ -61,12 +66,22 @@ function parseStageId(dragId: string | number) {
 function SortableProcessCard({ process, disabled }: { process: ProcessCard; disabled: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: processDragId(process.id),
-    data: { processId: process.id }
+    data: { processId: process.id },
+    transition: {
+      duration: 140,
+      easing: "cubic-bezier(0.2, 0.8, 0.2, 1)"
+    },
+    animateLayoutChanges: (args) => {
+      if (args.isSorting || args.wasDragging) {
+        return false;
+      }
+      return defaultAnimateLayoutChanges(args);
+    }
   });
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    transition: isDragging ? "none" : transition,
     opacity: isDragging ? 0.92 : 1,
     zIndex: isDragging ? 20 : "auto"
   };
