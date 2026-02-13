@@ -9,6 +9,7 @@ import { Logo } from "@/components/Logo";
 import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
 import { PhoneInput } from "@/components/PhoneInput";
+import { OperatorKanbanBoard } from "@/components/OperatorKanbanBoard";
 import { notifySuccess } from "@/lib/notify";
 
 interface ProcessSummary {
@@ -201,6 +202,14 @@ export default function OperatorDashboard() {
           </Link>
         </div>
       </header>
+
+      <Card className="p-6">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold">Kanban</h2>
+          <p className="text-sm text-slate">Gerencie as etapas arrastando os cards entre as colunas.</p>
+        </div>
+        <OperatorKanbanBoard />
+      </Card>
 
       <section className="grid gap-6 md:grid-cols-2">
         <Card className="p-6">

@@ -11,6 +11,7 @@ export type ProcessStatus =
 export type StepKey = "ETAPA_1" | "ETAPA_2" | "ETAPA_3" | "ETAPA_4" | "ETAPA_5" | "ETAPA_6";
 export type KanbanStage =
   | "VIABILIDADE"
+  | "DOC_INICIAL_APROVADA"
   | "DBE_RECEITA_FEDERAL"
   | "PREPARACAO_DOCUMENTOS"
   | "AGUARDANDO_DOCUMENTOS"
@@ -40,6 +41,7 @@ export const STEP_ORDER: StepKey[] = [
 ];
 
 export const KANBAN_STAGE_ORDER: KanbanStage[] = [
+  "DOC_INICIAL_APROVADA",
   "VIABILIDADE",
   "DBE_RECEITA_FEDERAL",
   "PREPARACAO_DOCUMENTOS",

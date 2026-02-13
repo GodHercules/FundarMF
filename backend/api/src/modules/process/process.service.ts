@@ -11,19 +11,21 @@ import { buildProcessEmailDrafts, ProcessEventDetails, ProcessEventKey } from ".
 
 const CLIENT_STEPS: StepKey[] = ["ETAPA_1", "ETAPA_2", "ETAPA_4", "ETAPA_5", "ETAPA_6"];
 const OPERATOR_STEPS: StepKey[] = ["ETAPA_3"];
-const KANBAN_STAGE_EMAILS: Record<KanbanStage, string> = {
-  VIABILIDADE:
-    "Prezado cliente seu processo acaba de ser iniciado e encontra-se em análise na Junta Comercial / Sedur – Viabilidade Regin.",
-  DBE_RECEITA_FEDERAL:
-    "Prezado cliente a viabilidade Regin foi aprovada e seu processo agora encontra-se em análise na Receita Federal para liberação do DBE (Documento Básico de Entrada CNPJ).",
-  PREPARACAO_DOCUMENTOS:
-    "Prezado cliente o DBE (Documento Básico de Entrada CNPJ) acaba de ser liberado e seu processo agora está na fase de preparação dos documentos (contrato social, capa processo e guia para pagamento).",
-  AGUARDANDO_DOCUMENTOS:
-    "Opa!!!! Os documentos foram enviados para proceder com as assinaturas, favor dar uma verificada no seu e-mail.",
-  ANALISE_JUCEB:
-    "Prezado cliente o seu processo acaba de ser protocolado na Junta Comercial para liberação do Contrato Social registrado e CNPJ.",
-  FINALIZADO:
-    "Excelente notícia! O seu processo acaba de ser liberado... Parabéns!!!!! Favor verificar as documentações enviadas no e-mail."
+const KANBAN_STAGE_EMAILS: Record<KanbanStage, (clientName: string) => string> = {
+  VIABILIDADE: (clientName) =>
+    `Olá, ${clientName}. Seu processo acaba de ser iniciado e encontra-se em análise na Junta Comercial / Sedur - Viabilidade Regin.`,
+  DOC_INICIAL_APROVADA: (clientName) =>
+    `Olá, ${clientName}. A documentação inicial foi aprovada e seu processo entrou na etapa Doc. Inicial Aprovada.`,
+  DBE_RECEITA_FEDERAL: (clientName) =>
+    `Olá, ${clientName}. A viabilidade Regin foi aprovada e seu processo agora encontra-se em análise na Receita Federal para liberação do DBE (Documento Básico de Entrada CNPJ).`,
+  PREPARACAO_DOCUMENTOS: (clientName) =>
+    `Olá, ${clientName}. O DBE (Documento Básico de Entrada CNPJ) acaba de ser liberado e seu processo agora está na fase de preparação dos documentos (contrato social, capa processo e guia para pagamento).`,
+  AGUARDANDO_DOCUMENTOS: (clientName) =>
+    `Olá, ${clientName}. Os documentos foram enviados para proceder com as assinaturas, favor verificar o seu e-mail.`,
+  ANALISE_JUCEB: (clientName) =>
+    `Olá, ${clientName}. O seu processo acaba de ser protocolado na Junta Comercial para liberação do Contrato Social registrado e CNPJ.`,
+  FINALIZADO: (clientName) =>
+    `Olá, ${clientName}. Excelente notícia! O seu processo acaba de ser liberado. Parabéns! Favor verificar as documentações enviadas no e-mail.`
 };
 
 function nextStep(step: StepKey): StepKey | null {
@@ -164,8 +166,9 @@ export class ProcessService {
     const process = await this.prisma.process.findUnique({ where: { id: processId } });
     if (!process) return;
 
-    const body = KANBAN_STAGE_EMAILS[stage];
-    const subject = `Atualização do seu processo ${process.id}`;
+    const clientName = process.clientName?.trim() || "cliente";
+    const body = KANBAN_STAGE_EMAILS[stage](clientName);
+    const subject = `Atualização do seu processo, ${clientName}`;
 
     try {
       await this.notificationService.sendEmail(process.clientEmail, subject, body);

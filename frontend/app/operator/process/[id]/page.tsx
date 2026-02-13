@@ -66,8 +66,7 @@ export default function OperatorProcess() {
   const [fachadaError, setFachadaError] = useState<string | null>(null);
   const [sendingLink, setSendingLink] = useState(false);
   const [sendingOtpOnly, setSendingOtpOnly] = useState(false);
-  const [statusUpdate, setStatusUpdate] = useState("");
-  const [sendingStatusUpdate, setSendingStatusUpdate] = useState(false);
+  const [validatingProcess, setValidatingProcess] = useState(false);
   const [rejectModal, setRejectModal] = useState<{
     type: "fields" | "document";
     fields?: string[];
@@ -94,7 +93,6 @@ export default function OperatorProcess() {
     if (!process) return;
     const step3Data = getStepData(process, "ETAPA_3");
     setStep3(normalizeStep(defaultStep3, step3Data));
-    setStatusUpdate(process.operatorStatusNote ?? "");
     setDocDecisions(
       Object.fromEntries(
         (process.documents ?? [])
@@ -218,32 +216,31 @@ export default function OperatorProcess() {
     load();
   }
 
-  async function goToReceitaReview() {
+  async function markAsValidated() {
     setMessage(null);
     if (!step3IsComplete()) {
-      setMessage("Preencha todos os campos obrigatórios da estrutura jurídica antes da revisão.");
+      setMessage("Preencha todos os campos obrigatórios da estrutura jurídica antes de validar.");
       return;
     }
-    await api(`/processes/${processId}/steps`, {
-      method: "PUT",
-      body: JSON.stringify({ stepKey: "ETAPA_3", data: step3 })
-    });
-    router.push(`/operator/process/${processId}/review`);
-  }
+    if (!approvalsComplete) {
+      setMessage("Aprove todos os campos e documentos do cliente antes de validar.");
+      return;
+    }
 
-  async function sendChatMessage() {
-    if (!chatInput.trim()) return;
-    setChatLoading(true);
+    setValidatingProcess(true);
     try {
-      await api(`/chats/${processId}/messages`, {
-        method: "POST",
-        body: JSON.stringify({ body: chatInput })
+      await api(`/processes/${processId}/steps`, {
+        method: "PUT",
+        body: JSON.stringify({ stepKey: "ETAPA_3", data: step3 })
       });
-      setChatInput("");
-      notifySuccess("Mensagem enviada.");
-      load();
+      await api(`/processes/${processId}/kanban-stage`, {
+        method: "PATCH",
+        body: JSON.stringify({ kanbanStage: "DOC_INICIAL_APROVADA" })
+      });
+      notifySuccess("Processo validado e movido para Doc. Inicial Aprovada.");
+      await load();
     } finally {
-      setChatLoading(false);
+      setValidatingProcess(false);
     }
   }
 
@@ -272,22 +269,19 @@ export default function OperatorProcess() {
     }
   }
 
-  async function sendStatusUpdate() {
-    const text = statusUpdate.trim();
-    if (!text) {
-      setMessage("Informe uma atualização de status para o cliente.");
-      return;
-    }
-    setSendingStatusUpdate(true);
-    setMessage(null);
+  async function sendChatMessage() {
+    if (!chatInput.trim()) return;
+    setChatLoading(true);
     try {
-      await api(`/processes/${processId}/status-update`, {
+      await api(`/chats/${processId}/messages`, {
         method: "POST",
-        body: JSON.stringify({ message: text })
+        body: JSON.stringify({ body: chatInput })
       });
-      notifySuccess("Status enviado ao cliente por e-mail.");
+      setChatInput("");
+      notifySuccess("Mensagem enviada.");
+      load();
     } finally {
-      setSendingStatusUpdate(false);
+      setChatLoading(false);
     }
   }
 
@@ -412,7 +406,13 @@ export default function OperatorProcess() {
   const clientSentDocs = docsWithClientFiles.filter((doc: any) => (doc.clientFiles ?? []).length > 0);
   const clientMissingDocs = docsWithClientFiles.filter((doc: any) => (doc.clientFiles ?? []).length === 0);
   const step3Enabled = process.currentStep === "ETAPA_3" || (step2Enabled && approvalsComplete);
-  const canReviewForReceita = approvalsComplete;
+  const persistedStep3 = getStepData(process, "ETAPA_3");
+  const canViewDocuments =
+    Boolean(persistedStep3.tipoAtividade) &&
+    Boolean(persistedStep3.naturezaJuridica) &&
+    Boolean(persistedStep3.capitalSocial) &&
+    Boolean(persistedStep3.cnae) &&
+    Boolean(persistedStep3.tributacao);
   const chatDisabled = ["CANCELADO", "CONCLUIDO"].includes(process.status);
 
   return (
@@ -448,7 +448,7 @@ export default function OperatorProcess() {
       <section className="grid gap-6 md:grid-cols-2">
         <Card className="p-6">
           <h2 className="text-lg font-semibold">Checklist</h2>
-          <p className="text-sm text-slate">Aprove campos e documentos. Envie para Receita quando tudo estiver OK.</p>
+          <p className="text-sm text-slate">Aprove campos e documentos para concluir a validação inicial.</p>
           <div className="mt-4 grid gap-3 rounded-2xl border border-ink/10 bg-white/70 p-4 text-sm text-slate sm:grid-cols-2">
             <div className="flex items-start gap-3">
               {fieldsRejectedCount > 0 ? (
@@ -495,24 +495,6 @@ export default function OperatorProcess() {
           <p className="text-sm text-slate">A reprovação acontece dentro de Ver dados do cliente.</p>
         </Card>
       </section>
-
-      <Card className="p-6">
-        <h2 className="text-lg font-semibold">Atualização de status para cliente</h2>
-        <p className="text-sm text-slate">Sempre que enviar, o cliente recebe este status por e-mail e WhatsApp.</p>
-        <div className="mt-4 flex flex-col gap-3">
-          <textarea
-            value={statusUpdate}
-            onChange={(event) => setStatusUpdate(event.target.value)}
-            className="min-h-24 w-full rounded-xl border border-ink/15 bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-brass focus:ring-2 focus:ring-brass/30"
-            placeholder="Ex: Estamos validando os documentos e retornaremos hoje."
-          />
-          <div>
-            <Button onClick={sendStatusUpdate} disabled={sendingStatusUpdate}>
-              {sendingStatusUpdate ? "Enviando atualização..." : "Enviar atualização ao cliente"}
-            </Button>
-          </div>
-        </div>
-      </Card>
 
       <Card className="p-6">
         <h2 className="text-lg font-semibold">Estrutura Jurídica e Financeira</h2>
@@ -591,9 +573,16 @@ export default function OperatorProcess() {
           <Button onClick={updateStep3} disabled={!step3Enabled}>
             Salvar
           </Button>
-          {canReviewForReceita && (
-            <Button variant="accent" onClick={goToReceitaReview} disabled={!step3IsComplete()}>
-              Revisar e enviar para Receita
+          <Button
+            variant="accent"
+            onClick={markAsValidated}
+            disabled={!step3Enabled || !approvalsComplete || !step3IsComplete() || validatingProcess}
+          >
+            {validatingProcess ? "Validando..." : "Validado"}
+          </Button>
+          {canViewDocuments && (
+            <Button variant="primary" onClick={() => router.push(`/operator/process/${processId}/review`)}>
+              Visualizar documentos
             </Button>
           )}
         </div>

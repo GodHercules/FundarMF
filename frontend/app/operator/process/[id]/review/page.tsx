@@ -9,7 +9,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Logo } from "@/components/Logo";
 import { StatusBadge } from "@/components/Stepper";
-import { notifyError, notifySuccess } from "@/lib/notify";
+import { notifyError } from "@/lib/notify";
 import { FiCheckCircle, FiFileText, FiXCircle } from "react-icons/fi";
 
 function getStepData(process: any, stepKey: string) {
@@ -33,8 +33,6 @@ export default function OperatorProcessReview() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
 
   async function load() {
     const [processData, documentsData] = await Promise.all([
@@ -116,22 +114,6 @@ export default function OperatorProcessReview() {
 
   const readyToSend = docsApproved && step3Ok;
 
-  async function confirmSend() {
-    setMessage(null);
-    if (!readyToSend) {
-      setMessage("Revise os pendentes antes de enviar para Receita.");
-      return;
-    }
-    setSending(true);
-    try {
-      await api(`/processes/${processId}/mark-in-progress`, { method: "POST" });
-      notifySuccess("Processo enviado para Receita.");
-      router.push(`/operator/process/${processId}`);
-    } finally {
-      setSending(false);
-    }
-  }
-
   if (!process) return <div className="p-8">Carregando...</div>;
 
   return (
@@ -164,8 +146,6 @@ export default function OperatorProcessReview() {
           <span className="text-sm text-slate">Etapa atual: {process.currentStep}</span>
         </div>
       </header>
-
-      {message && <p className="text-sm text-clay">{message}</p>}
 
       <section className="grid gap-6 lg:grid-cols-2">
         <Card className="p-6">
@@ -299,10 +279,10 @@ export default function OperatorProcessReview() {
 
       <Card className="p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">Documentos (somente visualização)</h2>
-            <p className="mt-1 text-xs text-slate">Use o visualizador para confirmar anexos antes do envio.</p>
-          </div>
+        <div>
+          <h2 className="text-lg font-semibold">Documentos (somente visualização)</h2>
+          <p className="mt-1 text-xs text-slate">Use o visualizador para confirmar anexos após o processo validado.</p>
+        </div>
           <span
             className={clsx(
               "badge inline-flex items-center gap-2",
@@ -349,10 +329,7 @@ export default function OperatorProcessReview() {
 
       <div className="flex flex-wrap gap-3">
         <Button className="bg-ink" onClick={() => router.push(`/operator/process/${processId}`)}>
-          Ajustar no processo
-        </Button>
-        <Button variant="accent" onClick={confirmSend} disabled={!readyToSend || sending}>
-          {sending ? "Enviando..." : "Confirmar envio para Receita"}
+          Voltar ao processo
         </Button>
       </div>
 

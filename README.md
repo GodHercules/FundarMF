@@ -1,18 +1,28 @@
-# FundarMF
+﻿# FundarMF
 
 Sistema de workflow para abertura de empresa. Stack moderna com NestJS (API), Next.js (web), PostgreSQL e worker (pg-boss).
 
 ## Novidade: Kanban do operador
-- Novo quadro Kanban em `/operator/kanban` com drag-and-drop (desktop e mobile).
+- Quadro Kanban exibido no dashboard do operador (`/operator/dashboard`) e tambem disponivel em `/operator/kanban`.
 - Colunas fixas:
+  - `Doc. Inicial Aprovada`
   - `VIABILIDADE`
   - `DBE/Receita Federal`
-  - `Preparação Documentos`
+  - `Preparacao Documentos`
   - `Aguardando Documentos`
   - `Analise JUCEB`
   - `Finalizado`
 - Ao mover um card, a API atualiza `Process.kanbanStage`, registra auditoria e dispara e-mail ao cliente.
-- Entrega de e-mail continua assíncrona via fila (`pg-boss`) com retries/backoff e logs em `Notification`.
+- No processo do operador:
+  - removido o bloco de "atualizacao de status para cliente";
+  - removido o fluxo "enviar para Receita";
+  - adicionado botao `Validado` (move para `Doc. Inicial Aprovada`);
+  - adicionado botao `Visualizar documentos` apos salvar os dados da `ETAPA_3`.
+- Entrega de e-mail continua assincrona via fila (`pg-boss`) com retries/backoff e logs em `Notification`.
+
+### Migracao Prisma desta funcionalidade
+- Migration: `20260213133000_add_doc_inicial_aprovada_stage`
+- Em ambiente Render/producao, use `pnpm --filter fundarmf-api prisma:deploy`.
 
 ## Viso geral da arquitetura
 - `backend/api`: API NestJS + Prisma (PostgreSQL)
@@ -414,3 +424,4 @@ pnpm --filter fundarmf-api exec prisma migrate dev -n add_otp_tracking
 ---
 
 Se quiser, posso adicionar mais detalhes de deploy, alertas de segurana ou um guia rpido de troubleshooting em produo.
+

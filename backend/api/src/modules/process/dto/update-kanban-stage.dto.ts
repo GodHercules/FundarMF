@@ -4,6 +4,7 @@ import { KanbanStage } from "@fundarmf/shared";
 export class UpdateKanbanStageDto {
   @IsIn([
     "VIABILIDADE",
+    "DOC_INICIAL_APROVADA",
     "DBE_RECEITA_FEDERAL",
     "PREPARACAO_DOCUMENTOS",
     "AGUARDANDO_DOCUMENTOS",

@@ -12,6 +12,7 @@ describe("ProcessService updateKanbanStage", () => {
           currentStep: "ETAPA_3",
           kanbanStage: "VIABILIDADE",
           ownerId: "op-1",
+          clientName: "Joana",
           clientEmail: "cliente@teste.com"
         })),
         update: vi.fn(async () => ({
@@ -20,6 +21,7 @@ describe("ProcessService updateKanbanStage", () => {
           currentStep: "ETAPA_3",
           kanbanStage: "DBE_RECEITA_FEDERAL",
           ownerId: "op-1",
+          clientName: "Joana",
           clientEmail: "cliente@teste.com"
         }))
       }
@@ -54,7 +56,7 @@ describe("ProcessService updateKanbanStage", () => {
     });
     expect(notificationService.sendEmail).toHaveBeenCalledWith(
       "cliente@teste.com",
-      expect.stringContaining("p1"),
+      expect.stringContaining("Joana"),
       expect.stringContaining("DBE")
     );
     expect(auditService.record).toHaveBeenCalledWith(

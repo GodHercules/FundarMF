@@ -21,6 +21,15 @@ const auth_service_1 = require("../auth/auth.service");
 const process_email_drafts_1 = require("../notification/process-email-drafts");
 const CLIENT_STEPS = ["ETAPA_1", "ETAPA_2", "ETAPA_4", "ETAPA_5", "ETAPA_6"];
 const OPERATOR_STEPS = ["ETAPA_3"];
+const KANBAN_STAGE_EMAILS = {
+    VIABILIDADE: (clientName) => `Olá, ${clientName}. Seu processo acaba de ser iniciado e encontra-se em análise na Junta Comercial / Sedur - Viabilidade Regin.`,
+    DOC_INICIAL_APROVADA: (clientName) => `Olá, ${clientName}. A documentação inicial foi aprovada e seu processo entrou na etapa Doc. Inicial Aprovada.`,
+    DBE_RECEITA_FEDERAL: (clientName) => `Olá, ${clientName}. A viabilidade Regin foi aprovada e seu processo agora encontra-se em análise na Receita Federal para liberação do DBE (Documento Básico de Entrada CNPJ).`,
+    PREPARACAO_DOCUMENTOS: (clientName) => `Olá, ${clientName}. O DBE (Documento Básico de Entrada CNPJ) acaba de ser liberado e seu processo agora está na fase de preparação dos documentos (contrato social, capa processo e guia para pagamento).`,
+    AGUARDANDO_DOCUMENTOS: (clientName) => `Olá, ${clientName}. Os documentos foram enviados para proceder com as assinaturas, favor verificar o seu e-mail.`,
+    ANALISE_JUCEB: (clientName) => `Olá, ${clientName}. O seu processo acaba de ser protocolado na Junta Comercial para liberação do Contrato Social registrado e CNPJ.`,
+    FINALIZADO: (clientName) => `Olá, ${clientName}. Excelente notícia! O seu processo acaba de ser liberado. Parabéns! Favor verificar as documentações enviadas no e-mail.`
+};
 function nextStep(step) {
     const order = ["ETAPA_1", "ETAPA_2", "ETAPA_3", "ETAPA_4", "ETAPA_5", "ETAPA_6"];
     const index = order.indexOf(step);
@@ -151,6 +160,45 @@ let ProcessService = class ProcessService {
         }
         catch (err) {
             console.warn("[process] sendProcessWebhook failed", err);
+        }
+    }
+    async sendKanbanStageEmail(processId, stage, actor) {
+        const process = await this.prisma.process.findUnique({ where: { id: processId } });
+        if (!process)
+            return;
+        const clientName = process.clientName?.trim() || "cliente";
+        const body = KANBAN_STAGE_EMAILS[stage](clientName);
+        const subject = `Atualização do seu processo, ${clientName}`;
+        try {
+            await this.notificationService.sendEmail(process.clientEmail, subject, body);
+            await this.auditService.record(actor, "kanban_stage_email_requested", "Process", processId, {
+                kanbanStage: stage,
+                recipient: process.clientEmail
+            });
+            // Fallback channel for environments with n8n enabled: if provider delivery fails, webhook can replay.
+            await this.notificationService.sendWebhook({
+                reason: "kanban_stage_changed",
+                channel: "system",
+                requestedBy: { email: actor.email, role: actor.role },
+                process: {
+                    id: process.id,
+                    status: process.status,
+                    currentStep: process.currentStep,
+                    kanbanStage: stage,
+                    clientEmail: process.clientEmail
+                },
+                to: process.clientEmail,
+                subject,
+                body
+            });
+        }
+        catch (err) {
+            console.error("[process] kanban stage email dispatch failed", err);
+            await this.auditService.record(actor, "kanban_stage_email_error", "Process", processId, {
+                kanbanStage: stage,
+                recipient: process.clientEmail,
+                error: err instanceof Error ? err.message : String(err)
+            });
         }
     }
     async notifyOwner(processId, ownerId, payload) {
@@ -745,6 +793,32 @@ let ProcessService = class ProcessService {
             message: text
         });
         return { ok: true, message: text, process: updated };
+    }
+    async updateKanbanStage(processId, actor, kanbanStage) {
+        if (actor.role !== "OPERADOR" && actor.role !== "MASTER") {
+            throw new common_1.ForbiddenException();
+        }
+        const process = await this.prisma.process.findUnique({ where: { id: processId } });
+        if (!process) {
+            throw new common_1.NotFoundException("Processo nÃ£o encontrado.");
+        }
+        this.ensureNotReadOnly(process);
+        if (actor.role === "OPERADOR" && process.ownerId !== actor.userId) {
+            throw new common_1.ForbiddenException();
+        }
+        if (process.kanbanStage === kanbanStage) {
+            return { ok: true, alreadyInStage: true, process };
+        }
+        const updated = await this.prisma.process.update({
+            where: { id: processId },
+            data: { kanbanStage }
+        });
+        await this.auditService.record(actor, "kanban_stage_updated", "Process", processId, {
+            from: process.kanbanStage,
+            to: kanbanStage
+        });
+        await this.sendKanbanStageEmail(processId, kanbanStage, actor);
+        return { ok: true, process: updated };
     }
     async cancelProcess(processId, actor, reason) {
         const process = await this.getProcess(processId, actor);

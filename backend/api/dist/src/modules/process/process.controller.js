@@ -26,6 +26,7 @@ const approve_step_dto_1 = require("./dto/approve-step.dto");
 const request_correction_dto_1 = require("./dto/request-correction.dto");
 const cancel_dto_1 = require("./dto/cancel.dto");
 const update_status_dto_1 = require("./dto/update-status.dto");
+const update_kanban_stage_dto_1 = require("./dto/update-kanban-stage.dto");
 let ProcessController = class ProcessController {
     processService;
     constructor(processService) {
@@ -75,6 +76,9 @@ let ProcessController = class ProcessController {
     }
     async updateClientStatus(id, dto, req) {
         return this.processService.updateClientStatus(id, req.actor, dto.message);
+    }
+    async updateKanbanStage(id, dto, req) {
+        return this.processService.updateKanbanStage(id, req.actor, dto.kanbanStage);
     }
     async cancel(id, dto, req) {
         return this.processService.cancelProcess(id, req.actor, dto.reason);
@@ -180,6 +184,16 @@ __decorate([
     __metadata("design:paramtypes", [String, update_status_dto_1.UpdateStatusDto, Object]),
     __metadata("design:returntype", Promise)
 ], ProcessController.prototype, "updateClientStatus", null);
+__decorate([
+    (0, common_1.Patch)(":id/kanban-stage"),
+    (0, roles_decorator_1.Roles)("OPERADOR", "MASTER"),
+    __param(0, (0, common_1.Param)("id")),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, update_kanban_stage_dto_1.UpdateKanbanStageDto, Object]),
+    __metadata("design:returntype", Promise)
+], ProcessController.prototype, "updateKanbanStage", null);
 __decorate([
     (0, common_1.Post)(":id/cancel"),
     __param(0, (0, common_1.Param)("id")),
