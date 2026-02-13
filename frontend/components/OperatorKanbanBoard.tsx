@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragEndEvent,
-  DragOverlay,
   PointerSensor,
   TouchSensor,
   useDroppable,
@@ -64,12 +63,17 @@ function SortableProcessCard({ process, disabled }: { process: ProcessCard; disa
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1
+    opacity: isDragging ? 0.92 : 1,
+    zIndex: isDragging ? 20 : "auto"
   };
 
   return (
     <div ref={setNodeRef} style={style}>
-      <Card className="border border-ink/10 bg-white/90 p-4 transition hover:-translate-y-0.5" {...attributes} {...listeners}>
+      <Card
+        className="cursor-grab border border-ink/10 bg-white/90 p-4 transition hover:-translate-y-0.5 active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
+      >
         <div className="flex items-start justify-between gap-2">
           <p className="line-clamp-2 text-sm font-semibold text-ink">{process.clientName ?? "Processo sem nome"}</p>
           <StatusBadge status={process.status} />
@@ -172,10 +176,6 @@ export function OperatorKanbanBoard() {
     return map;
   }, [processes]);
 
-  const activeProcess = activeProcessId
-    ? processes.find((process) => process.id === activeProcessId) ?? null
-    : null;
-
   function stageFromOverId(overId: string | number, current: ProcessCard[]) {
     const directStage = parseStageId(overId);
     if (directStage) return directStage;
@@ -249,18 +249,6 @@ export function OperatorKanbanBoard() {
           ))}
         </div>
       </section>
-
-      <DragOverlay>
-        {activeProcess ? (
-          <div className="w-[300px]">
-            <Card className="border border-ink/10 bg-white p-4 shadow-soft">
-              <p className="text-sm font-semibold text-ink">{activeProcess.clientName ?? "Processo"}</p>
-              <p className="mt-2 break-all font-mono text-[11px] text-slate">{activeProcess.id}</p>
-              <p className="mt-1 text-xs text-slate">{KANBAN_STAGE_LABELS[activeProcess.kanbanStage]}</p>
-            </Card>
-          </div>
-        ) : null}
-      </DragOverlay>
     </DndContext>
   );
 }
