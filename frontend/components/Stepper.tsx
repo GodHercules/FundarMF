@@ -31,10 +31,10 @@ export function Stepper({ steps, current }: { steps: string[]; current: string }
   );
 }
 
-export function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({ status, label }: { status: string; label?: string }) {
   return (
     <span className={clsx("badge text-white", statusColor[status] ?? "bg-slate")}>
-      {status.replaceAll("_", " ")}
+      {(label ?? status).replaceAll("_", " ")}
     </span>
   );
 }

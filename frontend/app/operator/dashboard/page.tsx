@@ -10,6 +10,7 @@ import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
 import { PhoneInput } from "@/components/PhoneInput";
 import { OperatorKanbanBoard } from "@/components/OperatorKanbanBoard";
+import { KANBAN_STAGE_LABELS, KanbanStage } from "@/lib/kanban";
 import { notifySuccess } from "@/lib/notify";
 
 interface ProcessSummary {
@@ -17,6 +18,7 @@ interface ProcessSummary {
   clientName?: string;
   status: string;
   currentStep: string;
+  kanbanStage?: KanbanStage;
 }
 
 type InAppNotification = {
@@ -421,7 +423,10 @@ export default function OperatorDashboard() {
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-3 md:justify-end">
-                  <StatusBadge status={process.status} />
+                  <StatusBadge
+                    status={process.status}
+                    label={process.kanbanStage ? KANBAN_STAGE_LABELS[process.kanbanStage] : undefined}
+                  />
                   <Link
                     href={`/operator/process/${process.id}`}
                     className="rounded-xl border border-brass/30 bg-brass/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink hover:border-brass"
