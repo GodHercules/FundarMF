@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { StepKey } from "@prisma/client";
 import { PrismaService } from "../../shared/prisma.service";
 import { Actor } from "../../common/auth/types";
 import { AuditService } from "../audit/audit.service";
@@ -7,9 +8,9 @@ import { AuditService } from "../audit/audit.service";
 export class ChecklistService {
   constructor(private readonly prisma: PrismaService, private readonly auditService: AuditService) {}
 
-  async getChecklist(processId: string, stepKey: string, actor: Actor) {
+  async getChecklist(processId: string, stepKey: StepKey, actor: Actor) {
     const checklist = await this.prisma.checklist.findUnique({
-      where: { processId_stepKey: { processId, stepKey: stepKey as any } }
+      where: { processId_stepKey: { processId, stepKey } }
     });
     if (!checklist) {
       throw new NotFoundException("Checklist não encontrado.");
@@ -29,7 +30,7 @@ export class ChecklistService {
     return checklist;
   }
 
-  async updateChecklist(processId: string, stepKey: string, items: Record<string, boolean>, actor: Actor) {
+  async updateChecklist(processId: string, stepKey: StepKey, items: Record<string, boolean>, actor: Actor) {
     if (actor.role !== "OPERADOR") {
       throw new ForbiddenException();
     }
@@ -43,7 +44,7 @@ export class ChecklistService {
     const status = values.length > 0 && values.every((val) => val === true) ? "COMPLETO" : "PENDENTE";
 
     const checklist = await this.prisma.checklist.update({
-      where: { processId_stepKey: { processId, stepKey: stepKey as any } },
+      where: { processId_stepKey: { processId, stepKey } },
       data: {
         items,
         status

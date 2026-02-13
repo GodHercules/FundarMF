@@ -10,7 +10,6 @@
         "./*"
       ]
     },
-    "allowJs": true,
     "noEmit": true,
     "incremental": true,
     "isolatedModules": true,
@@ -19,7 +18,8 @@
         "name": "next"
       }
     ],
-    "strictNullChecks": true
+    "strictNullChecks": true,
+    "allowJs": true
   },
   "include": [
     "next-env.d.ts",

@@ -43,27 +43,28 @@ async function proxy(req: Request, ctx: { params: Promise<{ path?: string[] }> }
   });
 }
 
-export async function GET(req: Request, ctx: any) {
+type RouteContext = { params: Promise<{ path?: string[] }> };
+
+export async function GET(req: Request, ctx: RouteContext) {
   return proxy(req, ctx);
 }
 
-export async function POST(req: Request, ctx: any) {
+export async function POST(req: Request, ctx: RouteContext) {
   return proxy(req, ctx);
 }
 
-export async function PUT(req: Request, ctx: any) {
+export async function PUT(req: Request, ctx: RouteContext) {
   return proxy(req, ctx);
 }
 
-export async function PATCH(req: Request, ctx: any) {
+export async function PATCH(req: Request, ctx: RouteContext) {
   return proxy(req, ctx);
 }
 
-export async function DELETE(req: Request, ctx: any) {
+export async function DELETE(req: Request, ctx: RouteContext) {
   return proxy(req, ctx);
 }
 
-export async function HEAD(req: Request, ctx: any) {
+export async function HEAD(req: Request, ctx: RouteContext) {
   return proxy(req, ctx);
 }
-

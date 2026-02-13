@@ -1,16 +1,17 @@
 import { Body, Controller, Get, Put, UseGuards } from "@nestjs/common";
-import { IsIn, IsInt, Max, Min } from "class-validator";
+import { StepKey, StepSide } from "@prisma/client";
+import { IsEnum, IsInt, Max, Min } from "class-validator";
 import { Roles } from "../../common/auth/roles.decorator";
 import { RolesGuard } from "../../common/auth/roles.guard";
 import { SlaService } from "./sla.service";
 import { AuthGuard } from "../../common/auth/auth.guard";
 
 class UpdateSlaDto {
-  @IsIn(["ETAPA_1", "ETAPA_2", "ETAPA_3", "ETAPA_4", "ETAPA_5", "ETAPA_6"])
-  stepKey: any;
+  @IsEnum(StepKey)
+  stepKey: StepKey;
 
-  @IsIn(["CLIENTE", "OPERADOR"])
-  side: any;
+  @IsEnum(StepSide)
+  side: StepSide;
 
   @IsInt()
   @Min(1)

@@ -1,8 +1,9 @@
-import { IsIn, IsObject } from "class-validator";
+import { StepKey } from "@prisma/client";
+import { IsEnum, IsObject } from "class-validator";
 
 export class UpdateChecklistDto {
-  @IsIn(["ETAPA_2", "ETAPA_4", "ETAPA_5", "ETAPA_6"])
-  stepKey: any;
+  @IsEnum(StepKey)
+  stepKey: StepKey;
 
   @IsObject()
   items: Record<string, boolean>;

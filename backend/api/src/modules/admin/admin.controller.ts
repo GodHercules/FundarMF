@@ -20,7 +20,7 @@ export class AdminController {
   }
 
   @Post("users")
-  async createUser(@Body() dto: CreateUserDto, @Req() req: Request) {
+  async createUser(@Body() dto: CreateUserDto) {
     return this.adminService.createOperator(dto.email, dto.name, dto.password, dto.whatsapp);
   }
 
@@ -53,7 +53,7 @@ export class AdminController {
   async report(@Param("processId") processId: string, @Res() res: Response) {
     const report = await this.adminService.getReport(processId);
     res.setHeader("Content-Type", report.mimeType);
-    res.setHeader("Content-Disposition", `attachment; filename=\"${report.fileName}\"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${report.fileName}"`);
     res.send(report.data);
   }
 }

@@ -63,18 +63,23 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
+      forbidNonWhitelisted: true,
       transform: true
     })
   );
   app.useGlobalInterceptors(new RequestLoggingInterceptor());
 
-  const config = new DocumentBuilder()
-    .setTitle("FundarMF API")
-    .setDescription("Workflow de abertura de empresa")
-    .setVersion("0.1.0")
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup("/docs", app, document);
+  const swaggerEnabled =
+    (process.env.SWAGGER_ENABLED ?? (process.env.NODE_ENV !== "production" ? "true" : "false")) === "true";
+  if (swaggerEnabled) {
+    const config = new DocumentBuilder()
+      .setTitle("FundarMF API")
+      .setDescription("Workflow de abertura de empresa")
+      .setVersion("0.1.0")
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup("/docs", app, document);
+  }
 
   const port = Number(process.env.API_PORT ?? 4000);
   await app.listen(port);
