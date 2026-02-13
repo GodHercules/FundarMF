@@ -13,7 +13,6 @@ import {
 } from "@dnd-kit/core";
 import {
   SortableContext,
-  defaultAnimateLayoutChanges,
   useSortable,
   verticalListSortingStrategy
 } from "@dnd-kit/sortable";
@@ -67,21 +66,13 @@ function SortableProcessCard({ process, disabled }: { process: ProcessCard; disa
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: processDragId(process.id),
     data: { processId: process.id },
-    transition: {
-      duration: 140,
-      easing: "cubic-bezier(0.2, 0.8, 0.2, 1)"
-    },
-    animateLayoutChanges: (args) => {
-      if (args.isSorting || args.wasDragging) {
-        return false;
-      }
-      return defaultAnimateLayoutChanges(args);
-    }
+    transition: null,
+    animateLayoutChanges: () => false
   });
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition: isDragging ? "none" : transition,
+    transition: transition ?? undefined,
     opacity: isDragging ? 0.92 : 1,
     zIndex: isDragging ? 20 : "auto"
   };
@@ -150,7 +141,7 @@ export function OperatorKanbanBoard({ onStageChange }: OperatorKanbanBoardProps)
   const [busyProcessId, setBusyProcessId] = useState<string | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 1 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } })
   );
 
