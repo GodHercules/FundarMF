@@ -195,6 +195,11 @@ export default function OperatorDashboard() {
         <span className="badge bg-emerald/15 text-ink">Painel interno</span>
         <h1 className="text-3xl font-semibold">Meus casos</h1>
         <p className="text-slate">Acompanhe validações, correções, chat e SLAs.</p>
+        <div>
+          <Link href="/operator/kanban" className="text-sm font-semibold text-brass">
+            Abrir quadro Kanban
+          </Link>
+        </div>
       </header>
 
       <section className="grid gap-6 md:grid-cols-2">

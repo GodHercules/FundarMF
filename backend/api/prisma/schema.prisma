@@ -30,6 +30,15 @@ enum StepKey {
   ETAPA_6
 }
 
+enum KanbanStage {
+  VIABILIDADE
+  DBE_RECEITA_FEDERAL
+  PREPARACAO_DOCUMENTOS
+  AGUARDANDO_DOCUMENTOS
+  ANALISE_JUCEB
+  FINALIZADO
+}
+
 enum StepSide {
   CLIENTE
   OPERADOR
@@ -96,6 +105,7 @@ model Process {
   clientPhone     String?
   status          ProcessStatus @default(EM_ANDAMENTO)
   currentStep     StepKey       @default(ETAPA_1)
+  kanbanStage     KanbanStage   @default(VIABILIDADE)
   ownerId         String?
   owner           User?         @relation("ProcessOwner", fields: [ownerId], references: [id])
   cancelledAt     DateTime?
@@ -116,6 +126,7 @@ model Process {
   notifications UserNotification[]
 
   @@index([ownerId, createdAt])
+  @@index([kanbanStage, ownerId, createdAt])
   @@index([clientEmail, createdAt])
   @@index([clientPhone, createdAt])
   @@index([status, createdAt])

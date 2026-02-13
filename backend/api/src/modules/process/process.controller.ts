@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
 import { Request } from "express";
 import { ProcessService } from "./process.service";
 import { AuthGuard } from "../../common/auth/auth.guard";
@@ -12,6 +12,7 @@ import { ApproveStepDto } from "./dto/approve-step.dto";
 import { RequestCorrectionDto } from "./dto/request-correction.dto";
 import { CancelDto } from "./dto/cancel.dto";
 import { UpdateStatusDto } from "./dto/update-status.dto";
+import { UpdateKanbanStageDto } from "./dto/update-kanban-stage.dto";
 
 @Controller("processes")
 @UseGuards(AuthGuard, RolesGuard)
@@ -91,6 +92,12 @@ export class ProcessController {
   @Roles("OPERADOR", "MASTER")
   async updateClientStatus(@Param("id") id: string, @Body() dto: UpdateStatusDto, @Req() req: Request) {
     return this.processService.updateClientStatus(id, req.actor!, dto.message);
+  }
+
+  @Patch(":id/kanban-stage")
+  @Roles("OPERADOR", "MASTER")
+  async updateKanbanStage(@Param("id") id: string, @Body() dto: UpdateKanbanStageDto, @Req() req: Request) {
+    return this.processService.updateKanbanStage(id, req.actor!, dto.kanbanStage);
   }
 
   @Post(":id/cancel")

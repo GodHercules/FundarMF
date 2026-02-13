@@ -1,0 +1,102 @@
+﻿import { describe, expect, it, vi } from "vitest";
+import { ProcessStatus } from "@prisma/client";
+import { ProcessService } from "../src/modules/process/process.service";
+
+describe("ProcessService updateKanbanStage", () => {
+  it("updates stage, records audit and dispatches client email", async () => {
+    const prisma = {
+      process: {
+        findUnique: vi.fn(async () => ({
+          id: "p1",
+          status: ProcessStatus.EM_ANDAMENTO,
+          currentStep: "ETAPA_3",
+          kanbanStage: "VIABILIDADE",
+          ownerId: "op-1",
+          clientEmail: "cliente@teste.com"
+        })),
+        update: vi.fn(async () => ({
+          id: "p1",
+          status: ProcessStatus.EM_ANDAMENTO,
+          currentStep: "ETAPA_3",
+          kanbanStage: "DBE_RECEITA_FEDERAL",
+          ownerId: "op-1",
+          clientEmail: "cliente@teste.com"
+        }))
+      }
+    };
+
+    const slaService = {} as any;
+    const auditService = { record: vi.fn(async () => undefined) };
+    const notificationService = {
+      sendEmail: vi.fn(async () => undefined),
+      sendWebhook: vi.fn(async () => undefined)
+    };
+    const authService = {} as any;
+
+    const service = new ProcessService(
+      prisma as any,
+      slaService,
+      auditService as any,
+      notificationService as any,
+      authService
+    );
+
+    const result = await service.updateKanbanStage(
+      "p1",
+      { role: "OPERADOR", userId: "op-1", email: "op@teste.com" },
+      "DBE_RECEITA_FEDERAL" as any
+    );
+
+    expect(result.ok).toBe(true);
+    expect(prisma.process.update).toHaveBeenCalledWith({
+      where: { id: "p1" },
+      data: { kanbanStage: "DBE_RECEITA_FEDERAL" }
+    });
+    expect(notificationService.sendEmail).toHaveBeenCalledWith(
+      "cliente@teste.com",
+      expect.stringContaining("p1"),
+      expect.stringContaining("DBE")
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      { role: "OPERADOR", userId: "op-1", email: "op@teste.com" },
+      "kanban_stage_updated",
+      "Process",
+      "p1",
+      { from: "VIABILIDADE", to: "DBE_RECEITA_FEDERAL" }
+    );
+  });
+
+  it("returns alreadyInStage without dispatching notification", async () => {
+    const prisma = {
+      process: {
+        findUnique: vi.fn(async () => ({
+          id: "p1",
+          status: ProcessStatus.EM_ANDAMENTO,
+          currentStep: "ETAPA_2",
+          kanbanStage: "VIABILIDADE",
+          ownerId: "op-1",
+          clientEmail: "cliente@teste.com"
+        })),
+        update: vi.fn()
+      }
+    };
+
+    const service = new ProcessService(
+      prisma as any,
+      {} as any,
+      { record: vi.fn(async () => undefined) } as any,
+      { sendEmail: vi.fn(async () => undefined), sendWebhook: vi.fn(async () => undefined) } as any,
+      {} as any
+    );
+
+    const result = await service.updateKanbanStage(
+      "p1",
+      { role: "OPERADOR", userId: "op-1", email: "op@teste.com" },
+      "VIABILIDADE" as any
+    );
+
+    expect(result).toEqual({ ok: true, alreadyInStage: true, process: expect.any(Object) });
+    expect(prisma.process.update).not.toHaveBeenCalled();
+  });
+});
+

@@ -2,6 +2,18 @@
 
 Sistema de workflow para abertura de empresa. Stack moderna com NestJS (API), Next.js (web), PostgreSQL e worker (pg-boss).
 
+## Novidade: Kanban do operador
+- Novo quadro Kanban em `/operator/kanban` com drag-and-drop (desktop e mobile).
+- Colunas fixas:
+  - `VIABILIDADE`
+  - `DBE/Receita Federal`
+  - `Preparação Documentos`
+  - `Aguardando Documentos`
+  - `Analise JUCEB`
+  - `Finalizado`
+- Ao mover um card, a API atualiza `Process.kanbanStage`, registra auditoria e dispara e-mail ao cliente.
+- Entrega de e-mail continua assíncrona via fila (`pg-boss`) com retries/backoff e logs em `Notification`.
+
 ## Viso geral da arquitetura
 - `backend/api`: API NestJS + Prisma (PostgreSQL)
 - `backend/worker`: jobs (pg-boss) para tarefas assncronas
@@ -260,6 +272,7 @@ pnpm --filter fundarmf-worker dev
 - `GET /processes/:id`
 - `POST /processes/:id/send-link`
 - `PUT /processes/:id/steps`
+- `PATCH /processes/:id/kanban-stage`
 - `POST /processes/:id/submit-step`
 - `POST /processes/:id/request-correction`
 - `POST /processes/:id/cancel`

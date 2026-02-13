@@ -9,6 +9,13 @@ export type ProcessStatus =
   | "CANCELADO";
 
 export type StepKey = "ETAPA_1" | "ETAPA_2" | "ETAPA_3" | "ETAPA_4" | "ETAPA_5" | "ETAPA_6";
+export type KanbanStage =
+  | "VIABILIDADE"
+  | "DBE_RECEITA_FEDERAL"
+  | "PREPARACAO_DOCUMENTOS"
+  | "AGUARDANDO_DOCUMENTOS"
+  | "ANALISE_JUCEB"
+  | "FINALIZADO";
 
 export type StepSide = "CLIENTE" | "OPERADOR";
 
@@ -30,6 +37,15 @@ export const STEP_ORDER: StepKey[] = [
   "ETAPA_4",
   "ETAPA_5",
   "ETAPA_6"
+];
+
+export const KANBAN_STAGE_ORDER: KanbanStage[] = [
+  "VIABILIDADE",
+  "DBE_RECEITA_FEDERAL",
+  "PREPARACAO_DOCUMENTOS",
+  "AGUARDANDO_DOCUMENTOS",
+  "ANALISE_JUCEB",
+  "FINALIZADO"
 ];
 
 export const NOTIFY_EMAIL_JOB = "notify:email";
