@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import clsx from "clsx";
-import { API_BASE, api } from "@/lib/api";
+import { DOCS_API_BASE, api } from "@/lib/api";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { StatusBadge } from "@/components/Stepper";
@@ -115,7 +115,7 @@ export default function OperatorProcess() {
       setPreviewError(null);
       setPreviewUrl(null);
       try {
-        const endpoint = `${API_BASE}/documents/${processId}/items/${selectedFile.itemKey}/preview/${selectedFile.file.id}`;
+        const endpoint = `${DOCS_API_BASE}/documents/${processId}/items/${selectedFile.itemKey}/preview/${selectedFile.file.id}`;
         const response = await fetch(endpoint, { credentials: "include" });
         if (!response.ok) {
           const text = await response.text();
@@ -148,7 +148,7 @@ export default function OperatorProcess() {
       active = false;
       if (objectUrlToRevoke) URL.revokeObjectURL(objectUrlToRevoke);
     };
-  }, [API_BASE, processId, selectedFile?.itemKey, selectedFile?.file?.id]);
+  }, [DOCS_API_BASE, processId, selectedFile?.itemKey, selectedFile?.file?.id]);
 
   async function validateDocument(itemKey: string, socioId: string | undefined, status: "APROVADO" | "REPROVADO", reason = "") {
     if (status === "REPROVADO" && !reason.trim()) {
@@ -301,7 +301,7 @@ export default function OperatorProcess() {
     fachadaFiles.forEach((file) => formData.append("files", file));
     setDocLoading("FOTO_FACHADA_UPLOAD");
     try {
-      const response = await fetch(`${API_BASE}/documents/${processId}/items/FOTO_FACHADA/upload`, {
+      const response = await fetch(`${DOCS_API_BASE}/documents/${processId}/items/FOTO_FACHADA/upload`, {
         method: "POST",
         credentials: "include",
         body: formData
@@ -1150,7 +1150,7 @@ export default function OperatorProcess() {
                       </Button>
                       <a
                         className="inline-flex items-center justify-center rounded-xl border border-ink/15 px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.14em] text-ink shadow-lift transition hover:-translate-y-0.5 hover:border-brass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass/40"
-                        href={`${API_BASE}/documents/${processId}/items/${selectedFile.itemKey}/download/${selectedFile.file.id}`}
+                        href={`${DOCS_API_BASE}/documents/${processId}/items/${selectedFile.itemKey}/download/${selectedFile.file.id}`}
                         target="_blank"
                         rel="noreferrer"
                       >

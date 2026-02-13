@@ -17,6 +17,7 @@ vi.mock("next/image", () => ({
 const apiMock = vi.fn();
 vi.mock("@/lib/api", () => ({
   API_BASE: "/api",
+  DOCS_API_BASE: "/apix",
   api: (...args: any[]) => apiMock(...args)
 }));
 

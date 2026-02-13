@@ -1,11 +1,13 @@
 ﻿export const API_BASE = "/api";
+export const DOCS_API_BASE = "/apix";
 
 import { notifyError } from "@/lib/notify";
 import { logClientPerf } from "@/lib/perf";
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   try {
-    const requestUrl = `${API_BASE}${path}`;
+    const base = path.startsWith("/documents/") ? DOCS_API_BASE : API_BASE;
+    const requestUrl = `${base}${path}`;
     const perfUrl =
       typeof window !== "undefined" ? new URL(requestUrl, window.location.origin).toString() : requestUrl;
     const start = typeof performance !== "undefined" ? performance.now() : Date.now();
@@ -87,4 +89,3 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     throw error;
   }
 }
-

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import clsx from "clsx";
-import { API_BASE, api } from "@/lib/api";
+import { DOCS_API_BASE, api } from "@/lib/api";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Logo } from "@/components/Logo";
@@ -59,7 +59,7 @@ export default function OperatorProcessReview() {
       setPreviewError(null);
       setPreviewUrl(null);
       try {
-        const endpoint = `${API_BASE}/documents/${processId}/items/${selectedFile.itemKey}/preview/${selectedFile.file.id}`;
+        const endpoint = `${DOCS_API_BASE}/documents/${processId}/items/${selectedFile.itemKey}/preview/${selectedFile.file.id}`;
         const response = await fetch(endpoint, { credentials: "include" });
         if (!response.ok) {
           const text = await response.text();
@@ -92,7 +92,7 @@ export default function OperatorProcessReview() {
       active = false;
       if (objectUrlToRevoke) URL.revokeObjectURL(objectUrlToRevoke);
     };
-  }, [API_BASE, processId, selectedFile?.itemKey, selectedFile?.file?.id]);
+  }, [DOCS_API_BASE, processId, selectedFile?.itemKey, selectedFile?.file?.id]);
 
   const step2 = useMemo(() => getStepData(process, "ETAPA_2"), [process]);
   const step3 = useMemo(() => getStepData(process, "ETAPA_3"), [process]);
@@ -382,7 +382,7 @@ export default function OperatorProcessReview() {
                       </Button>
                       <a
                         className="inline-flex items-center justify-center rounded-xl border border-ink/15 px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.14em] text-ink shadow-lift transition hover:-translate-y-0.5 hover:border-brass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass/40"
-                        href={`${API_BASE}/documents/${processId}/items/${selectedFile.itemKey}/download/${selectedFile.file.id}`}
+                        href={`${DOCS_API_BASE}/documents/${processId}/items/${selectedFile.itemKey}/download/${selectedFile.file.id}`}
                         target="_blank"
                         rel="noreferrer"
                       >
