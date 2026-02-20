@@ -13,7 +13,49 @@ describe("ProcessService updateKanbanStage", () => {
           kanbanStage: "VIABILIDADE",
           ownerId: "op-1",
           clientName: "Joana",
-          clientEmail: "cliente@teste.com"
+          clientEmail: "cliente@teste.com",
+          steps: [
+            {
+              stepKey: "ETAPA_2",
+              locked: true,
+              status: ProcessStatus.AGUARDANDO_OPERADOR,
+              data: {
+                razaoSocial1: "Empresa Teste",
+                municipio: "Salvador - BA",
+                emailCnpj: "cliente@teste.com",
+                telefoneCnpj: "+5571999999999",
+                endereco: { escritorioVirtual: "Sim" },
+                quadroSocietario: [
+                  {
+                    socioId: "s1",
+                    socioNome: "Joana",
+                    socioCpf: "000.000.000-00",
+                    socioEmail: "joana@teste.com",
+                    socioTelefone: "+5571999999999",
+                    socioPercentual: "100%",
+                    socioAdministrador: "Sim",
+                    responsavelCnpj: "Joana",
+                    socioEstadoCivil: "Solteiro(a)",
+                    socioProfissao: "Analista"
+                  }
+                ]
+              }
+            },
+            {
+              stepKey: "ETAPA_3",
+              data: {
+                tipoAtividade: "Servico",
+                naturezaJuridica: "Sociedade empresaria Ltda",
+                capitalSocial: "10000",
+                cnae: "6201-5/01",
+                tributacao: "Simples Nacional"
+              }
+            }
+          ],
+          documents: [
+            { itemKey: "IDENTIFICACAO_SOCIOS", socioId: "s1", status: "APROVADO" },
+            { itemKey: "COMPROVANTE_RESIDENCIA", socioId: "s1", status: "APROVADO" }
+          ]
         })),
         update: vi.fn(async () => ({
           id: "p1",
@@ -77,7 +119,9 @@ describe("ProcessService updateKanbanStage", () => {
           currentStep: "ETAPA_2",
           kanbanStage: "VIABILIDADE",
           ownerId: "op-1",
-          clientEmail: "cliente@teste.com"
+          clientEmail: "cliente@teste.com",
+          steps: [],
+          documents: []
         })),
         update: vi.fn()
       }

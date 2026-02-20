@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { DocumentItemKey, KanbanStage, Prisma, ProcessStatus, StepKey, StepSide } from "@prisma/client";
+import { DocumentItemKey, DocumentItemStatus, KanbanStage, Prisma, ProcessStatus, StepKey, StepSide } from "@prisma/client";
 import { PrismaService } from "../../shared/prisma.service";
 import { Actor } from "../../common/auth/types";
 import { isClientOwner, normalizePhone } from "../../common/auth/identity";
@@ -264,6 +264,138 @@ export class ProcessService {
     return [];
   }
 
+  private hasText(value: unknown) {
+    return typeof value === "string" && value.trim().length > 0;
+  }
+
+  private isStep2DataComplete(data: Record<string, unknown>) {
+    if (!this.hasText(data.razaoSocial1)) return false;
+    if (!this.hasText(data.municipio)) return false;
+    if (!this.hasText(data.emailCnpj)) return false;
+    if (!this.hasText(data.telefoneCnpj)) return false;
+
+    const endereco = (data.endereco ?? {}) as Record<string, unknown>;
+    const escritorioVirtual = String(endereco.escritorioVirtual ?? "").trim();
+    if (!escritorioVirtual) return false;
+
+    const needsPhysicalAddress = escritorioVirtual !== "Sim";
+    if (needsPhysicalAddress) {
+      const requiredAddress = ["cep", "endereco", "numero", "bairro", "cidade", "uf", "iptu"];
+      if (requiredAddress.some((field) => !this.hasText(endereco[field]))) {
+        return false;
+      }
+    }
+
+    const socios = this.normalizeSocios(data.quadroSocietario);
+    if (socios.length === 0) return false;
+
+    for (const socio of socios) {
+      const required = [
+        "socioId",
+        "socioNome",
+        "socioCpf",
+        "socioEmail",
+        "socioTelefone",
+        "socioPercentual",
+        "socioAdministrador",
+        "responsavelCnpj",
+        "socioEstadoCivil",
+        "socioProfissao"
+      ];
+      if (required.some((field) => !this.hasText(socio[field]))) {
+        return false;
+      }
+
+      if (String(socio.socioEstadoCivil).trim() === "Casado(a)" && !this.hasText(socio.socioRegimeCasamento)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private isStep3DataComplete(data: Record<string, unknown>) {
+    const required = ["tipoAtividade", "naturezaJuridica", "capitalSocial", "cnae", "tributacao"];
+    return required.every((field) => this.hasText(data[field]));
+  }
+
+  private hasRequiredUploadedDocuments(
+    step2Data: Record<string, unknown>,
+    documents: Array<{ itemKey: DocumentItemKey; socioId: string | null; files: Array<{ id: string }> }>
+  ) {
+    const socios = this.normalizeSocios(step2Data.quadroSocietario);
+    const socioIds = socios
+      .map((socio) => socio.socioId)
+      .filter((value) => typeof value === "string" && value.trim().length > 0) as string[];
+
+    if (socioIds.length !== socios.length) return false;
+
+    const hasUpload = (itemKey: DocumentItemKey, socioId: string | null) =>
+      documents.some(
+        (doc) =>
+          doc.itemKey === itemKey &&
+          (doc.socioId ?? null) === socioId &&
+          Array.isArray(doc.files) &&
+          doc.files.length > 0
+      );
+
+    for (const socioId of socioIds) {
+      if (!hasUpload(DocumentItemKey.IDENTIFICACAO_SOCIOS, socioId)) return false;
+      if (!hasUpload(DocumentItemKey.COMPROVANTE_RESIDENCIA, socioId)) return false;
+    }
+
+    const endereco = (step2Data.endereco ?? {}) as Record<string, unknown>;
+    const escritorioVirtual = String(endereco.escritorioVirtual ?? "").trim();
+    if (escritorioVirtual !== "Sim" && !hasUpload(DocumentItemKey.FOTO_FACHADA, null)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private isKanbanEligible(
+    step2: { data: Prisma.JsonValue; locked: boolean; status: ProcessStatus } | null | undefined,
+    step3: { data: Prisma.JsonValue } | null | undefined,
+    documents: Array<{ itemKey: DocumentItemKey; socioId: string | null; status: DocumentItemStatus }>
+  ) {
+    if (!step2 || !step2.locked) return false;
+    if (![ProcessStatus.AGUARDANDO_OPERADOR, ProcessStatus.CONCLUIDO].includes(step2.status)) return false;
+
+    const step2Data = (step2.data ?? {}) as Record<string, unknown>;
+    if (!this.isStep2DataComplete(step2Data)) return false;
+
+    const step3Data = (step3?.data ?? {}) as Record<string, unknown>;
+    if (!this.isStep3DataComplete(step3Data)) return false;
+
+    const socios = this.normalizeSocios(step2Data.quadroSocietario);
+    const socioIds = socios
+      .map((socio) => socio.socioId)
+      .filter((value) => typeof value === "string" && value.trim().length > 0) as string[];
+
+    if (socioIds.length !== socios.length) return false;
+
+    const hasApproved = (itemKey: DocumentItemKey, socioId: string | null) =>
+      documents.some(
+        (doc) =>
+          doc.itemKey === itemKey &&
+          (doc.socioId ?? null) === socioId &&
+          doc.status === DocumentItemStatus.APROVADO
+      );
+
+    for (const socioId of socioIds) {
+      if (!hasApproved(DocumentItemKey.IDENTIFICACAO_SOCIOS, socioId)) return false;
+      if (!hasApproved(DocumentItemKey.COMPROVANTE_RESIDENCIA, socioId)) return false;
+    }
+
+    const endereco = (step2Data.endereco ?? {}) as Record<string, unknown>;
+    const escritorioVirtual = String(endereco.escritorioVirtual ?? "").trim();
+    if (escritorioVirtual !== "Sim" && !hasApproved(DocumentItemKey.FOTO_FACHADA, null)) {
+      return false;
+    }
+
+    return true;
+  }
+
   private async syncDocumentItems(processId: string, data: Record<string, unknown>) {
     const socios = this.normalizeSocios(data.quadroSocietario);
     const socioIds = socios
@@ -473,12 +605,29 @@ export class ProcessService {
       });
     }
 
-    if (actor.role === "OPERADOR") {
-      return this.prisma.process.findMany({
-        where: { ownerId: actor.userId },
+    if (actor.role === "OPERADOR" || actor.role === "MASTER") {
+      const processes = await this.prisma.process.findMany({
+        where: actor.role === "OPERADOR" ? { ownerId: actor.userId } : undefined,
         orderBy: { createdAt: "desc" },
         take,
-        skip
+        skip,
+        include: {
+          steps: {
+            where: { stepKey: { in: [StepKey.ETAPA_2, StepKey.ETAPA_3] } },
+            select: { stepKey: true, data: true, locked: true, status: true }
+          },
+          documents: {
+            select: { itemKey: true, socioId: true, status: true }
+          }
+        }
+      });
+
+      return processes.map((process) => {
+        const step2 = process.steps.find((step) => step.stepKey === StepKey.ETAPA_2);
+        const step3 = process.steps.find((step) => step.stepKey === StepKey.ETAPA_3);
+        const kanbanEligible = this.isKanbanEligible(step2, step3, process.documents);
+        const { steps, documents, ...rest } = process;
+        return { ...rest, kanbanEligible };
       });
     }
 
@@ -652,6 +801,26 @@ export class ProcessService {
     // Idempotency: avoid double delivery if the client retries the submit request.
     if (current.locked && current.status === ProcessStatus.AGUARDANDO_OPERADOR) {
       return { ok: true, alreadySubmitted: true };
+    }
+
+    if (stepKey === StepKey.ETAPA_2) {
+      const step2Data = (current.data ?? {}) as Record<string, unknown>;
+      if (!this.isStep2DataComplete(step2Data)) {
+        throw new BadRequestException("Formulário do cliente incompleto.");
+      }
+
+      const docs = await this.prisma.documentItem.findMany({
+        where: { processId },
+        select: {
+          itemKey: true,
+          socioId: true,
+          files: { select: { id: true }, take: 1 }
+        }
+      });
+
+      if (!this.hasRequiredUploadedDocuments(step2Data, docs)) {
+        throw new BadRequestException("Documentação obrigatória ainda não foi enviada.");
+      }
     }
 
     await this.prisma.processStep.update({
@@ -934,7 +1103,18 @@ export class ProcessService {
       throw new ForbiddenException();
     }
 
-    const process = await this.prisma.process.findUnique({ where: { id: processId } });
+    const process = await this.prisma.process.findUnique({
+      where: { id: processId },
+      include: {
+        steps: {
+          where: { stepKey: { in: [StepKey.ETAPA_2, StepKey.ETAPA_3] } },
+          select: { stepKey: true, data: true, locked: true, status: true }
+        },
+        documents: {
+          select: { itemKey: true, socioId: true, status: true }
+        }
+      }
+    });
     if (!process) {
       throw new NotFoundException("Processo nÃ£o encontrado.");
     }
@@ -946,6 +1126,14 @@ export class ProcessService {
 
     if (process.kanbanStage === kanbanStage) {
       return { ok: true, alreadyInStage: true, process };
+    }
+
+    const step2 = process.steps.find((step) => step.stepKey === StepKey.ETAPA_2);
+    const step3 = process.steps.find((step) => step.stepKey === StepKey.ETAPA_3);
+    if (!this.isKanbanEligible(step2, step3, process.documents)) {
+      throw new BadRequestException(
+        "Processo ainda não está apto para o Kanban. Finalize o preenchimento do cliente e a validação do operador."
+      );
     }
 
     const updated = await this.prisma.process.update({

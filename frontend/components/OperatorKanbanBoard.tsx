@@ -28,6 +28,7 @@ type ProcessCard = {
   status: string;
   currentStep: string;
   kanbanStage: KanbanStage;
+  kanbanEligible?: boolean;
   createdAt?: string;
 };
 
@@ -180,6 +181,9 @@ export function OperatorKanbanBoard({ onStageChange }: OperatorKanbanBoardProps)
     };
 
     for (const process of processes) {
+      if (process.kanbanEligible === false) {
+        continue;
+      }
       const stage = process.kanbanStage ?? "VIABILIDADE";
       map[stage].push(process);
     }
