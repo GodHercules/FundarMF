@@ -58,6 +58,19 @@ export class ProcessController {
     });
   }
 
+  @Get("kanban")
+  @Roles("OPERADOR", "MASTER")
+  async listKanban(
+    @Req() req: Request,
+    @Query("limit") limit?: string,
+    @Query("offset") offset?: string
+  ) {
+    return this.processService.listKanbanProcesses(req.actor!, {
+      take: limit ? Number(limit) : undefined,
+      skip: offset ? Number(offset) : undefined
+    });
+  }
+
   @Get(":id")
   async get(@Param("id") id: string, @Req() req: Request) {
     return this.processService.getProcess(id, req.actor!);

@@ -353,6 +353,25 @@ export class ProcessService {
     return true;
   }
 
+  private mapWithKanbanEligibility(
+    process: {
+      steps: Array<{ stepKey: StepKey; data: Prisma.JsonValue; locked: boolean; status: ProcessStatus }>;
+      documents: Array<{ itemKey: DocumentItemKey; socioId: string | null; status: DocumentItemStatus }>;
+      kanbanStage: KanbanStage;
+    } & Record<string, unknown>
+  ) {
+    const step2 = process.steps.find((step) => step.stepKey === StepKey.ETAPA_2);
+    const step3 = process.steps.find((step) => step.stepKey === StepKey.ETAPA_3);
+    const kanbanEligible = this.isKanbanEligible(step2, step3, process.documents);
+    const { steps, documents, ...rest } = process;
+    const kanbanStage =
+      kanbanEligible && rest.kanbanStage === KanbanStage.VIABILIDADE
+        ? KanbanStage.DOC_INICIAL_APROVADA
+        : (rest.kanbanStage as KanbanStage);
+
+    return { ...rest, kanbanEligible, kanbanStage };
+  }
+
   private isKanbanEligible(
     step2: { data: Prisma.JsonValue; locked: boolean; status: ProcessStatus } | null | undefined,
     step3: { data: Prisma.JsonValue } | null | undefined,
@@ -622,13 +641,7 @@ export class ProcessService {
         }
       });
 
-      return processes.map((process) => {
-        const step2 = process.steps.find((step) => step.stepKey === StepKey.ETAPA_2);
-        const step3 = process.steps.find((step) => step.stepKey === StepKey.ETAPA_3);
-        const kanbanEligible = this.isKanbanEligible(step2, step3, process.documents);
-        const { steps, documents, ...rest } = process;
-        return { ...rest, kanbanEligible };
-      });
+      return processes.map((process) => this.mapWithKanbanEligibility(process));
     }
 
     return this.prisma.process.findMany({
@@ -636,6 +649,35 @@ export class ProcessService {
       take,
       skip
     });
+  }
+
+  async listKanbanProcesses(actor: Actor, options?: { take?: number; skip?: number }) {
+    if (actor.role !== "OPERADOR" && actor.role !== "MASTER") {
+      throw new ForbiddenException();
+    }
+
+    const take = options?.take && options.take > 0 ? Math.min(options.take, 200) : 200;
+    const skip = options?.skip && options.skip > 0 ? options.skip : 0;
+
+    const processes = await this.prisma.process.findMany({
+      where: actor.role === "OPERADOR" ? { ownerId: actor.userId } : undefined,
+      orderBy: { createdAt: "desc" },
+      take,
+      skip,
+      include: {
+        steps: {
+          where: { stepKey: { in: [StepKey.ETAPA_2, StepKey.ETAPA_3] } },
+          select: { stepKey: true, data: true, locked: true, status: true }
+        },
+        documents: {
+          select: { itemKey: true, socioId: true, status: true }
+        }
+      }
+    });
+
+    return processes
+      .map((process) => this.mapWithKanbanEligibility(process))
+      .filter((process) => process.kanbanEligible === true);
   }
 
   private async cancelInactiveProcessesForClient(email: string, phone?: string | null) {

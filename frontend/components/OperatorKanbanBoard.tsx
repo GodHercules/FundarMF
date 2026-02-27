@@ -150,7 +150,7 @@ export function OperatorKanbanBoard({ onStageChange }: OperatorKanbanBoardProps)
     setLoading(true);
     setError(null);
     try {
-      const data = await api<ProcessCard[]>("/processes?limit=200&offset=0");
+      const data = await api<ProcessCard[]>("/processes/kanban?limit=200&offset=0");
       setProcesses(
         [...data].sort((a, b) => {
           const aTs = a.createdAt ? Date.parse(a.createdAt) : 0;
@@ -181,10 +181,10 @@ export function OperatorKanbanBoard({ onStageChange }: OperatorKanbanBoardProps)
     };
 
     for (const process of processes) {
-      if (process.kanbanEligible === false) {
+      if (process.kanbanEligible !== true) {
         continue;
       }
-      const stage = process.kanbanStage ?? "VIABILIDADE";
+      const stage = process.kanbanStage;
       map[stage].push(process);
     }
     return map;
