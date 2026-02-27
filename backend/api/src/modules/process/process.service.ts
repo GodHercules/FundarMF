@@ -378,7 +378,8 @@ export class ProcessService {
     documents: Array<{ itemKey: DocumentItemKey; socioId: string | null; status: DocumentItemStatus }>
   ) {
     if (!step2 || !step2.locked) return false;
-    if (![ProcessStatus.AGUARDANDO_OPERADOR, ProcessStatus.CONCLUIDO].includes(step2.status)) return false;
+    const validStep2Statuses: ProcessStatus[] = [ProcessStatus.AGUARDANDO_OPERADOR, ProcessStatus.CONCLUIDO];
+    if (!validStep2Statuses.includes(step2.status)) return false;
 
     const step2Data = (step2.data ?? {}) as Record<string, unknown>;
     if (!this.isStep2DataComplete(step2Data)) return false;

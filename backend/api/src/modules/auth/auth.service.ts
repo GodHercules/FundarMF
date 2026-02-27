@@ -193,7 +193,9 @@ export class AuthService {
       );
     }
     if (notifyTasks.length > 0) {
-      await Promise.all(notifyTasks);
+      void Promise.all(notifyTasks).catch((err) => {
+        console.error("[auth] requestCustomerLink notify failed", err);
+      });
     }
 
     if (!email) {
@@ -271,7 +273,7 @@ export class AuthService {
       "Se você não solicitou este código, ignore este e-mail."
     ].join("\n");
 
-    await this.notificationService.sendEmail(link.email!, subject, emailText);
+    void this.notificationService.sendEmail(link.email!, subject, emailText);
 
     if (this.shouldSendAuthWebhook()) {
       void this.notificationService.sendWebhook({
@@ -371,7 +373,7 @@ export class AuthService {
       ctaLabel: "Abrir acesso",
       ctaUrl: linkUrl
     });
-    await this.notificationService.sendEmail(link.email, subject, emailText);
+    void this.notificationService.sendEmail(link.email, subject, emailText);
 
     if (this.shouldSendAuthWebhook()) {
       void this.notificationService.sendWebhook({

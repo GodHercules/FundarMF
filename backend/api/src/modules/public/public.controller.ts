@@ -10,6 +10,11 @@ export class PublicController {
     return this.publicService.getMetrics();
   }
 
+  @Get("health")
+  health() {
+    return { ok: true, ts: Date.now() };
+  }
+
   @Get("municipalities")
   async municipalities() {
     return this.publicService.getMunicipalities();

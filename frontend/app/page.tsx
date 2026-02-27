@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { Card } from "@/components/Card";
@@ -15,6 +15,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Warm up backend on free-tier cold starts so login request is faster.
+    void api("/public/health", { method: "GET" }).catch(() => {});
+  }, []);
 
   async function handleLogin() {
     setMessage(null);
