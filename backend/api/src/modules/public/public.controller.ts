@@ -1,6 +1,14 @@
 import { Controller, Get } from "@nestjs/common";
 import { PublicService } from "./public.service";
 
+@Controller()
+export class RootController {
+  @Get()
+  root() {
+    return { ok: true, service: "FundarMF API", ts: Date.now() };
+  }
+}
+
 @Controller("public")
 export class PublicController {
   constructor(private readonly publicService: PublicService) {}
