@@ -66,6 +66,8 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
         OTP_INVALID: "OTP inválido.",
         OTP_EXPIRED: "OTP expirado.",
         OTP_REQUIRED: "OTP obrigatório.",
+        OTP_TOO_SOON: "Aguarde alguns minutos para solicitar um novo OTP.",
+        OTP_LIMIT_REACHED: "Limite de reenvios de OTP atingido para este link.",
         LINK_INVALID: "Link inválido ou expirado."
       };
 

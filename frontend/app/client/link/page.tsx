@@ -79,7 +79,7 @@ function ClientLinkInner() {
         setOtpStatus("OTP obrigatório para continuar.");
         displayMessage = "";
       } else if (parsed.code === "OTP_TOO_SOON") {
-        setOtpStatus("Aguarde 24 horas para solicitar um novo OTP.");
+        setOtpStatus("Aguarde alguns minutos para solicitar um novo OTP.");
         displayMessage = "";
       } else if (parsed.code === "OTP_LIMIT_REACHED") {
         setOtpStatus("Limite de OTP atingido. Solicite um novo processo ao operador.");
@@ -108,7 +108,7 @@ function ClientLinkInner() {
     } catch (error: any) {
       const parsed = parseError(error);
       if (parsed.code === "OTP_TOO_SOON") {
-        setOtpStatus("Aguarde 24 horas para solicitar um novo OTP.");
+        setOtpStatus("Aguarde alguns minutos para solicitar um novo OTP.");
       } else if (parsed.code === "OTP_LIMIT_REACHED") {
         setOtpStatus("Limite de OTP atingido. Solicite um novo processo ao operador.");
       } else {
