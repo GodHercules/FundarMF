@@ -1,5 +1,14 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { DocumentItemKey, DocumentItemStatus, KanbanStage, Prisma, ProcessStatus, StepKey, StepSide } from "@prisma/client";
+import {
+  DocumentItemKey,
+  DocumentItemStatus,
+  IdempotencyScope,
+  KanbanStage,
+  Prisma,
+  ProcessStatus,
+  StepKey,
+  StepSide
+} from "@prisma/client";
 import { PrismaService } from "../../shared/prisma.service";
 import { Actor } from "../../common/auth/types";
 import { isClientOwner, normalizePhone } from "../../common/auth/identity";
@@ -8,6 +17,7 @@ import { AuditService } from "../audit/audit.service";
 import { NotificationService } from "../notification/notification.service";
 import { AuthService } from "../auth/auth.service";
 import { buildProcessEmailDrafts, ProcessEventDetails, ProcessEventKey } from "../notification/process-email-drafts";
+import { IdempotencyService } from "../../shared/idempotency.service";
 
 const CLIENT_STEPS: StepKey[] = ["ETAPA_1", "ETAPA_2", "ETAPA_4", "ETAPA_5", "ETAPA_6"];
 const OPERATOR_STEPS: StepKey[] = ["ETAPA_3"];
@@ -58,8 +68,49 @@ export class ProcessService {
     private readonly slaService: SlaService,
     private readonly auditService: AuditService,
     private readonly notificationService: NotificationService,
-    private readonly authService: AuthService
+    private readonly authService: AuthService,
+    private readonly idempotencyService: IdempotencyService
   ) {}
+
+  private async startSlaTx(tx: Prisma.TransactionClient, processId: string, stepKey: StepKey, side: StepSide) {
+    const config = await tx.slaConfigStep.findUnique({
+      where: { stepKey_side: { stepKey, side } }
+    });
+    if (!config) return;
+
+    const startedAt = new Date();
+    const dueAt = new Date(startedAt.getTime() + config.durationHours * 60 * 60 * 1000);
+    await tx.slaEvent.upsert({
+      where: { processId_stepKey_side: { processId, stepKey, side } },
+      update: {
+        startedAt,
+        dueAt,
+        status: "ON_TRACK"
+      },
+      create: {
+        processId,
+        stepKey,
+        side,
+        startedAt,
+        dueAt,
+        status: "ON_TRACK"
+      }
+    });
+  }
+
+  private async stopSlaTx(tx: Prisma.TransactionClient, processId: string, stepKey: StepKey, side: StepSide) {
+    await tx.slaEvent.updateMany({
+      where: { processId, stepKey, side },
+      data: { status: "STOPPED" }
+    });
+  }
+
+  private async stopAllSlaTx(tx: Prisma.TransactionClient, processId: string) {
+    await tx.slaEvent.updateMany({
+      where: { processId },
+      data: { status: "STOPPED" }
+    });
+  }
 
   private async sendProcessEventEmails(processId: string, event: ProcessEventKey, details?: ProcessEventDetails) {
     try {
@@ -459,7 +510,8 @@ export class ProcessService {
 
   async createProcessByOperator(
     actor: Actor,
-    payload: { nome?: string; email: string; telefone: string; sendEmail?: boolean; sendWhatsapp?: boolean }
+    payload: { nome?: string; email: string; telefone: string; sendEmail?: boolean; sendWhatsapp?: boolean },
+    idempotencyKey?: string
   ) {
     if (actor.role !== "OPERADOR" && actor.role !== "MASTER") {
       throw new ForbiddenException();
@@ -467,97 +519,115 @@ export class ProcessService {
 
     const normalizedPhone = normalizePhone(payload.telefone) ?? payload.telefone;
     const clientName = payload.nome?.trim() || payload.email?.split("@")[0] || "Cliente";
-    await this.cancelInactiveProcessesForClient(payload.email, normalizedPhone);
-    const active = await this.prisma.process.findFirst({
-      where: {
-        clientEmail: payload.email,
-        status: { notIn: [ProcessStatus.CONCLUIDO, ProcessStatus.CANCELADO] }
-      }
-    });
-    if (active) {
-      throw new BadRequestException("J existe um processo ativo para este e-mail.");
-    }
-
-    const checklistDefaults = this.buildChecklistData();
-    const process = await this.prisma.process.create({
-      data: {
-        clientName,
-        clientEmail: payload.email,
-        clientPhone: normalizedPhone,
-        status: ProcessStatus.AGUARDANDO_CLIENTE,
-        currentStep: StepKey.ETAPA_2,
-        ownerId: actor.userId,
-        steps: {
-          create: {
-            stepKey: StepKey.ETAPA_1,
-            side: StepSide.CLIENTE,
-            status: ProcessStatus.CONCLUIDO,
-            data: {
-              nome: clientName,
-              email: payload.email,
-              telefone: normalizedPhone
-            }
-          }
-        },
-        documents: {
-          create: [{ itemKey: DocumentItemKey.FOTO_FACHADA }]
-        },
-        checklists: {
-          create: [
-            {
-              stepKey: StepKey.ETAPA_2,
-              status: "PENDENTE",
-              items: checklistDefaults.step2
-            },
-            {
-              stepKey: StepKey.ETAPA_4,
-              status: "PENDENTE",
-              items: checklistDefaults.step4
-            },
-            {
-              stepKey: StepKey.ETAPA_5,
-              status: "PENDENTE",
-              items: checklistDefaults.step5
-            },
-            {
-              stepKey: StepKey.ETAPA_6,
-              status: "PENDENTE",
-              items: checklistDefaults.step6
-            }
-          ]
-        },
-        ownerHistory: actor.userId
-          ? {
-              create: [{ ownerId: actor.userId, assignedBy: actor.userId }]
-            }
-          : undefined
-      }
-    });
-
-    await this.slaService.startSla(process.id, StepKey.ETAPA_2, StepSide.CLIENTE);
-
-    await this.auditService.record(actor, "process_started", "Process", process.id, {
-      clientEmail: payload.email
-    });
-
-    if (actor.userId) {
-      await this.notifyOwner(process.id, actor.userId, {
-        title: "Processo iniciado",
-        body: `Processo ${process.id} iniciado para ${clientName}.`,
-        type: "process_started"
-      });
-    }
-
-    void this.sendProcessWebhook(process.id, "process_started", actor);
-
-    if (payload.sendEmail || payload.sendWhatsapp) {
-      await this.sendClientLink(process.id, actor, {
+    const { data } = await this.idempotencyService.execute(
+      IdempotencyScope.PROCESS_CREATE,
+      idempotencyKey,
+      {
+        actorId: actor.userId ?? null,
+        actorRole: actor.role,
+        email: payload.email,
+        telefone: normalizedPhone,
+        nome: payload.nome ?? null,
         sendEmail: payload.sendEmail ?? true,
         sendWhatsapp: payload.sendWhatsapp ?? Boolean(normalizedPhone)
-      });
-    }
+      },
+      async () => {
+        await this.cancelInactiveProcessesForClient(payload.email, normalizedPhone);
+        const active = await this.prisma.process.findFirst({
+          where: {
+            clientEmail: payload.email,
+            status: { notIn: [ProcessStatus.CONCLUIDO, ProcessStatus.CANCELADO] }
+          }
+        });
+        if (active) {
+          throw new BadRequestException("J existe um processo ativo para este e-mail.");
+        }
 
-    return process;
+        const checklistDefaults = this.buildChecklistData();
+        const process = await this.prisma.process.create({
+          data: {
+            clientName,
+            clientEmail: payload.email,
+            clientPhone: normalizedPhone,
+            status: ProcessStatus.AGUARDANDO_CLIENTE,
+            currentStep: StepKey.ETAPA_2,
+            ownerId: actor.userId,
+            steps: {
+              create: {
+                stepKey: StepKey.ETAPA_1,
+                side: StepSide.CLIENTE,
+                status: ProcessStatus.CONCLUIDO,
+                data: {
+                  nome: clientName,
+                  email: payload.email,
+                  telefone: normalizedPhone
+                }
+              }
+            },
+            documents: {
+              create: [{ itemKey: DocumentItemKey.FOTO_FACHADA }]
+            },
+            checklists: {
+              create: [
+                {
+                  stepKey: StepKey.ETAPA_2,
+                  status: "PENDENTE",
+                  items: checklistDefaults.step2
+                },
+                {
+                  stepKey: StepKey.ETAPA_4,
+                  status: "PENDENTE",
+                  items: checklistDefaults.step4
+                },
+                {
+                  stepKey: StepKey.ETAPA_5,
+                  status: "PENDENTE",
+                  items: checklistDefaults.step5
+                },
+                {
+                  stepKey: StepKey.ETAPA_6,
+                  status: "PENDENTE",
+                  items: checklistDefaults.step6
+                }
+              ]
+            },
+            ownerHistory: actor.userId
+              ? {
+                  create: [{ ownerId: actor.userId, assignedBy: actor.userId }]
+                }
+              : undefined
+          }
+        });
+
+        await this.slaService.startSla(process.id, StepKey.ETAPA_2, StepSide.CLIENTE);
+
+        await this.auditService.record(actor, "process_started", "Process", process.id, {
+          clientEmail: payload.email
+        });
+
+        if (actor.userId) {
+          await this.notifyOwner(process.id, actor.userId, {
+            title: "Processo iniciado",
+            body: `Processo ${process.id} iniciado para ${clientName}.`,
+            type: "process_started"
+          });
+        }
+
+        void this.sendProcessWebhook(process.id, "process_started", actor);
+
+        if (payload.sendEmail || payload.sendWhatsapp) {
+          await this.sendClientLink(process.id, actor, {
+            sendEmail: payload.sendEmail ?? true,
+            sendWhatsapp: payload.sendWhatsapp ?? Boolean(normalizedPhone)
+          });
+        }
+
+        return process;
+      },
+      1800
+    );
+
+    return data;
   }
 
   async sendClientLink(processId: string, actor: Actor, channels: { sendEmail?: boolean; sendWhatsapp?: boolean }) {
@@ -807,15 +877,17 @@ export class ProcessService {
     }
 
     if (operatorPreStep3) {
-      await this.prisma.process.update({
-        where: { id: processId },
-        data: {
-          currentStep: "ETAPA_3",
-          status: ProcessStatus.AGUARDANDO_OPERADOR
-        }
+      await this.prisma.$transaction(async (tx) => {
+        await tx.process.update({
+          where: { id: processId },
+          data: {
+            currentStep: "ETAPA_3",
+            status: ProcessStatus.AGUARDANDO_OPERADOR
+          }
+        });
+        await this.stopSlaTx(tx, processId, "ETAPA_2", "CLIENTE");
+        await this.startSlaTx(tx, processId, "ETAPA_3", "OPERADOR");
       });
-      await this.slaService.stopSla(processId, "ETAPA_2", "CLIENTE");
-      await this.slaService.startSla(processId, "ETAPA_3", "OPERADOR");
     }
 
     await this.auditService.record(actor, "update_step", "ProcessStep", updated.id, { stepKey });
@@ -866,18 +938,39 @@ export class ProcessService {
       }
     }
 
-    await this.prisma.processStep.update({
-      where: { processId_stepKey: { processId, stepKey } },
-      data: { status: ProcessStatus.AGUARDANDO_OPERADOR, locked: true }
+    const submitResult = await this.prisma.$transaction(async (tx) => {
+      const lock = await tx.processStep.updateMany({
+        where: {
+          processId,
+          stepKey,
+          locked: false
+        },
+        data: { status: ProcessStatus.AGUARDANDO_OPERADOR, locked: true }
+      });
+
+      if (lock.count === 0) {
+        const already = await tx.processStep.findUnique({
+          where: { processId_stepKey: { processId, stepKey } },
+          select: { locked: true, status: true }
+        });
+        if (already?.locked && already.status === ProcessStatus.AGUARDANDO_OPERADOR) {
+          return { alreadySubmitted: true };
+        }
+        throw new BadRequestException("NÃ£o foi possÃ­vel submeter a etapa no estado atual.");
+      }
+
+      await tx.process.update({
+        where: { id: processId },
+        data: { status: ProcessStatus.AGUARDANDO_OPERADOR }
+      });
+      await this.stopSlaTx(tx, processId, stepKey, "CLIENTE");
+      await this.startSlaTx(tx, processId, stepKey, "OPERADOR");
+      return { alreadySubmitted: false };
     });
 
-    await this.prisma.process.update({
-      where: { id: processId },
-      data: { status: ProcessStatus.AGUARDANDO_OPERADOR }
-    });
-
-    await this.slaService.stopSla(processId, stepKey, "CLIENTE");
-    await this.slaService.startSla(processId, stepKey, "OPERADOR");
+    if (submitResult.alreadySubmitted) {
+      return { ok: true, alreadySubmitted: true };
+    }
 
     await this.auditService.record(actor, "submit_step", "Process", processId, { stepKey });
 
@@ -959,20 +1052,21 @@ export class ProcessService {
       }
     }
 
-    await this.prisma.processStep.update({
-      where: { processId_stepKey: { processId, stepKey } },
-      data: { status: ProcessStatus.CONCLUIDO, locked: true }
-    });
-
-    await this.slaService.stopSla(processId, stepKey, "OPERADOR");
-
     const next = nextStep(stepKey);
     if (!next) {
-      await this.prisma.process.update({
-        where: { id: processId },
-        data: { status: ProcessStatus.CONCLUIDO, currentStep: stepKey }
+      await this.prisma.$transaction(async (tx) => {
+        await tx.processStep.update({
+          where: { processId_stepKey: { processId, stepKey } },
+          data: { status: ProcessStatus.CONCLUIDO, locked: true }
+        });
+        await this.stopSlaTx(tx, processId, stepKey, "OPERADOR");
+        await tx.process.update({
+          where: { id: processId },
+          data: { status: ProcessStatus.CONCLUIDO, currentStep: stepKey }
+        });
+        await this.stopAllSlaTx(tx, processId);
       });
-      await this.slaService.stopAll(processId);
+
       await Promise.all([
         this.sendProcessEventEmails(processId, "process_completed"),
         this.notificationService.sendWhatsApp(process.clientPhone ?? process.clientEmail, "Processo concluido.")
@@ -985,12 +1079,18 @@ export class ProcessService {
     const nextSide = stepSide(next);
     const newStatus = nextSide === "CLIENTE" ? ProcessStatus.AGUARDANDO_CLIENTE : ProcessStatus.AGUARDANDO_OPERADOR;
 
-    await this.prisma.process.update({
-      where: { id: processId },
-      data: { status: newStatus, currentStep: next }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.processStep.update({
+        where: { processId_stepKey: { processId, stepKey } },
+        data: { status: ProcessStatus.CONCLUIDO, locked: true }
+      });
+      await this.stopSlaTx(tx, processId, stepKey, "OPERADOR");
+      await tx.process.update({
+        where: { id: processId },
+        data: { status: newStatus, currentStep: next }
+      });
+      await this.startSlaTx(tx, processId, next, nextSide);
     });
-
-    await this.slaService.startSla(processId, next, nextSide);
 
     await this.auditService.record(actor, "approve_step", "Process", processId, { stepKey });
 
@@ -1022,28 +1122,30 @@ export class ProcessService {
       throw new BadRequestException("Etapa ainda não preenchida.");
     }
 
-    const updated = await this.prisma.processStep.update({
-      where: { processId_stepKey: { processId, stepKey } },
-      data: {
-        status: ProcessStatus.CORRECAO_SOLICITADA,
-        locked: false,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const stepUpdated = await tx.processStep.update({
+        where: { processId_stepKey: { processId, stepKey } },
         data: {
-          ...(step.data as any),
-          correction: {
-            fields,
-            reason
+          status: ProcessStatus.CORRECAO_SOLICITADA,
+          locked: false,
+          data: {
+            ...(step.data as any),
+            correction: {
+              fields,
+              reason
+            }
           }
         }
-      }
-    });
+      });
 
-    await this.prisma.process.update({
-      where: { id: processId },
-      data: { status: ProcessStatus.CORRECAO_SOLICITADA }
+      await tx.process.update({
+        where: { id: processId },
+        data: { status: ProcessStatus.CORRECAO_SOLICITADA }
+      });
+      await this.stopSlaTx(tx, processId, stepKey, "OPERADOR");
+      await this.startSlaTx(tx, processId, stepKey, "CLIENTE");
+      return stepUpdated;
     });
-
-    await this.slaService.stopSla(processId, stepKey, "OPERADOR");
-    await this.slaService.startSla(processId, stepKey, "CLIENTE");
 
     await Promise.all([
       this.notificationService.sendEmail(
@@ -1198,23 +1300,25 @@ export class ProcessService {
     const process = await this.getProcess(processId, actor);
     this.ensureNotReadOnly(process);
 
-    await this.prisma.process.update({
-      where: { id: processId },
-      data: {
-        status: ProcessStatus.CANCELADO,
-        cancelledAt: new Date(),
-        cancelledByRole: actor.role,
-        cancelledById: actor.userId,
-        cancelReason: reason
-      }
-    });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.process.update({
+        where: { id: processId },
+        data: {
+          status: ProcessStatus.CANCELADO,
+          cancelledAt: new Date(),
+          cancelledByRole: actor.role,
+          cancelledById: actor.userId,
+          cancelReason: reason
+        }
+      });
 
-    await this.prisma.processStep.updateMany({
-      where: { processId },
-      data: { locked: true }
-    });
+      await tx.processStep.updateMany({
+        where: { processId },
+        data: { locked: true }
+      });
 
-    await this.slaService.stopAll(processId);
+      await this.stopAllSlaTx(tx, processId);
+    });
 
     await Promise.all([
       this.sendProcessEventEmails(processId, "process_cancelled", { cancelReason: reason }),

@@ -12,9 +12,25 @@ import { AppModule } from "./modules/app.module";
 import { requestContextMiddleware } from "./shared/request-context";
 import { RequestLoggingInterceptor } from "./shared/request-logging.interceptor";
 
+function withDbPoolDefaults(urlRaw: string | undefined, defaults: { connectionLimit: number; poolTimeout: number }) {
+  if (!urlRaw) return urlRaw;
+  try {
+    const url = new URL(urlRaw);
+    if (!url.searchParams.has("connection_limit")) {
+      url.searchParams.set("connection_limit", String(defaults.connectionLimit));
+    }
+    if (!url.searchParams.has("pool_timeout")) {
+      url.searchParams.set("pool_timeout", String(defaults.poolTimeout));
+    }
+    return url.toString();
+  } catch {
+    return urlRaw;
+  }
+}
+
 async function bootstrap() {
-  // Support running the API from different working directories (repo root, `backend`, `backend/api`, etc).
-  // pnpm/nest often execute with `cwd` set to the package folder, so we search upwards for `.env`.
+  // Allow the API to start from different working directories (`backend`, `backend/api`, repo root).
+  // This avoids missing env vars when pnpm/nest resolves `cwd` differently across local/dev/prod.
   const candidates = [
     path.resolve(process.cwd(), ".env"),
     path.resolve(process.cwd(), "..", ".env"),
@@ -25,6 +41,11 @@ async function bootstrap() {
   const envPath = candidates.find((p) => fs.existsSync(p));
   if (envPath) dotenv.config({ path: envPath });
   else dotenv.config();
+
+  process.env.DATABASE_URL = withDbPoolDefaults(process.env.DATABASE_URL, {
+    connectionLimit: Number(process.env.API_DB_CONNECTION_LIMIT ?? 10),
+    poolTimeout: Number(process.env.DB_POOL_TIMEOUT_SECONDS ?? 10)
+  });
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 

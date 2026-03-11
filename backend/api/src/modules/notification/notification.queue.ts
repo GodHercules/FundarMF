@@ -27,6 +27,10 @@ const toNumber = (value: string | undefined, fallback: number) => {
 @Injectable()
 export class NotificationQueue implements OnModuleInit, OnModuleDestroy {
   private boss?: PgBoss;
+  private resolveReady?: () => void;
+  private readonly ready = new Promise<void>((resolve) => {
+    this.resolveReady = resolve;
+  });
 
   async onModuleInit() {
     const connectionString = process.env.DATABASE_URL;
@@ -35,12 +39,27 @@ export class NotificationQueue implements OnModuleInit, OnModuleDestroy {
     }
     this.boss = new PgBoss({ connectionString });
     await this.boss.start();
+    this.resolveReady?.();
   }
 
   async onModuleDestroy() {
     if (this.boss) {
       await this.boss.stop();
     }
+  }
+
+  async whenReady() {
+    await this.ready;
+  }
+
+  async createQueue(name: string) {
+    if (!this.boss) return;
+    await this.boss.createQueue(name);
+  }
+
+  async work<T = unknown>(name: string, options: Record<string, unknown>, handler: (jobs: unknown) => Promise<T>) {
+    if (!this.boss) return;
+    await this.boss.work(name, options as any, handler as any);
   }
 
   async enqueueEmail(payload: Omit<EmailJobPayload, "correlationId"> & { correlationId?: string }) {

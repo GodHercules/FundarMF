@@ -12,12 +12,12 @@ import { ResendEmailProvider } from "./resend.provider";
 import { SmtpEmailProvider, TwilioWhatsAppProvider } from "./smtp.provider";
 import { NotificationController } from "./notification.controller";
 import { NotificationQueue } from "./notification.queue";
+import { NotificationWorkerService } from "./notification.worker.service";
 
 @Module({
   controllers: [NotificationController],
   providers: [
     NotificationService,
-    PrismaService,
     {
       provide: EMAIL_PROVIDER,
       useFactory: (prisma: PrismaService) => {
@@ -51,7 +51,8 @@ import { NotificationQueue } from "./notification.queue";
       },
       inject: [PrismaService]
     },
-    NotificationQueue
+    NotificationQueue,
+    NotificationWorkerService
   ],
   exports: [NotificationService]
 })

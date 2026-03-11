@@ -28,7 +28,7 @@ export class ProcessController {
       telefone: dto.telefone,
       sendEmail: dto.sendEmail,
       sendWhatsapp: dto.sendWhatsapp
-    });
+    }, req.header("idempotency-key") ?? undefined);
   }
 
   @Post(":id/send-link")

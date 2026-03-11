@@ -83,6 +83,11 @@ enum SlaStatus {
   STOPPED
 }
 
+enum IdempotencyScope {
+  PROCESS_CREATE
+  CUSTOMER_LINK_REQUEST
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -94,28 +99,28 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  ownedProcesses Process[] @relation("ProcessOwner")
+  ownedProcesses Process[]          @relation("ProcessOwner")
   sessions       Session[]
   notifications  UserNotification[]
 }
 
 model Process {
-  id              String        @id @default(uuid())
-  clientName      String?
-  clientEmail     String
-  clientPhone     String?
-  status          ProcessStatus @default(EM_ANDAMENTO)
-  currentStep     StepKey       @default(ETAPA_1)
-  kanbanStage     KanbanStage   @default(VIABILIDADE)
-  ownerId         String?
-  owner           User?         @relation("ProcessOwner", fields: [ownerId], references: [id])
-  cancelledAt     DateTime?
-  cancelledByRole AuditActorRole?
-  cancelledById   String?
-  cancelReason    String?
+  id                 String          @id @default(uuid())
+  clientName         String?
+  clientEmail        String
+  clientPhone        String?
+  status             ProcessStatus   @default(EM_ANDAMENTO)
+  currentStep        StepKey         @default(ETAPA_1)
+  kanbanStage        KanbanStage     @default(VIABILIDADE)
+  ownerId            String?
+  owner              User?           @relation("ProcessOwner", fields: [ownerId], references: [id])
+  cancelledAt        DateTime?
+  cancelledByRole    AuditActorRole?
+  cancelledById      String?
+  cancelReason       String?
   operatorStatusNote String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
 
   steps         ProcessStep[]
   checklists    Checklist[]
@@ -125,6 +130,7 @@ model Process {
   slaEvents     SlaEvent[]
   reports       Report[]
   notifications UserNotification[]
+  fileObjects   FileObject[]
 
   @@index([ownerId, createdAt])
   @@index([kanbanStage, ownerId, createdAt])
@@ -134,15 +140,15 @@ model Process {
 }
 
 model ProcessStep {
-  id        String   @id @default(uuid())
+  id        String        @id @default(uuid())
   processId String
   stepKey   StepKey
   side      StepSide
   data      Json
   status    ProcessStatus
-  locked    Boolean  @default(false)
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
+  locked    Boolean       @default(false)
+  updatedAt DateTime      @updatedAt
+  createdAt DateTime      @default(now())
 
   process Process @relation(fields: [processId], references: [id])
 
@@ -174,20 +180,20 @@ model DocumentItem {
   updatedAt DateTime           @updatedAt
   createdAt DateTime           @default(now())
 
-  process Process @relation(fields: [processId], references: [id])
+  process Process        @relation(fields: [processId], references: [id])
   files   DocumentFile[]
 
   @@unique([processId, itemKey, socioId])
 }
 
 model DocumentFile {
-  id        String   @id @default(uuid())
-  itemId    String
-  fileName  String
-  mimeType  String
-  size      Int
-  data      Bytes
-  createdAt DateTime @default(now())
+  id             String         @id @default(uuid())
+  itemId         String
+  fileName       String
+  mimeType       String
+  size           Int
+  data           Bytes
+  createdAt      DateTime       @default(now())
   uploadedByRole AuditActorRole
   uploadedById   String?
 
@@ -195,62 +201,67 @@ model DocumentFile {
 }
 
 model ChatThread {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   processId String
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   botState  Json?
   handoffAt DateTime?
 
-  process Process @relation(fields: [processId], references: [id])
+  process  Process       @relation(fields: [processId], references: [id])
   messages ChatMessage[]
 
   @@unique([processId])
 }
 
 model ChatMessage {
-  id        String   @id @default(uuid())
-  threadId  String
+  id         String         @id @default(uuid())
+  threadId   String
   authorRole ChatAuthorRole
-  authorId  String?
-  body      String
-  createdAt DateTime @default(now())
+  authorId   String?
+  body       String
+  createdAt  DateTime       @default(now())
 
   thread ChatThread @relation(fields: [threadId], references: [id])
 }
 
 model Session {
-  id           String   @id @default(uuid())
-  role         AuditActorRole
-  userId       String?
-  clientEmail  String?
+  id             String         @id @default(uuid())
+  role           AuditActorRole
+  userId         String?
+  clientEmail    String?
   clientWhatsapp String?
-  tokenHash    String   @unique
-  expiresAt    DateTime
-  lastActiveAt DateTime
-  rotatedAt    DateTime?
-  createdAt    DateTime @default(now())
+  tokenHash      String         @unique
+  expiresAt      DateTime
+  lastActiveAt   DateTime
+  rotatedAt      DateTime?
+  createdAt      DateTime       @default(now())
 
   user User? @relation(fields: [userId], references: [id])
+
+  @@index([expiresAt])
 }
 
 model CustomerLinkToken {
-  id             String   @id @default(uuid())
+  id             String    @id @default(uuid())
   email          String?
   whatsapp       String?
-  tokenHash      String   @unique
+  tokenHash      String    @unique
   tokenExpiresAt DateTime
   otpHash        String?
   otpExpiresAt   DateTime?
-  otpSentCount   Int      @default(0)
+  otpSentCount   Int       @default(0)
   lastOtpSentAt  DateTime?
   usedAt         DateTime?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime  @default(now())
+
+  @@index([email, usedAt, tokenExpiresAt, createdAt(sort: Desc)])
+  @@index([whatsapp, usedAt, tokenExpiresAt, createdAt(sort: Desc)])
 }
 
 model ProcessOwnerHistory {
-  id        String   @id @default(uuid())
-  processId String
-  ownerId   String?
+  id         String   @id @default(uuid())
+  processId  String
+  ownerId    String?
   assignedAt DateTime @default(now())
   assignedBy String?
 
@@ -258,42 +269,44 @@ model ProcessOwnerHistory {
 }
 
 model AuditEvent {
-  id        String   @id @default(uuid())
-  actorRole AuditActorRole
-  actorId   String?
+  id         String         @id @default(uuid())
+  actorRole  AuditActorRole
+  actorId    String?
   actorEmail String?
-  action    String
-  entity    String
-  entityId  String?
-  metadata  Json
-  ip        String?
-  userAgent String?
-  createdAt DateTime @default(now())
+  action     String
+  entity     String
+  entityId   String?
+  metadata   Json
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime       @default(now())
+
+  @@index([createdAt(sort: Desc), entity, action])
 }
 
 model SlaConfigStep {
-  id        String   @id @default(uuid())
-  stepKey   StepKey
-  side      StepSide
+  id            String   @id @default(uuid())
+  stepKey       StepKey
+  side          StepSide
   durationHours Int
-  alertPercent Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  alertPercent  Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@unique([stepKey, side])
 }
 
 model SlaEvent {
-  id        String   @id @default(uuid())
-  processId String
-  stepKey   StepKey
-  side      StepSide
-  startedAt DateTime
-  dueAt     DateTime
-  status    SlaStatus
+  id             String    @id @default(uuid())
+  processId      String
+  stepKey        StepKey
+  side           StepSide
+  startedAt      DateTime
+  dueAt          DateTime
+  status         SlaStatus
   lastNotifiedAt DateTime?
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
+  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime  @default(now())
 
   process Process @relation(fields: [processId], references: [id])
 
@@ -312,27 +325,57 @@ model Report {
 }
 
 model Notification {
-  id        String   @id @default(uuid())
+  id        String              @id @default(uuid())
   channel   NotificationChannel
   recipient String
   subject   String
   body      String
   status    String
-  createdAt DateTime @default(now())
+  createdAt DateTime            @default(now())
+
+  @@index([createdAt(sort: Desc), channel, status])
 }
 
 model UserNotification {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
   processId String?
   type      String
   title     String
   body      String
   readAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
-  user    User    @relation(fields: [userId], references: [id])
+  user    User     @relation(fields: [userId], references: [id])
   process Process? @relation(fields: [processId], references: [id])
 
   @@index([userId, readAt])
+}
+
+model IdempotencyKey {
+  id          String           @id @default(uuid())
+  scope       IdempotencyScope
+  key         String
+  requestHash String
+  response    Json?
+  expiresAt   DateTime
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([scope, key])
+  @@index([expiresAt])
+}
+
+model FileObject {
+  id           String   @id @default(uuid())
+  processId    String?
+  bucket       String
+  objectKey    String   @unique
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  sha256       String
+  uploadedAt   DateTime @default(now())
+
+  process Process? @relation(fields: [processId], references: [id])
 }

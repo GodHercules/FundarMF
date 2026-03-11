@@ -21,7 +21,7 @@ export class AuthController {
     return this.authService.requestCustomerLink(dto.email, dto.whatsapp, dto.nome, {
       email: req.actor?.email,
       role: req.actor?.role
-    });
+    }, { idempotencyKey: req.header("idempotency-key") ?? undefined });
   }
 
   @Post("customer/verify")

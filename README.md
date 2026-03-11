@@ -170,7 +170,7 @@ O payload inclui, quando aplicvel:
 - OTP expira em **24 horas** (`OTP_TTL_MINUTES=1440`).
 - Reenvio de OTP limitado:
   - mximo **5 OTPs** por link
-  - somente **1 a cada 24h**
+  - intervalo configurvel por ambiente (`OTP_RESEND_COOLDOWN_MINUTES`, padro: `1`)
 
 Se o cliente no preencher os dados em 5 dias, o processo  cancelado automaticamente por inatividade.
 
@@ -180,13 +180,18 @@ Se o cliente no preencher os dados em 5 dias, o processo  cancelado automaticame
 
 ### backend/.env (nico arquivo para API e Worker)
 ```
-  DATABASE_URL=postgresql://fundarmf:fundarmf@localhost:5499/fundarmf?schema=public
+  DATABASE_URL=postgresql://fundarmf:fundarmf@localhost:5499/fundarmf?schema=public&connection_limit=6&pool_timeout=10
+  WORKER_DATABASE_URL=postgresql://fundarmf:fundarmf@localhost:5499/fundarmf?schema=public&connection_limit=4&pool_timeout=10
+  API_DB_CONNECTION_LIMIT=6
+  WORKER_DB_CONNECTION_LIMIT=4
+  DB_POOL_TIMEOUT_SECONDS=10
   API_PORT=4000
 SESSION_SECRET=change-me
 SESSION_TTL_HOURS=48
 SESSION_ROTATE_MINUTES=60
 COOKIE_SECURE=false
 OTP_TTL_MINUTES=1440
+OTP_RESEND_COOLDOWN_MINUTES=1
 LINK_TTL_HOURS=120
 RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX=1000
@@ -217,7 +222,7 @@ UPLOAD_MAX_TOTAL_MB=60
   WORKER_SLA_CHECK_EVERY_MS=3600000
   WORKER_REPORTS_EVERY_MS=3600000
   WORKER_CANCEL_INACTIVE_EVERY_MS=3600000
-  WORKER_CONCURRENCY=3
+  WORKER_CONCURRENCY=2
   ```
   
   ### backend/api/.env
@@ -352,6 +357,7 @@ pnpm install && pnpm build
      - `FRONTEND_URL`
      - `COOKIE_SECURE=true`
      - `OTP_TTL_MINUTES=1440`
+     - `OTP_RESEND_COOLDOWN_MINUTES=1`
      - `LINK_TTL_HOURS=120`
      - **Notificaes (fila + worker):**
        - `NOTIFY_MODE=real`

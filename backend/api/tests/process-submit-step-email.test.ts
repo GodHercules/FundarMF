@@ -5,6 +5,7 @@ import { ProcessService } from "../src/modules/process/process.service";
 describe("ProcessService submitStep email", () => {
   it("sends email to client on first submit and is idempotent on retry", async () => {
     const prisma = {
+      $transaction: vi.fn(async (fn: (tx: any) => Promise<unknown>) => fn(prisma as any)),
       process: {
         findUnique: vi.fn(async () => ({
           id: "p1",
@@ -48,7 +49,8 @@ describe("ProcessService submitStep email", () => {
             ]
           }
         })),
-        update: vi.fn(async () => ({}))
+        update: vi.fn(async () => ({})),
+        updateMany: vi.fn(async () => ({ count: 1 }))
       },
       documentItem: {
         findMany: vi.fn(async () => [
@@ -70,6 +72,13 @@ describe("ProcessService submitStep email", () => {
           email: "op@exemplo.com",
           whatsapp: "+5511999999999"
         }))
+      },
+      slaEvent: {
+        updateMany: vi.fn(async () => ({ count: 1 })),
+        upsert: vi.fn(async () => ({}))
+      },
+      slaConfigStep: {
+        findUnique: vi.fn(async () => ({ durationHours: 24 }))
       }
     };
 
@@ -135,6 +144,7 @@ describe("ProcessService submitStep email", () => {
 
   it("blocks submit when client form/documents are incomplete", async () => {
     const prisma = {
+      $transaction: vi.fn(async (fn: (tx: any) => Promise<unknown>) => fn(prisma as any)),
       process: {
         findUnique: vi.fn(async () => ({
           id: "p1",

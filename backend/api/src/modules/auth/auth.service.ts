@@ -9,6 +9,8 @@ import { AuditService } from "../audit/audit.service";
 import { Actor } from "../../common/auth/types";
 import { timeAsync } from "../../shared/perf";
 import { renderBaseEmail } from "../notification/email.template";
+import { IdempotencyService } from "../../shared/idempotency.service";
+import { IdempotencyScope } from "@prisma/client";
 
 @Injectable()
 export class AuthService {
@@ -16,7 +18,8 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly sessionService: SessionService,
     private readonly notificationService: NotificationService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly idempotencyService: IdempotencyService
   ) {}
 
   private shouldSendAuthWebhook() {
@@ -27,6 +30,22 @@ export class AuthService {
     const raw = Number(process.env.LINK_REQUEST_DEDUP_SECONDS ?? 30);
     if (!Number.isFinite(raw) || raw <= 0) return 0;
     return Math.min(raw, 10 * 60);
+  }
+
+  private otpResendCooldownMinutes() {
+    const raw = Number(process.env.OTP_RESEND_COOLDOWN_MINUTES ?? 1);
+    if (!Number.isFinite(raw) || raw < 0) return 1;
+    return Math.min(raw, 24 * 60);
+  }
+
+  private assertOtpResendCooldown(lastOtpSentAt?: Date | null) {
+    const cooldownMinutes = this.otpResendCooldownMinutes();
+    if (!lastOtpSentAt || cooldownMinutes <= 0) return;
+
+    const nextAllowedAt = dayjs(lastOtpSentAt).add(cooldownMinutes, "minute");
+    if (dayjs().isBefore(nextAllowedAt)) {
+      throw new BadRequestException({ code: "OTP_TOO_SOON" });
+    }
   }
 
   private hash(value: string) {
@@ -86,13 +105,27 @@ export class AuthService {
     whatsapp?: string,
     name?: string,
     requestedBy?: { email?: string; role?: string },
-    options?: { forceNew?: boolean }
-  ) {
+    options?: { forceNew?: boolean; idempotencyKey?: string }
+  ): Promise<{ otpRequired: boolean; deduped?: boolean }> {
     if (!email && !whatsapp) {
       throw new BadRequestException("Informe e-mail ou WhatsApp.");
     }
 
     const normalizedWhatsapp = whatsapp ? this.normalizeWhatsApp(whatsapp) : undefined;
+
+    if (!options?.forceNew && options?.idempotencyKey) {
+      const result = await this.idempotencyService.execute<{ otpRequired: boolean; deduped?: boolean }>(
+        IdempotencyScope.CUSTOMER_LINK_REQUEST,
+        options.idempotencyKey,
+        { email, whatsapp: normalizedWhatsapp, name, requestedBy },
+        async () =>
+          this.requestCustomerLink(email, normalizedWhatsapp, name, requestedBy, {
+            forceNew: true
+          }),
+        900
+      );
+      return result.data;
+    }
 
     // Deduplicate near-simultaneous requests (double-clicks, retries, accidental double submits).
     // This ensures the client receives only one link+OTP unless an explicit resend is requested.
@@ -241,25 +274,31 @@ export class AuthService {
     if (!link) {
       throw new BadRequestException({ code: "LINK_INVALID" });
     }
-    if (link.otpSentCount >= 5) {
-      throw new BadRequestException({ code: "OTP_LIMIT_REACHED" });
-    }
-    if (link.lastOtpSentAt && dayjs().diff(dayjs(link.lastOtpSentAt), "hour") < 24) {
-      throw new BadRequestException({ code: "OTP_TOO_SOON" });
-    }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpHash = this.hash(otp);
     const otpExpiresAt = dayjs().add(Number(process.env.OTP_TTL_MINUTES ?? 1440), "minute").toDate();
 
-    await this.prisma.customerLinkToken.update({
-      where: { id: link.id },
-      data: {
-        otpHash,
-        otpExpiresAt,
-        otpSentCount: link.otpSentCount + 1,
-        lastOtpSentAt: new Date()
+    const updatedLink = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "CustomerLinkToken" WHERE id = ${link.id} FOR UPDATE`;
+      const locked = await tx.customerLinkToken.findUnique({ where: { id: link.id } });
+      if (!locked || locked.usedAt || dayjs(locked.tokenExpiresAt).isBefore(dayjs())) {
+        throw new BadRequestException({ code: "LINK_INVALID" });
       }
+      if (locked.otpSentCount >= 5) {
+        throw new BadRequestException({ code: "OTP_LIMIT_REACHED" });
+      }
+      this.assertOtpResendCooldown(locked.lastOtpSentAt);
+
+      return tx.customerLinkToken.update({
+        where: { id: locked.id },
+        data: {
+          otpHash,
+          otpExpiresAt,
+          otpSentCount: { increment: 1 },
+          lastOtpSentAt: new Date()
+        }
+      });
     });
 
     const subject = "Seu novo OTP do FundarMF";
@@ -273,12 +312,12 @@ export class AuthService {
       "Se você não solicitou este código, ignore este e-mail."
     ].join("\n");
 
-    void this.notificationService.sendEmail(link.email!, subject, emailText);
+    void this.notificationService.sendEmail(updatedLink.email!, subject, emailText);
 
     if (this.shouldSendAuthWebhook()) {
       void this.notificationService.sendWebhook({
-        email: link.email ?? undefined,
-        whatsapp: link.whatsapp ?? undefined,
+        email: updatedLink.email ?? undefined,
+        whatsapp: updatedLink.whatsapp ?? undefined,
         otp,
         reason: "otp_resent_by_operator",
         requestedBy
@@ -289,8 +328,8 @@ export class AuthService {
       { role: "SYSTEM" },
       "customer_otp_resent_by_operator",
       "CustomerLinkToken",
-      link.id,
-      { email: link.email, requestedBy }
+      updatedLink.id,
+      { email: updatedLink.email, requestedBy }
     );
 
     return { ok: true };
@@ -315,10 +354,17 @@ export class AuthService {
       }
     }
 
-    await this.prisma.customerLinkToken.update({
-      where: { id: link.id },
+    const consume = await this.prisma.customerLinkToken.updateMany({
+      where: {
+        id: link.id,
+        usedAt: null,
+        tokenExpiresAt: { gt: new Date() }
+      },
       data: { usedAt: new Date() }
     });
+    if (consume.count === 0) {
+      throw new BadRequestException({ code: "LINK_INVALID" });
+    }
 
     const actor: Actor = { role: "CLIENTE", email: link.email ?? undefined, whatsapp: link.whatsapp ?? undefined };
     const { token: sessionToken } = await this.sessionService.createSession(
@@ -340,28 +386,34 @@ export class AuthService {
     if (!link || link.usedAt || dayjs(link.tokenExpiresAt).isBefore(dayjs())) {
       throw new BadRequestException({ code: "LINK_INVALID" });
     }
-    if (!link.email) {
-      throw new BadRequestException("E-mail não disponível para reenvio do OTP.");
-    }
-    if (link.otpSentCount >= 5) {
-      throw new BadRequestException({ code: "OTP_LIMIT_REACHED" });
-    }
-    if (link.lastOtpSentAt && dayjs().diff(dayjs(link.lastOtpSentAt), "hour") < 24) {
-      throw new BadRequestException({ code: "OTP_TOO_SOON" });
-    }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpHash = this.hash(otp);
     const otpExpiresAt = dayjs().add(Number(process.env.OTP_TTL_MINUTES ?? 1440), "minute").toDate();
 
-    await this.prisma.customerLinkToken.update({
-      where: { id: link.id },
-      data: {
-        otpHash,
-        otpExpiresAt,
-        otpSentCount: link.otpSentCount + 1,
-        lastOtpSentAt: new Date()
+    const updatedLink = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "CustomerLinkToken" WHERE id = ${link.id} FOR UPDATE`;
+      const locked = await tx.customerLinkToken.findUnique({ where: { id: link.id } });
+      if (!locked || locked.usedAt || dayjs(locked.tokenExpiresAt).isBefore(dayjs())) {
+        throw new BadRequestException({ code: "LINK_INVALID" });
       }
+      if (!locked.email) {
+        throw new BadRequestException("E-mail não disponível para reenvio do OTP.");
+      }
+      if (locked.otpSentCount >= 5) {
+        throw new BadRequestException({ code: "OTP_LIMIT_REACHED" });
+      }
+      this.assertOtpResendCooldown(locked.lastOtpSentAt);
+
+      return tx.customerLinkToken.update({
+        where: { id: locked.id },
+        data: {
+          otpHash,
+          otpExpiresAt,
+          otpSentCount: { increment: 1 },
+          lastOtpSentAt: new Date()
+        }
+      });
     });
 
     const linkUrl = `${process.env.FRONTEND_URL ?? "http://localhost:3000"}/client/link?token=${token}`;
@@ -373,20 +425,20 @@ export class AuthService {
       ctaLabel: "Abrir acesso",
       ctaUrl: linkUrl
     });
-    void this.notificationService.sendEmail(link.email, subject, emailText);
+    void this.notificationService.sendEmail(updatedLink.email!, subject, emailText);
 
     if (this.shouldSendAuthWebhook()) {
       void this.notificationService.sendWebhook({
-        email: link.email,
-        whatsapp: link.whatsapp ?? undefined,
+        email: updatedLink.email ?? undefined,
+        whatsapp: updatedLink.whatsapp ?? undefined,
         link: linkUrl,
         otp,
         reason: "otp_resent",
-        requestedBy: { email: link.email ?? undefined, role: "CLIENTE" },
+        requestedBy: { email: updatedLink.email ?? undefined, role: "CLIENTE" },
         emails: {
           client: {
             target: "client",
-            to: link.email,
+            to: updatedLink.email!,
             subject,
             text: emailRendered.text,
             html: emailRendered.html
@@ -399,8 +451,8 @@ export class AuthService {
       { role: "SYSTEM" },
       "customer_otp_resent",
       "CustomerLinkToken",
-      link.id,
-      { email: link.email }
+      updatedLink.id,
+      { email: updatedLink.email }
     );
 
     return { ok: true };
