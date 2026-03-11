@@ -26,7 +26,10 @@ export class ResendEmailProvider implements EmailProvider {
       to,
       subject,
       text: body,
-      html
+      html,
+      headers: {
+        "Content-Type": "text/html; charset=UTF-8"
+      }
     });
   }
 }

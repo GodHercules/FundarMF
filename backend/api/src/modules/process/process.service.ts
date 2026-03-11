@@ -61,6 +61,15 @@ function hasAnyValue(value: unknown): boolean {
   return false;
 }
 
+function normalizeCompanyKey(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 @Injectable()
 export class ProcessService {
   constructor(
@@ -518,91 +527,108 @@ export class ProcessService {
     }
 
     const normalizedPhone = normalizePhone(payload.telefone) ?? payload.telefone;
-    const clientName = payload.nome?.trim() || payload.email?.split("@")[0] || "Cliente";
+    const clientEmail = payload.email.trim().toLowerCase();
+    const clientName = payload.nome?.trim() || clientEmail.split("@")[0] || "Cliente";
+    const companyKey = normalizeCompanyKey(clientName);
+
     const { data } = await this.idempotencyService.execute(
       IdempotencyScope.PROCESS_CREATE,
       idempotencyKey,
       {
         actorId: actor.userId ?? null,
         actorRole: actor.role,
-        email: payload.email,
+        email: clientEmail,
         telefone: normalizedPhone,
         nome: payload.nome ?? null,
         sendEmail: payload.sendEmail ?? true,
         sendWhatsapp: payload.sendWhatsapp ?? Boolean(normalizedPhone)
       },
       async () => {
-        await this.cancelInactiveProcessesForClient(payload.email, normalizedPhone);
-        const active = await this.prisma.process.findFirst({
+        await this.cancelInactiveProcessesForClient(clientEmail, normalizedPhone);
+
+        const activeForEmail = await this.prisma.process.findMany({
           where: {
-            clientEmail: payload.email,
+            clientEmail: { equals: clientEmail, mode: "insensitive" },
             status: { notIn: [ProcessStatus.CONCLUIDO, ProcessStatus.CANCELADO] }
-          }
+          },
+          select: { id: true, clientName: true }
         });
-        if (active) {
-          throw new BadRequestException("J existe um processo ativo para este e-mail.");
+
+        const duplicateCompany = activeForEmail.find(
+          (process) => normalizeCompanyKey(process.clientName?.trim() || "") === companyKey
+        );
+        if (duplicateCompany) {
+          throw new BadRequestException("J\u00e1 existe um processo ativo para esta empresa com este e-mail.");
         }
 
         const checklistDefaults = this.buildChecklistData();
-        const process = await this.prisma.process.create({
-          data: {
-            clientName,
-            clientEmail: payload.email,
-            clientPhone: normalizedPhone,
-            status: ProcessStatus.AGUARDANDO_CLIENTE,
-            currentStep: StepKey.ETAPA_2,
-            ownerId: actor.userId,
-            steps: {
-              create: {
-                stepKey: StepKey.ETAPA_1,
-                side: StepSide.CLIENTE,
-                status: ProcessStatus.CONCLUIDO,
-                data: {
-                  nome: clientName,
-                  email: payload.email,
-                  telefone: normalizedPhone
+        let process;
+        try {
+          process = await this.prisma.process.create({
+            data: {
+              clientName,
+              clientEmail,
+              clientPhone: normalizedPhone,
+              status: ProcessStatus.AGUARDANDO_CLIENTE,
+              currentStep: StepKey.ETAPA_2,
+              ownerId: actor.userId,
+              steps: {
+                create: {
+                  stepKey: StepKey.ETAPA_1,
+                  side: StepSide.CLIENTE,
+                  status: ProcessStatus.CONCLUIDO,
+                  data: {
+                    nome: clientName,
+                    email: clientEmail,
+                    telefone: normalizedPhone
+                  }
                 }
-              }
-            },
-            documents: {
-              create: [{ itemKey: DocumentItemKey.FOTO_FACHADA }]
-            },
-            checklists: {
-              create: [
-                {
-                  stepKey: StepKey.ETAPA_2,
-                  status: "PENDENTE",
-                  items: checklistDefaults.step2
-                },
-                {
-                  stepKey: StepKey.ETAPA_4,
-                  status: "PENDENTE",
-                  items: checklistDefaults.step4
-                },
-                {
-                  stepKey: StepKey.ETAPA_5,
-                  status: "PENDENTE",
-                  items: checklistDefaults.step5
-                },
-                {
-                  stepKey: StepKey.ETAPA_6,
-                  status: "PENDENTE",
-                  items: checklistDefaults.step6
-                }
-              ]
-            },
-            ownerHistory: actor.userId
-              ? {
-                  create: [{ ownerId: actor.userId, assignedBy: actor.userId }]
-                }
-              : undefined
+              },
+              documents: {
+                create: [{ itemKey: DocumentItemKey.FOTO_FACHADA }]
+              },
+              checklists: {
+                create: [
+                  {
+                    stepKey: StepKey.ETAPA_2,
+                    status: "PENDENTE",
+                    items: checklistDefaults.step2
+                  },
+                  {
+                    stepKey: StepKey.ETAPA_4,
+                    status: "PENDENTE",
+                    items: checklistDefaults.step4
+                  },
+                  {
+                    stepKey: StepKey.ETAPA_5,
+                    status: "PENDENTE",
+                    items: checklistDefaults.step5
+                  },
+                  {
+                    stepKey: StepKey.ETAPA_6,
+                    status: "PENDENTE",
+                    items: checklistDefaults.step6
+                  }
+                ]
+              },
+              ownerHistory: actor.userId
+                ? {
+                    create: [{ ownerId: actor.userId, assignedBy: actor.userId }]
+                  }
+                : undefined
+            }
+          });
+        } catch (error) {
+          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+            throw new BadRequestException("J\u00e1 existe um processo ativo para esta empresa com este e-mail.");
           }
-        });
+          throw error;
+        }
 
         await this.slaService.startSla(process.id, StepKey.ETAPA_2, StepSide.CLIENTE);
 
         await this.auditService.record(actor, "process_started", "Process", process.id, {
-          clientEmail: payload.email
+          clientEmail
         });
 
         if (actor.userId) {
@@ -956,7 +982,7 @@ export class ProcessService {
         if (already?.locked && already.status === ProcessStatus.AGUARDANDO_OPERADOR) {
           return { alreadySubmitted: true };
         }
-        throw new BadRequestException("NÃ£o foi possÃ­vel submeter a etapa no estado atual.");
+        throw new BadRequestException("Não foi possível submeter a etapa no estado atual.");
       }
 
       await tx.process.update({
@@ -1260,7 +1286,7 @@ export class ProcessService {
       }
     });
     if (!process) {
-      throw new NotFoundException("Processo nÃ£o encontrado.");
+      throw new NotFoundException("Processo não encontrado.");
     }
     this.ensureNotReadOnly(process);
 

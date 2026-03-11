@@ -41,10 +41,10 @@
     <mj-section padding="0 16px 24px">
       <mj-column>
         <mj-text align="center" css-class="muted">
-          {{companyName}} · {{companyLocation}}
+          {{companyName}} &middot; {{companyLocation}}
         </mj-text>
         <mj-text align="center" css-class="muted">
-          Se você não esperava este e-mail, ignore esta mensagem.
+          Se voc&#234; n&#227;o esperava este e-mail, ignore esta mensagem.
         </mj-text>
       </mj-column>
     </mj-section>

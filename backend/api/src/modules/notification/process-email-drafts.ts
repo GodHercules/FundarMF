@@ -35,20 +35,20 @@ export type ProcessEventDetails = {
 };
 
 const stepLabels: Record<string, string> = {
-  ETAPA_1: "Inicio",
-  ETAPA_2: "Preenchimento de dados e informacoes",
-  ETAPA_3: "Estrutura Juridica",
+  ETAPA_1: "In\u00edcio",
+  ETAPA_2: "Preenchimento de dados e informa\u00e7\u00f5es",
+  ETAPA_3: "Estrutura Jur\u00eddica",
   ETAPA_4: "Checklist",
-  ETAPA_5: "Endereco",
+  ETAPA_5: "Endere\u00e7o",
   ETAPA_6: "Documentos"
 };
 
 const statusLabels: Record<string, string> = {
-  CONCLUIDO: "Concluido",
+  CONCLUIDO: "Conclu\u00eddo",
   EM_ANDAMENTO: "Em andamento",
   AGUARDANDO_CLIENTE: "Aguardando cliente",
   AGUARDANDO_OPERADOR: "Aguardando operador",
-  CORRECAO_SOLICITADA: "Correcao solicitada",
+  CORRECAO_SOLICITADA: "Corre\u00e7\u00e3o solicitada",
   CANCELADO: "Cancelado"
 };
 
@@ -72,7 +72,7 @@ function buildUrls(processId: string) {
 
 function hello(name?: string | null) {
   const clean = name?.trim();
-  return clean && clean.length > 0 ? `Ola, ${clean},` : "Ola,";
+  return clean && clean.length > 0 ? `Ol\u00e1, ${clean},` : "Ol\u00e1,";
 }
 
 function asLines(value: string | string[]) {
@@ -134,7 +134,7 @@ export function buildProcessEmailDrafts(input: {
   }
 
   if (event === "client_link_sent") {
-    // O link/OTP e exclusivo do cliente. O operador nao deve receber notificacao sobre isso.
+    // O link/OTP \u00e9 exclusivo do cliente. O operador n\u00e3o deve receber notifica\u00e7\u00e3o sobre isso.
     return { meta };
   }
 
@@ -144,7 +144,7 @@ export function buildProcessEmailDrafts(input: {
 
     const operatorSubject = `Cliente enviou etapa: ${submittedLabel} (${process.id})`;
     const operatorLines = [
-      "O cliente enviou a etapa para revisao do operador.",
+      "O cliente enviou a etapa para revis\u00e3o do operador.",
       "",
       `Processo: ${process.id}`,
       `Cliente: ${clientName}`,
@@ -153,7 +153,7 @@ export function buildProcessEmailDrafts(input: {
       `Status atual: ${statusLabel}`
     ];
 
-    const bothSubject = `Atualizacao do processo ${process.id}`;
+    const bothSubject = `Atualiza\u00e7\u00e3o do processo ${process.id}`;
     const bothLines = [
       `Processo: ${process.id}`,
       `Cliente: ${clientName}`,
@@ -175,11 +175,11 @@ export function buildProcessEmailDrafts(input: {
     const correctionLabel = stepLabels[correctionStep] ?? correctionStep;
     const fields = correction?.fields ?? [];
 
-    const clientSubject = `Correcao solicitada no processo ${process.id}`;
+    const clientSubject = `Corre\u00e7\u00e3o solicitada no processo ${process.id}`;
     const clientLines = [
       hello(clientName),
       "",
-      "Encontramos alguns pontos que precisam de correcao para continuar seu processo.",
+      "Encontramos alguns pontos que precisam de corre\u00e7\u00e3o para continuar seu processo.",
       "",
       `Etapa: ${correctionStep} (${correctionLabel})`,
       correction?.reason ? `Motivo: ${correction.reason}` : "",
@@ -189,9 +189,9 @@ export function buildProcessEmailDrafts(input: {
       "Acesse o portal para ajustar os dados e reenviar."
     ].filter(Boolean) as string[];
 
-    const operatorSubject = `Correcao solicitada: ${clientName} (${process.id})`;
+    const operatorSubject = `Corre\u00e7\u00e3o solicitada: ${clientName} (${process.id})`;
     const operatorLines = [
-      "Correcao solicitada ao cliente.",
+      "Corre\u00e7\u00e3o solicitada ao cliente.",
       "",
       `Processo: ${process.id}`,
       `Cliente: ${clientName}`,
@@ -199,10 +199,10 @@ export function buildProcessEmailDrafts(input: {
       `Etapa: ${correctionStep} (${correctionLabel})`,
       correction?.reason ? `Motivo: ${correction.reason}` : "",
       fields.length > 0 ? "" : "",
-      ...(fields.length > 0 ? ["Campos liberados para correcao:", ...fields.map((f) => `- ${f}`)] : [])
+      ...(fields.length > 0 ? ["Campos liberados para corre\u00e7\u00e3o:", ...fields.map((f) => `- ${f}`)] : [])
     ].filter(Boolean) as string[];
 
-    const bothSubject = `Status do processo ${process.id}: correcao solicitada`;
+    const bothSubject = `Status do processo ${process.id}: corre\u00e7\u00e3o solicitada`;
     const bothLines = [
       `Processo: ${process.id}`,
       `Cliente: ${clientName}`,
@@ -246,24 +246,24 @@ export function buildProcessEmailDrafts(input: {
       `Cliente: ${clientName}`,
       `Status: ${statusLabel}`,
       `Etapa atual: ${process.currentStep} (${stepLabel})`,
-      next ? `Proxima etapa: ${next} (${nextLabel})` : "",
+      next ? `Pr\u00f3xima etapa: ${next} (${nextLabel})` : "",
       `Progresso: ${progress}%`
     ].filter(Boolean) as string[];
 
-    const clientSubject = `Atualizacao do seu processo ${process.id}`;
+    const clientSubject = `Atualiza\u00e7\u00e3o do seu processo ${process.id}`;
     const clientLines = [
       hello(clientName),
       "",
-      "Temos uma atualizacao no seu processo.",
+      "Temos uma atualiza\u00e7\u00e3o no seu processo.",
       "",
       `Status: ${statusLabel}`,
       `Etapa atual: ${process.currentStep} (${stepLabel})`,
-      next ? `Proxima etapa: ${next} (${nextLabel})` : "",
+      next ? `Pr\u00f3xima etapa: ${next} (${nextLabel})` : "",
       "",
       "Acompanhe pelo portal do cliente."
     ].filter(Boolean) as string[];
 
-    const bothSubject = `Atualizacao do processo ${process.id}`;
+    const bothSubject = `Atualiza\u00e7\u00e3o do processo ${process.id}`;
     const bothLines = [
       `Processo: ${process.id}`,
       `Cliente: ${clientName}`,
@@ -281,19 +281,19 @@ export function buildProcessEmailDrafts(input: {
   }
 
   if (event === "process_completed") {
-    const clientSubject = `Processo concluido: ${process.id}`;
+    const clientSubject = `Processo conclu\u00eddo: ${process.id}`;
     const clientLines = [
       hello(clientName),
       "",
-      "Seu processo foi concluido com sucesso.",
+      "Seu processo foi conclu\u00eddo com sucesso.",
       "",
       `Processo: ${process.id}`,
       "Se precisar de suporte, responda este e-mail."
     ];
 
-    const operatorSubject = `Processo concluido: ${clientName} (${process.id})`;
+    const operatorSubject = `Processo conclu\u00eddo: ${clientName} (${process.id})`;
     const operatorLines = [
-      "Processo concluido.",
+      "Processo conclu\u00eddo.",
       "",
       `Processo: ${process.id}`,
       `Cliente: ${clientName}`,
@@ -301,8 +301,8 @@ export function buildProcessEmailDrafts(input: {
       process.clientPhone ? `Telefone: ${process.clientPhone}` : ""
     ].filter(Boolean) as string[];
 
-    const bothSubject = `Status do processo ${process.id}: concluido`;
-    const bothLines = [`Processo: ${process.id}`, `Cliente: ${clientName}`, "Status: Concluido", "Progresso: 100%"];
+    const bothSubject = `Status do processo ${process.id}: conclu\u00eddo`;
+    const bothLines = [`Processo: ${process.id}`, `Cliente: ${clientName}`, "Status: Conclu\u00eddo", "Progresso: 100%"];
 
     return {
       client: render(clientSubject, clientLines, { label: "Abrir portal", url: urls.client }),
@@ -323,7 +323,7 @@ export function buildProcessEmailDrafts(input: {
       reason ? `Motivo: ${reason}` : "",
       "",
       `Processo: ${process.id}`,
-      "Se voce acredita que isso e um engano, responda este e-mail."
+      "Se voc\u00ea acredita que isso \u00e9 um engano, responda este e-mail."
     ].filter(Boolean) as string[];
 
     const operatorSubject = `Processo cancelado: ${clientName} (${process.id})`;
@@ -353,7 +353,7 @@ export function buildProcessEmailDrafts(input: {
   }
 
   // Default fallback: only include a minimal "both" update.
-  const bothSubject = `Atualizacao do processo ${process.id}`;
+  const bothSubject = `Atualiza\u00e7\u00e3o do processo ${process.id}`;
   const bothLines = [
     `Processo: ${process.id}`,
     `Cliente: ${clientName}`,

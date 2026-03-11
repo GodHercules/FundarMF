@@ -41,7 +41,11 @@ export class SmtpEmailProvider implements EmailProvider {
       to,
       subject,
       text: body,
-      html
+      html,
+      textEncoding: "base64",
+      headers: {
+        "Content-Type": "text/html; charset=UTF-8"
+      }
     });
   }
 }

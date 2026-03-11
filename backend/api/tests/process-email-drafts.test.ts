@@ -21,7 +21,7 @@ describe("buildProcessEmailDrafts", () => {
       }
     });
 
-    expect(drafts.client?.text).toContain("Ola, Maria Silva");
+    expect(drafts.client?.text).toContain("Olá, Maria Silva");
     expect(drafts.client?.html).toContain("<html");
     expect(drafts.operator?.text).toContain("Processo: proc-123");
   });
@@ -43,4 +43,3 @@ describe("buildProcessEmailDrafts", () => {
     expect(drafts.operator?.html).toContain("<html");
   });
 });
-
