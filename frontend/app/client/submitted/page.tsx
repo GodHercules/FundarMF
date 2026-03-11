@@ -10,7 +10,7 @@ export default function ClientSubmitted() {
         <span className="badge bg-emerald/15 text-ink">Envio concluído</span>
         <h1 className="text-3xl font-semibold">Seu processo será iniciado</h1>
         <p className="text-slate">
-          Recebemos suas informações e documentos. Aguarde o contato por e-mail ou WhatsApp para acompanhar o andamento.
+          Obrigado por mandar os seus documentos. Aguarde o contato por e-mail ou WhatsApp para acompanhar o andamento.
         </p>
       </div>
       <Card className="p-6">
@@ -20,3 +20,4 @@ export default function ClientSubmitted() {
     </main>
   );
 }
+

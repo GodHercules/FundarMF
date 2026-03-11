@@ -36,7 +36,7 @@ export type ProcessEventDetails = {
 
 const stepLabels: Record<string, string> = {
   ETAPA_1: "Inicio",
-  ETAPA_2: "Dados e Socios",
+  ETAPA_2: "Preenchimento de dados e informacoes",
   ETAPA_3: "Estrutura Juridica",
   ETAPA_4: "Checklist",
   ETAPA_5: "Endereco",

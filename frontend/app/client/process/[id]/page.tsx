@@ -254,7 +254,7 @@ export default function ClientProcess() {
           <Logo withText />
           <span className="badge bg-emerald/15 text-ink">Envio concluído</span>
           <h1 className="text-3xl font-semibold">Recebemos os seus dados</h1>
-          <p className="text-slate">Seu processo foi iniciado e está em análise. Aguarde o contato por e-mail ou WhatsApp.</p>
+          <p className="text-slate">Obrigado por mandar os seus documentos. Aguarde o contato por e-mail ou WhatsApp.</p>
         </div>
         <Card className="p-6">
           <p className="text-sm text-slate">

@@ -11,7 +11,7 @@ const statusColor: Record<string, string> = {
 
 const stepLabels: Record<string, string> = {
   ETAPA_1: "Início",
-  ETAPA_2: "Dados e Sócios",
+  ETAPA_2: "Preenchimento de dados e informações",
   ETAPA_3: "Estrutura Jurídica",
   ETAPA_4: "Checklist",
   ETAPA_5: "Endereço",

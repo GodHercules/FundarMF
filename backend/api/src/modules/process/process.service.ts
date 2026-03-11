@@ -982,10 +982,9 @@ export class ProcessService {
 
     await this.notificationService.sendEmail(
       process.clientEmail,
-      "Recebemos seus dados - Processo iniciado",
+      "Recebemos seus dados",
       [
-        "Recebemos suas informações e documentos.",
-        "Seu processo foi iniciado e está em análise pela nossa equipe.",
+        "Obrigado por mandar os seus documentos.",
         "Aguarde o contato por e-mail ou WhatsApp para acompanhar o andamento.",
         "",
         `Processo: ${process.id}`,

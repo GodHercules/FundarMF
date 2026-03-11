@@ -100,7 +100,7 @@ describe("ProcessService submitStep email", () => {
 
     expect(notificationService.sendEmail).toHaveBeenCalledWith(
       "cliente@exemplo.com",
-      expect.stringMatching(/processo iniciado/i),
+      expect.stringMatching(/recebemos seus dados/i),
       expect.stringContaining("Processo: p1")
     );
 
