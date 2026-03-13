@@ -37,7 +37,17 @@ export class NotificationQueue implements OnModuleInit, OnModuleDestroy {
     if (!connectionString) {
       throw new Error("DATABASE_URL is required to enqueue notifications.");
     }
-    this.boss = new PgBoss({ connectionString });
+    const sslMode = (process.env.PGSSLMODE ?? "").toLowerCase();
+    const noVerify =
+      sslMode === "no-verify" || (process.env.PG_BOSS_SSL_NO_VERIFY ?? "false").toLowerCase() === "true";
+
+    const bossOptions: Record<string, unknown> = { connectionString };
+    if (noVerify) {
+      // Some managed Postgres providers use custom CA chains. Allow opting out of CA validation for pg-boss only.
+      bossOptions.ssl = { rejectUnauthorized: false };
+    }
+
+    this.boss = new PgBoss(bossOptions as any);
     await this.boss.start();
     this.resolveReady?.();
   }

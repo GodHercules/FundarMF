@@ -111,4 +111,7 @@ async function bootstrap() {
   console.log(`FundarMF API running on http://localhost:${port}`);
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  console.error("[bootstrap] failed to start API", error);
+  process.exit(1);
+});
