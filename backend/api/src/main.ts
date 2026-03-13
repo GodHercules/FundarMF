@@ -9,8 +9,10 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./modules/app.module";
+import { NotificationService } from "./modules/notification/notification.service";
 import { requestContextMiddleware } from "./shared/request-context";
 import { RequestLoggingInterceptor } from "./shared/request-logging.interceptor";
+import { installTerminalErrorMonitor } from "./shared/terminal-error-monitor";
 
 function withDbPoolDefaults(urlRaw: string | undefined, defaults: { connectionLimit: number; poolTimeout: number }) {
   if (!urlRaw) return urlRaw;
@@ -48,6 +50,8 @@ async function bootstrap() {
   });
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const notificationService = app.get(NotificationService);
+  installTerminalErrorMonitor(notificationService);
 
   // Render (and most hosted platforms) run Node behind a reverse proxy and will set X-Forwarded-For.
   // express-rate-limit validates this header and requires trust proxy to be enabled to avoid IP spoofing.

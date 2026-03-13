@@ -38,7 +38,7 @@ export type WebhookPayload = {
   subject?: string;
   body?: string;
   html?: string;
-  audience?: "client" | "operator" | "unknown";
+  audience?: "client" | "operator" | "unknown" | "Error";
   requestedBy?: { email?: string; role?: string };
 
   // Rich email drafts for n8n to dispatch (ProcessService, AuthService)
