@@ -111,21 +111,16 @@ pnpm dev
 
 ---
 
-### 6) (Opcional, mas recomendado) Subir o Worker
-**Onde rodar:** dentro de `backend`, em outro terminal.
+### 6) Worker separado
+**Estado atual deste snapshot:** o diretrio `backend/worker` no est estruturado como um pacote executvel do workspace neste repositrio. Hoje, os jobs em fila e os jobs agendados precisam ser validados pelo runtime da API.
 
-```bash
-cd backend
-pnpm --filter fundarmf-worker dev
-```
-
-**Por que rodar:** executa jobs peridicos (SLA, relatrios, cancelamento por inatividade) e o envio assncrono de notificaes (e-mail/WhatsApp).
+**Importante:** no confie em comandos `pnpm --filter fundarmf-worker ...` at que o pacote do worker seja restaurado com `package.json` e cdigo-fonte.
 
 ---
 
 ## Notificaes (e-mail + WhatsApp)
 - Os disparos continuam na API (servios de Auth/Process/Chat/Document).
-- A entrega real ocorre no `backend/worker` via pg-boss.
+- Neste snapshot, a fila e parte do processamento em segundo plano tambm precisam ser validados pela prpria API.
 - Modos:
   - `NOTIFY_MODE=mock`: no envia; loga destino + contedo.
   - `NOTIFY_MODE=terminal`: no envia; imprime preview (HTML do e-mail + texto do WhatsApp).
@@ -389,25 +384,7 @@ pnpm --filter fundarmf-api start
 ```
 
 ### Worker no Render
-1. Crie um Worker Service.
-2. Defina a raiz como `backend`.
-  3. Variveis:
-     - `DATABASE_URL`
-     - `WORKER_CONCURRENCY`
-     - `WORKER_CANCEL_INACTIVE_EVERY_MS=3600000`
-     - `NOTIFY_MODE=real` (ou `terminal` / `mock`)
-     - `NOTIFY_EMAIL_ENABLED=true`
-     - `NOTIFY_WHATSAPP_ENABLED=true`
-     - `EMAIL_PROVIDER` + credenciais (Resend ou SMTP)
-     - `WHATSAPP_PROVIDER` + credenciais (Twilio Sandbox)
-4. Build command:
-```
-pnpm install && pnpm --filter fundarmf-worker build
-```
-5. Start command:
-```
-pnpm --filter fundarmf-worker start
-```
+No estado atual do repositrio, esta parte deve ser tratada como **no verificada**. O pacote `fundarmf-worker` no est presente como workspace executvel, ento os comandos abaixo no devem ser usados em produo sem antes restaurar o worker como pacote real e validar seu fluxo fim a fim.
 
 ---
 
