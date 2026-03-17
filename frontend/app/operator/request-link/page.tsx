@@ -48,7 +48,7 @@ export default function OperatorRequestLink() {
   async function handleSubmit() {
     setMessage(null);
     if (!name.trim()) {
-      setMessage("Informe o nome do cliente.");
+      setMessage("Informe o nome da empresa.");
       return;
     }
     if (!email && !whatsapp) {
@@ -91,11 +91,11 @@ export default function OperatorRequestLink() {
         <Logo withText />
         <span className="badge bg-emerald/15 text-ink">Envio de link</span>
         <h1 className="text-3xl font-semibold">Enviar acesso ao cliente</h1>
-        <p className="text-slate">Informe o e-mail e o telefone do cliente para envio do link seguro.</p>
+        <p className="text-slate">Informe a empresa e os contatos do cliente para envio do link seguro.</p>
       </div>
       <Card className="p-6">
-        <label className="text-sm font-semibold text-slate">Nome do cliente</label>
-        <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Nome completo" />
+        <label className="text-sm font-semibold text-slate">Nome da empresa</label>
+        <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Razão social ou nome empresarial" />
         <div className="mt-4">
           <label className="text-sm font-semibold text-slate">E-mail do cliente</label>
           <Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="cliente@email.com" />

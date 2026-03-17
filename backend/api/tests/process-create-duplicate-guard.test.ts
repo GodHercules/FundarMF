@@ -10,6 +10,7 @@ describe("ProcessService createProcessByOperator duplicate guard", () => {
           if (args?.where?.currentStep === StepKey.ETAPA_2) return [];
           return [];
         }),
+        findFirst: vi.fn(async () => null),
         create: vi.fn(async () => ({ id: "p1", ownerId: null })),
         findUnique: vi.fn(async () => ({
           id: "p1",
@@ -71,11 +72,9 @@ describe("ProcessService createProcessByOperator duplicate guard", () => {
     const deps = baseDeps();
     deps.prisma.process.findMany = vi.fn(async (args: any) => {
       if (args?.where?.currentStep === StepKey.ETAPA_2) return [];
-      if (args?.where?.clientEmail) {
-        return [{ id: "active-1", clientName: "Empresa Alfa" }];
-      }
       return [];
     }) as any;
+    deps.prisma.process.findFirst = vi.fn(async () => null) as any;
 
     const service = new ProcessService(
       deps.prisma as any,
@@ -102,15 +101,13 @@ describe("ProcessService createProcessByOperator duplicate guard", () => {
     expect(deps.prisma.process.create).toHaveBeenCalledTimes(1);
   });
 
-  it("bloqueia empresa duplicada para o mesmo e-mail (ignora acentos/caixa)", async () => {
+  it("bloqueia empresa duplicada mesmo com email diferente (ignora acentos/caixa)", async () => {
     const deps = baseDeps();
     deps.prisma.process.findMany = vi.fn(async (args: any) => {
       if (args?.where?.currentStep === StepKey.ETAPA_2) return [];
-      if (args?.where?.clientEmail) {
-        return [{ id: "active-1", clientName: "ACME Com\u00e9rcio" }];
-      }
       return [];
     }) as any;
+    deps.prisma.process.findFirst = vi.fn(async () => ({ id: "active-1" })) as any;
 
     const service = new ProcessService(
       deps.prisma as any,
@@ -126,14 +123,39 @@ describe("ProcessService createProcessByOperator duplicate guard", () => {
         { role: "MASTER", email: "master@exemplo.com" } as any,
         {
           nome: "acme comercio",
+          email: "outro-cliente@exemplo.com",
+          telefone: "+5511999999999",
+          sendEmail: false,
+          sendWhatsapp: false
+        }
+      )
+    ).rejects.toThrow(/j\u00e1 existe um processo ativo para esta empresa/i);
+
+    expect(deps.prisma.process.create).not.toHaveBeenCalled();
+  });
+
+  it("exige nome da empresa para iniciar o processo", async () => {
+    const deps = baseDeps();
+    const service = new ProcessService(
+      deps.prisma as any,
+      deps.slaService as any,
+      deps.auditService as any,
+      deps.notificationService as any,
+      deps.authService as any,
+      deps.idempotencyService as any
+    );
+
+    await expect(
+      service.createProcessByOperator(
+        { role: "MASTER", email: "master@exemplo.com" } as any,
+        {
+          nome: "   ",
           email: "cliente@exemplo.com",
           telefone: "+5511999999999",
           sendEmail: false,
           sendWhatsapp: false
         }
       )
-    ).rejects.toThrow(/j\u00e1 existe um processo ativo para esta empresa com este e-mail/i);
-
-    expect(deps.prisma.process.create).not.toHaveBeenCalled();
+    ).rejects.toThrow(/informe o nome da empresa/i);
   });
 });

@@ -18,6 +18,7 @@ describe("ProcessService submitStep email", () => {
           checklists: [],
           slaEvents: []
         })),
+        findFirst: vi.fn(async () => null),
         update: vi.fn(async () => ({}))
       },
       processStep: {
@@ -156,7 +157,8 @@ describe("ProcessService submitStep email", () => {
           steps: [],
           checklists: [],
           slaEvents: []
-        }))
+        })),
+        findFirst: vi.fn(async () => null)
       },
       processStep: {
         findUnique: vi.fn(async () => ({

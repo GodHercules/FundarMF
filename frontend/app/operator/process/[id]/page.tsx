@@ -324,7 +324,7 @@ export default function OperatorProcess() {
 
   async function sendCorrection(fields: string[], reason: string) {
     if (!step2Enabled) {
-      setMessage("Correções só podem ser enviadas quando a etapa atual é ETAPA_2.");
+      setMessage("Correções só podem ser enviadas quando a etapa atual é Preenchimento de dados e informações.");
       return;
     }
     if (!reason.trim()) {

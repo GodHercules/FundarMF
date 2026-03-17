@@ -107,6 +107,7 @@ model User {
 model Process {
   id                 String          @id @default(uuid())
   clientName         String?
+  companyKey         String?
   clientEmail        String
   clientPhone        String?
   status             ProcessStatus   @default(EM_ANDAMENTO)
@@ -135,6 +136,7 @@ model Process {
   @@index([ownerId, createdAt])
   @@index([kanbanStage, ownerId, createdAt])
   @@index([clientEmail, createdAt])
+  @@index([companyKey, createdAt])
   @@index([clientPhone, createdAt])
   @@index([status, createdAt])
 }

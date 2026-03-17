@@ -70,6 +70,23 @@ function normalizeCompanyKey(value: string) {
     .trim();
 }
 
+function getDuplicateCompanyMessage() {
+  return "Já existe um processo ativo para esta empresa.";
+}
+
+function getStepLabel(stepKey: StepKey) {
+  const labels: Record<StepKey, string> = {
+    ETAPA_1: "Início",
+    ETAPA_2: "Preenchimento de dados e informações",
+    ETAPA_3: "Estrutura jurídica",
+    ETAPA_4: "Checklist",
+    ETAPA_5: "Endereço",
+    ETAPA_6: "Documentos"
+  };
+
+  return labels[stepKey];
+}
+
 @Injectable()
 export class ProcessService {
   constructor(
@@ -328,6 +345,27 @@ export class ProcessService {
     return typeof value === "string" && value.trim().length > 0;
   }
 
+  private getStep2CompanyKey(data: Record<string, unknown>) {
+    if (!this.hasText(data.razaoSocial1)) return null;
+    const companyKey = normalizeCompanyKey(String(data.razaoSocial1));
+    return companyKey || null;
+  }
+
+  private async ensureCompanyKeyAvailable(companyKey: string, currentProcessId?: string) {
+    const duplicate = await this.prisma.process.findFirst({
+      where: {
+        companyKey,
+        status: { notIn: [ProcessStatus.CONCLUIDO, ProcessStatus.CANCELADO] },
+        ...(currentProcessId ? { id: { not: currentProcessId } } : {})
+      },
+      select: { id: true }
+    });
+
+    if (duplicate) {
+      throw new BadRequestException(getDuplicateCompanyMessage());
+    }
+  }
+
   private isStep2DataComplete(data: Record<string, unknown>) {
     if (!this.hasText(data.razaoSocial1)) return false;
     if (!this.hasText(data.municipio)) return false;
@@ -528,8 +566,12 @@ export class ProcessService {
 
     const normalizedPhone = normalizePhone(payload.telefone) ?? payload.telefone;
     const clientEmail = payload.email.trim().toLowerCase();
-    const clientName = payload.nome?.trim() || clientEmail.split("@")[0] || "Cliente";
-    const companyKey = normalizeCompanyKey(clientName);
+    const clientName = payload.nome?.trim();
+    const companyKey = normalizeCompanyKey(clientName ?? "");
+
+    if (!clientName || !companyKey) {
+      throw new BadRequestException("Informe o nome da empresa para iniciar o processo.");
+    }
 
     const { data } = await this.idempotencyService.execute(
       IdempotencyScope.PROCESS_CREATE,
@@ -544,22 +586,9 @@ export class ProcessService {
         sendWhatsapp: payload.sendWhatsapp ?? Boolean(normalizedPhone)
       },
       async () => {
-        await this.cancelInactiveProcessesForClient(clientEmail, normalizedPhone);
+        await this.cancelInactiveProcessesForCompany(companyKey, clientEmail, normalizedPhone);
 
-        const activeForEmail = await this.prisma.process.findMany({
-          where: {
-            clientEmail: { equals: clientEmail, mode: "insensitive" },
-            status: { notIn: [ProcessStatus.CONCLUIDO, ProcessStatus.CANCELADO] }
-          },
-          select: { id: true, clientName: true }
-        });
-
-        const duplicateCompany = activeForEmail.find(
-          (process) => normalizeCompanyKey(process.clientName?.trim() || "") === companyKey
-        );
-        if (duplicateCompany) {
-          throw new BadRequestException("J\u00e1 existe um processo ativo para esta empresa com este e-mail.");
-        }
+        await this.ensureCompanyKeyAvailable(companyKey);
 
         const checklistDefaults = this.buildChecklistData();
         let process;
@@ -567,6 +596,7 @@ export class ProcessService {
           process = await this.prisma.process.create({
             data: {
               clientName,
+              companyKey,
               clientEmail,
               clientPhone: normalizedPhone,
               status: ProcessStatus.AGUARDANDO_CLIENTE,
@@ -620,7 +650,7 @@ export class ProcessService {
           });
         } catch (error) {
           if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-            throw new BadRequestException("J\u00e1 existe um processo ativo para esta empresa com este e-mail.");
+            throw new BadRequestException(getDuplicateCompanyMessage());
           }
           throw error;
         }
@@ -777,11 +807,12 @@ export class ProcessService {
       .filter((process) => process.kanbanEligible === true);
   }
 
-  private async cancelInactiveProcessesForClient(email: string, phone?: string | null) {
+  private async cancelInactiveProcessesForCompany(companyKey: string, email: string, phone?: string | null) {
     const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
     const normalizedPhone = phone ? normalizePhone(phone) ?? phone : undefined;
     const candidates = await this.prisma.process.findMany({
       where: {
+        companyKey,
         status: ProcessStatus.AGUARDANDO_CLIENTE,
         currentStep: StepKey.ETAPA_2,
         createdAt: { lte: fiveDaysAgo },
@@ -899,6 +930,14 @@ export class ProcessService {
     });
 
     if (stepKey === "ETAPA_2") {
+      const step2CompanyKey = this.getStep2CompanyKey(merged as Record<string, unknown>);
+      if (step2CompanyKey) {
+        await this.ensureCompanyKeyAvailable(step2CompanyKey, processId);
+        await this.prisma.process.update({
+          where: { id: processId },
+          data: { companyKey: step2CompanyKey }
+        });
+      }
       await this.syncDocumentItems(processId, merged as Record<string, unknown>);
     }
 
@@ -950,6 +989,11 @@ export class ProcessService {
         throw new BadRequestException("Formulário do cliente incompleto.");
       }
 
+      const step2CompanyKey = this.getStep2CompanyKey(step2Data);
+      if (step2CompanyKey) {
+        await this.ensureCompanyKeyAvailable(step2CompanyKey, processId);
+      }
+
       const docs = await this.prisma.documentItem.findMany({
         where: { processId },
         select: {
@@ -987,7 +1031,14 @@ export class ProcessService {
 
       await tx.process.update({
         where: { id: processId },
-        data: { status: ProcessStatus.AGUARDANDO_OPERADOR }
+        data: {
+          status: ProcessStatus.AGUARDANDO_OPERADOR,
+          ...(stepKey === StepKey.ETAPA_2
+            ? {
+                companyKey: this.getStep2CompanyKey((current.data ?? {}) as Record<string, unknown>) ?? process.companyKey
+              }
+            : {})
+        }
       });
       await this.stopSlaTx(tx, processId, stepKey, "CLIENTE");
       await this.startSlaTx(tx, processId, stepKey, "OPERADOR");
@@ -1002,7 +1053,7 @@ export class ProcessService {
 
     await this.notifyOwner(processId, process.ownerId ?? null, {
       title: "Cliente enviou o formulário",
-      body: `O cliente ${process.clientEmail} enviou o formulário final da etapa ${stepKey}.`,
+      body: `O cliente ${process.clientEmail} enviou o formulário final da etapa ${getStepLabel(stepKey)}.`,
       type: "client_submitted"
     });
 
@@ -1014,7 +1065,7 @@ export class ProcessService {
         "Aguarde o contato por e-mail ou WhatsApp para acompanhar o andamento.",
         "",
         `Processo: ${process.id}`,
-        `Etapa enviada: ${stepKey}`
+        `Etapa enviada: ${getStepLabel(stepKey)}`
       ].join("\n")
     );
 
@@ -1176,17 +1227,17 @@ export class ProcessService {
       this.notificationService.sendEmail(
         process.clientEmail,
         "Correcao solicitada",
-        `Correcao solicitada na ${stepKey}: ${reason}`
+        `Correcao solicitada na etapa ${getStepLabel(stepKey)}: ${reason}`
       ),
       this.notificationService.sendWhatsApp(
         process.clientPhone ?? process.clientEmail,
-        `Correção solicitada na ${stepKey}: ${reason}`
+        `Correção solicitada na etapa ${getStepLabel(stepKey)}: ${reason}`
       )
     ]);
 
     await this.notifyOwner(processId, process.ownerId ?? null, {
       title: "Correção solicitada",
-      body: `Correção solicitada na ${stepKey} para ${process.clientEmail}.`,
+      body: `Correção solicitada na etapa ${getStepLabel(stepKey)} para ${process.clientEmail}.`,
       type: "correction_requested"
     });
 
@@ -1249,7 +1300,7 @@ export class ProcessService {
       "",
       `Processo: ${process.id}`,
       `Status atual: ${process.status}`,
-      `Etapa atual: ${process.currentStep}`,
+      `Etapa atual: ${getStepLabel(process.currentStep)}`,
       "",
       `Mensagem do operador: ${text}`,
       "",

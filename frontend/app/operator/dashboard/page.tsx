@@ -349,11 +349,11 @@ export default function OperatorDashboard() {
         <Card className="p-6">
           <h2 className="text-lg font-semibold">Iniciar novo processo</h2>
           <p className="mt-1 text-sm text-slate">
-            Preencha os dados do cliente e envie o link seguro por e-mail e/ou WhatsApp.
+            Preencha os dados da empresa e do contato do cliente para enviar o link seguro por e-mail e/ou WhatsApp.
           </p>
           <div className="mt-4 grid gap-3">
             <Input
-              placeholder="Nome do cliente"
+              placeholder="Nome da empresa"
               value={form.nome}
               onChange={(event) => setForm((prev) => ({ ...prev, nome: event.target.value }))}
             />
