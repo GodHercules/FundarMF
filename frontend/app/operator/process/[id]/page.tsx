@@ -44,6 +44,16 @@ function normalizeStep<T extends Record<string, string>>(defaults: T, data: Reco
   return normalized as T;
 }
 
+function getSocioTipoPessoa(socio: Record<string, unknown>) {
+  return socio?.tipoPessoa === "CNPJ" ? "CNPJ" : "CPF";
+}
+
+function getSocioDisplayName(socio: Record<string, unknown>, index: number) {
+  const tipoPessoa = getSocioTipoPessoa(socio);
+  const primary = tipoPessoa === "CNPJ" ? socio?.socioRazaoSocial : socio?.socioNome;
+  return String(primary ?? socio?.socioEmail ?? `Sócio ${index + 1}`).trim() || `Sócio ${index + 1}`;
+}
+
 export default function OperatorProcess() {
   const params = useParams();
   const router = useRouter();
@@ -362,7 +372,7 @@ export default function OperatorProcess() {
   const socioMap = new Map(
     sociosList.map((socio: any, index: number) => [
       socio?.socioId ?? `index-${index}`,
-      socio?.socioNome || socio?.socioEmail || `Sócio ${index + 1}`
+      getSocioDisplayName(socio ?? {}, index)
     ])
   );
   const isVirtual = endereco?.escritorioVirtual === "Sim";
@@ -784,12 +794,24 @@ export default function OperatorProcess() {
                           </div>
                           <dl className="mt-3 grid gap-3 text-sm text-slate sm:grid-cols-2">
                             <div className="sm:col-span-2">
-                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Nome</dt>
-                              <dd className="mt-1 text-ink">{formatValue(socio?.socioNome)}</dd>
+                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">
+                                {getSocioTipoPessoa(socio ?? {}) === "CNPJ" ? "Razão social" : "Nome"}
+                              </dt>
+                              <dd className="mt-1 text-ink">
+                                {formatValue(
+                                  getSocioTipoPessoa(socio ?? {}) === "CNPJ" ? socio?.socioRazaoSocial : socio?.socioNome
+                                )}
+                              </dd>
                             </div>
                             <div>
-                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">CPF</dt>
-                              <dd className="mt-1 text-ink">{formatValue(socio?.socioCpf)}</dd>
+                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">
+                                {getSocioTipoPessoa(socio ?? {}) === "CNPJ" ? "CNPJ" : "CPF"}
+                              </dt>
+                              <dd className="mt-1 text-ink">
+                                {formatValue(
+                                  getSocioTipoPessoa(socio ?? {}) === "CNPJ" ? socio?.socioCnpj : socio?.socioCpf
+                                )}
+                              </dd>
                             </div>
                             <div>
                               <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Administrador</dt>
@@ -803,18 +825,24 @@ export default function OperatorProcess() {
                               <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Telefone</dt>
                               <dd className="mt-1 text-ink">{formatValue(socio?.socioTelefone)}</dd>
                             </div>
-                            <div>
-                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Estado civil</dt>
-                              <dd className="mt-1 text-ink">{formatValue(socio?.socioEstadoCivil)}</dd>
-                            </div>
-                            <div>
-                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Profissão</dt>
-                              <dd className="mt-1 text-ink">{formatValue(socio?.socioProfissao)}</dd>
-                            </div>
-                            <div className="sm:col-span-2">
-                              <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Regime de casamento</dt>
-                              <dd className="mt-1 text-ink">{formatValue(socio?.socioRegimeCasamento)}</dd>
-                            </div>
+                            {getSocioTipoPessoa(socio ?? {}) !== "CNPJ" && (
+                              <div>
+                                <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Estado civil</dt>
+                                <dd className="mt-1 text-ink">{formatValue(socio?.socioEstadoCivil)}</dd>
+                              </div>
+                            )}
+                            {getSocioTipoPessoa(socio ?? {}) !== "CNPJ" && (
+                              <div>
+                                <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Profissão</dt>
+                                <dd className="mt-1 text-ink">{formatValue(socio?.socioProfissao)}</dd>
+                              </div>
+                            )}
+                            {getSocioTipoPessoa(socio ?? {}) !== "CNPJ" && (
+                              <div className="sm:col-span-2">
+                                <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Regime de casamento</dt>
+                                <dd className="mt-1 text-ink">{formatValue(socio?.socioRegimeCasamento)}</dd>
+                              </div>
+                            )}
                             <div className="sm:col-span-2">
                               <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate">Responsável CNPJ</dt>
                               <dd className="mt-1 text-ink">{formatValue(socio?.responsavelCnpj)}</dd>

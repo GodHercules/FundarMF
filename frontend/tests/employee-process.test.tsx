@@ -164,4 +164,49 @@ describe("OperatorProcess", () => {
       );
     });
   });
+
+  it("exibe razão social e CNPJ quando o sócio é pessoa jurídica", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/processes/process-123") {
+        return Promise.resolve({
+          ...processPayload,
+          steps: [
+            {
+              ...processPayload.steps[0],
+              data: {
+                ...processPayload.steps[0].data,
+                quadroSocietario: [
+                  {
+                    socioId: "s1",
+                    tipoPessoa: "CNPJ",
+                    socioRazaoSocial: "Holding Teste Ltda",
+                    socioCnpj: "12.345.678/0001-99",
+                    socioEmail: "contato@holding.com",
+                    socioTelefone: "(71) 90000-0000",
+                    socioPercentual: "60%",
+                    socioAdministrador: "Sim",
+                    responsavelCnpj: "Maria"
+                  }
+                ]
+              }
+            },
+            processPayload.steps[1]
+          ]
+        });
+      }
+      if (path === "/documents/process-123/items") return Promise.resolve(processPayload.documents);
+      if (path === "/chats/process-123") return Promise.resolve({ messages: [] });
+      return Promise.resolve({ ok: true });
+    });
+
+    const { default: EmployeeProcess } = await import("@/app/operator/process/[id]/page");
+    const user = userEvent.setup();
+    render(<EmployeeProcess />);
+
+    const btn = await screen.findByRole("button", { name: /ver dados do cliente/i });
+    await user.click(btn);
+
+    expect(await screen.findByText(/holding teste ltda/i)).toBeInTheDocument();
+    expect(screen.getByText(/12.345.678\/0001-99/i)).toBeInTheDocument();
+  });
 });

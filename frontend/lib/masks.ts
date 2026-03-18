@@ -15,6 +15,21 @@ export function maskCpf(value: string) {
   return masked;
 }
 
+export function maskCnpj(value: string) {
+  const digits = onlyDigits(value).slice(0, 14);
+  const part1 = digits.slice(0, 2);
+  const part2 = digits.slice(2, 5);
+  const part3 = digits.slice(5, 8);
+  const part4 = digits.slice(8, 12);
+  const part5 = digits.slice(12, 14);
+  let masked = part1;
+  if (part2) masked += `.${part2}`;
+  if (part3) masked += `.${part3}`;
+  if (part4) masked += `/${part4}`;
+  if (part5) masked += `-${part5}`;
+  return masked;
+}
+
 export function maskPhone(value: string) {
   const digits = onlyDigits(value).slice(0, 11);
   const ddd = digits.slice(0, 2);

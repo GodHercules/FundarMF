@@ -194,4 +194,91 @@ describe("ProcessService submitStep email", () => {
       /incompleto/i
     );
   });
+
+  it("accepts submit when a socio is pessoa juridica with CNPJ fields", async () => {
+    const prisma = {
+      $transaction: vi.fn(async (fn: (tx: any) => Promise<unknown>) => fn(prisma as any)),
+      process: {
+        findUnique: vi.fn(async () => ({
+          id: "p1",
+          status: ProcessStatus.EM_ANDAMENTO,
+          currentStep: "ETAPA_2",
+          clientEmail: "cliente@exemplo.com",
+          clientPhone: "+5511999999999",
+          ownerId: "op-1",
+          steps: [],
+          checklists: [],
+          slaEvents: []
+        })),
+        findFirst: vi.fn(async () => null),
+        update: vi.fn(async () => ({}))
+      },
+      processStep: {
+        findUnique: vi.fn(async () => ({
+          id: "s1",
+          locked: false,
+          status: ProcessStatus.EM_ANDAMENTO,
+          data: {
+            razaoSocial1: "Empresa Teste",
+            municipio: "Salvador - BA",
+            emailCnpj: "cliente@exemplo.com",
+            telefoneCnpj: "+5511999999999",
+            endereco: { escritorioVirtual: "Sim" },
+            quadroSocietario: [
+              {
+                socioId: "s1",
+                tipoPessoa: "CNPJ",
+                socioRazaoSocial: "Holding Teste Ltda",
+                socioCnpj: "12.345.678/0001-99",
+                socioEmail: "contato@holding.com",
+                socioTelefone: "+5511999999999",
+                socioPercentual: "100%",
+                socioAdministrador: "Sim",
+                responsavelCnpj: "Maria"
+              }
+            ]
+          }
+        })),
+        update: vi.fn(async () => ({})),
+        updateMany: vi.fn(async () => ({ count: 1 }))
+      },
+      documentItem: {
+        findMany: vi.fn(async () => [
+          { itemKey: "IDENTIFICACAO_SOCIOS", socioId: "s1", files: [{ id: "file-1" }] },
+          { itemKey: "COMPROVANTE_RESIDENCIA", socioId: "s1", files: [{ id: "file-2" }] }
+        ])
+      },
+      user: {
+        findUnique: vi.fn(async () => ({
+          id: "op-1",
+          email: "op@exemplo.com",
+          whatsapp: "+5511999999999"
+        }))
+      },
+      slaEvent: {
+        updateMany: vi.fn(async () => ({ count: 1 })),
+        upsert: vi.fn(async () => ({}))
+      },
+      slaConfigStep: {
+        findUnique: vi.fn(async () => ({ durationHours: 24 }))
+      }
+    };
+
+    const service = new ProcessService(
+      prisma as any,
+      { stopSla: vi.fn(async () => undefined), startSla: vi.fn(async () => undefined) } as any,
+      { record: vi.fn(async () => undefined) } as any,
+      {
+        createInApp: vi.fn(async () => undefined),
+        sendEmail: vi.fn(async () => undefined),
+        sendWhatsApp: vi.fn(async () => undefined),
+        sendWebhook: vi.fn(async () => undefined)
+      } as any,
+      {} as any
+    );
+
+    await expect(service.submitStep("p1", { role: "CLIENTE", email: "cliente@exemplo.com" }, "ETAPA_2")).resolves.toEqual({
+      ok: true
+    });
+  });
 });

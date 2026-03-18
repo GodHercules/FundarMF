@@ -345,6 +345,10 @@ export class ProcessService {
     return typeof value === "string" && value.trim().length > 0;
   }
 
+  private getSocioTipoPessoa(socio: Record<string, unknown>) {
+    return socio.tipoPessoa === "CNPJ" ? "CNPJ" : "CPF";
+  }
+
   private getStep2CompanyKey(data: Record<string, unknown>) {
     if (!this.hasText(data.razaoSocial1)) return null;
     const companyKey = normalizeCompanyKey(String(data.razaoSocial1));
@@ -388,23 +392,22 @@ export class ProcessService {
     if (socios.length === 0) return false;
 
     for (const socio of socios) {
-      const required = [
-        "socioId",
-        "socioNome",
-        "socioCpf",
-        "socioEmail",
-        "socioTelefone",
-        "socioPercentual",
-        "socioAdministrador",
-        "responsavelCnpj",
-        "socioEstadoCivil",
-        "socioProfissao"
-      ];
+      const tipoPessoa = this.getSocioTipoPessoa(socio);
+      const required = ["socioId", "socioEmail", "socioTelefone", "socioPercentual", "socioAdministrador", "responsavelCnpj"];
+      if (tipoPessoa === "CNPJ") {
+        required.push("socioRazaoSocial", "socioCnpj");
+      } else {
+        required.push("socioNome", "socioCpf", "socioEstadoCivil", "socioProfissao");
+      }
       if (required.some((field) => !this.hasText(socio[field]))) {
         return false;
       }
 
-      if (String(socio.socioEstadoCivil).trim() === "Casado(a)" && !this.hasText(socio.socioRegimeCasamento)) {
+      if (
+        tipoPessoa !== "CNPJ" &&
+        String(socio.socioEstadoCivil).trim() === "Casado(a)" &&
+        !this.hasText(socio.socioRegimeCasamento)
+      ) {
         return false;
       }
     }

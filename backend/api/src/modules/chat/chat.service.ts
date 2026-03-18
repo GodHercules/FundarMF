@@ -76,6 +76,10 @@ function buildBotMessage(intent?: FaqIntent) {
   return `${intent.answer}${extra}`;
 }
 
+function getSocioDisplayName(socio: any) {
+  return socio?.tipoPessoa === "CNPJ" ? socio?.socioRazaoSocial : socio?.socioNome;
+}
+
 @Injectable()
 export class ChatService {
   constructor(
@@ -150,7 +154,7 @@ export class ChatService {
       `Município: ${step2Data.municipio ?? "-"}`,
       `Endereço virtual: ${endereco.escritorioVirtual ?? "-"}`,
       `Sócios: ${socios.length || 0}`,
-      `Sócios (nomes): ${socios.map((s: any) => s?.socioNome).filter(Boolean).join(", ") || "-"}`,
+      `Sócios (nomes): ${socios.map((s: any) => getSocioDisplayName(s)).filter(Boolean).join(", ") || "-"}`,
       `E-mail CNPJ: ${step2Data.emailCnpj ?? "-"}`,
       `Telefone CNPJ: ${step2Data.telefoneCnpj ?? "-"}`,
       `Transcrição recente:\n${transcript || "-"}`

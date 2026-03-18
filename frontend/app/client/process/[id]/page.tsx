@@ -14,7 +14,7 @@ import { Stepper, StatusBadge } from "@/components/Stepper";
 import { Logo } from "@/components/Logo";
 import { SupportChat } from "@/components/SupportChat";
 import { notifySuccess } from "@/lib/notify";
-import { maskCep, maskCpf, maskIptu, maskPercent } from "@/lib/masks";
+import { maskCep, maskCnpj, maskCpf, maskIptu, maskPercent } from "@/lib/masks";
 
 const steps = ["ETAPA_1", "ETAPA_2", "ETAPA_3", "ETAPA_4", "ETAPA_5", "ETAPA_6"];
 const ESTADOS_CIVIS = ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União estável"];
@@ -51,8 +51,11 @@ const defaultStep2 = {
 
 const defaultSocio = {
   socioId: "",
+  tipoPessoa: "CPF",
   socioNome: "",
   socioCpf: "",
+  socioRazaoSocial: "",
+  socioCnpj: "",
   socioEmail: "",
   socioTelefone: "",
   socioPercentual: "",
@@ -135,6 +138,17 @@ function normalizeSocios(input: unknown, legacy?: Record<string, unknown>) {
 
 function createEmptySocio() {
   return { ...defaultSocio, socioId: createSocioId() };
+}
+
+function getSocioTipoPessoa(socio: Partial<typeof defaultSocio>) {
+  return socio.tipoPessoa === "CNPJ" ? "CNPJ" : "CPF";
+}
+
+function getSocioDisplayName(socio: Partial<typeof defaultSocio>) {
+  if (getSocioTipoPessoa(socio) === "CNPJ") {
+    return socio.socioRazaoSocial?.trim() || socio.socioEmail?.trim() || "Sem razão social";
+  }
+  return socio.socioNome?.trim() || socio.socioEmail?.trim() || "Sem nome";
 }
 
 function createSocioId() {
@@ -322,16 +336,22 @@ export default function ClientProcess() {
 
     socios.forEach((socio, index) => {
       const prefix = `Sócio ${index + 1}`;
-      if (!socio.socioNome.trim()) missing.push(`${prefix}: nome`);
-      if (!socio.socioCpf.trim()) missing.push(`${prefix}: CPF`);
+      const tipoPessoa = getSocioTipoPessoa(socio);
+      if (tipoPessoa === "CNPJ") {
+        if (!socio.socioRazaoSocial.trim()) missing.push(`${prefix}: razão social`);
+        if (!socio.socioCnpj.trim()) missing.push(`${prefix}: CNPJ`);
+      } else {
+        if (!socio.socioNome.trim()) missing.push(`${prefix}: nome`);
+        if (!socio.socioCpf.trim()) missing.push(`${prefix}: CPF`);
+      }
       if (!socio.socioEmail.trim()) missing.push(`${prefix}: e-mail`);
       if (!socio.socioTelefone.trim()) missing.push(`${prefix}: telefone`);
       if (!socio.socioPercentual.trim()) missing.push(`${prefix}: participação`);
       if (!socio.socioAdministrador.trim()) missing.push(`${prefix}: administrador`);
       if (!socio.responsavelCnpj.trim()) missing.push(`${prefix}: responsável CNPJ`);
-      if (!socio.socioEstadoCivil.trim()) missing.push(`${prefix}: estado civil`);
-      if (!socio.socioProfissao.trim()) missing.push(`${prefix}: profissão`);
-      if (socio.socioEstadoCivil === "Casado(a)" && !socio.socioRegimeCasamento.trim()) {
+      if (tipoPessoa === "CPF" && !socio.socioEstadoCivil.trim()) missing.push(`${prefix}: estado civil`);
+      if (tipoPessoa === "CPF" && !socio.socioProfissao.trim()) missing.push(`${prefix}: profissão`);
+      if (tipoPessoa === "CPF" && socio.socioEstadoCivil === "Casado(a)" && !socio.socioRegimeCasamento.trim()) {
         missing.push(`${prefix}: regime de casamento`);
       }
     });
@@ -500,6 +520,18 @@ export default function ClientProcess() {
       prev.map((socio, i) => {
         if (i !== index) return socio;
         const updated = { ...socio, [field]: value };
+        if (field === "tipoPessoa") {
+          if (value === "CNPJ") {
+            updated.socioNome = "";
+            updated.socioCpf = "";
+            updated.socioEstadoCivil = "";
+            updated.socioProfissao = "";
+            updated.socioRegimeCasamento = "";
+          } else {
+            updated.socioRazaoSocial = "";
+            updated.socioCnpj = "";
+          }
+        }
         if (field === "socioEstadoCivil" && value !== "Casado(a)") {
           updated.socioRegimeCasamento = "";
         }
@@ -684,6 +716,11 @@ export default function ClientProcess() {
                 <div className="mt-4 flex flex-col gap-6">
                   {socios.map((socio, index) => (
                     <div key={socio.socioId ?? index} className="rounded-2xl border border-ink/10 bg-white/80 p-4">
+                      {(() => {
+                        const tipoPessoa = getSocioTipoPessoa(socio);
+                        const isPessoaJuridica = tipoPessoa === "CNPJ";
+                        return (
+                          <>
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <p className="text-sm font-semibold text-ink">Sócio {index + 1}</p>
                         {index > 0 && (
@@ -693,24 +730,46 @@ export default function ClientProcess() {
                         )}
                       </div>
                       <div className="mt-4 grid gap-4 md:grid-cols-2">
-                        <Field label="Nome completo" required hint="Como consta no documento oficial.">
+                        <Field label="Tipo de sócio" required hint="Escolha se o sócio é pessoa física ou jurídica.">
+                          <Select
+                            value={tipoPessoa}
+                            onChange={(event) => updateSocio(index, "tipoPessoa", event.target.value)}
+                            disabled={!formEditable}
+                          >
+                            <option value="CPF">CPF</option>
+                            <option value="CNPJ">CNPJ</option>
+                          </Select>
+                        </Field>
+                        <Field
+                          label={isPessoaJuridica ? "Razão social" : "Nome completo"}
+                          required
+                          hint={isPessoaJuridica ? "Como consta no cartão CNPJ." : "Como consta no documento oficial."}
+                        >
                           <Input
-                            placeholder="Nome do sócio"
-                            value={socio.socioNome}
-                            onChange={(event) => updateSocio(index, "socioNome", event.target.value)}
+                            placeholder={isPessoaJuridica ? "Razão social do sócio" : "Nome do sócio"}
+                            value={isPessoaJuridica ? socio.socioRazaoSocial : socio.socioNome}
+                            onChange={(event) =>
+                              updateSocio(index, isPessoaJuridica ? "socioRazaoSocial" : "socioNome", event.target.value)
+                            }
                             disabled={!formEditable}
                           />
                         </Field>
-                    <Field label="CPF" required hint="Somente números.">
-                      <Input
-                        placeholder="000.000.000-00"
-                        value={socio.socioCpf}
-                        onChange={(event) => updateSocio(index, "socioCpf", maskCpf(event.target.value))}
-                        disabled={!formEditable}
-                        inputMode="numeric"
-                        maxLength={14}
-                      />
-                    </Field>
+                        <Field label={isPessoaJuridica ? "CNPJ" : "CPF"} required hint="Somente números.">
+                          <Input
+                            placeholder={isPessoaJuridica ? "00.000.000/0000-00" : "000.000.000-00"}
+                            value={isPessoaJuridica ? socio.socioCnpj : socio.socioCpf}
+                            onChange={(event) =>
+                              updateSocio(
+                                index,
+                                isPessoaJuridica ? "socioCnpj" : "socioCpf",
+                                isPessoaJuridica ? maskCnpj(event.target.value) : maskCpf(event.target.value)
+                              )
+                            }
+                            disabled={!formEditable}
+                            inputMode="numeric"
+                            maxLength={isPessoaJuridica ? 18 : 14}
+                          />
+                        </Field>
                         <Field label="E-mail do sócio" required hint="Usado para autenticações futuras.">
                           <Input
                             type="email"
@@ -737,29 +796,33 @@ export default function ClientProcess() {
                             maxLength={4}
                           />
                         </Field>
-                        <Field label="Estado civil" required>
-                          <Select
-                            value={socio.socioEstadoCivil}
-                            onChange={(event) => updateSocio(index, "socioEstadoCivil", event.target.value)}
-                            disabled={!formEditable}
-                          >
-                            <option value="">Selecione</option>
-                            {ESTADOS_CIVIS.map((estado) => (
-                              <option key={estado} value={estado}>
-                                {estado}
-                              </option>
-                            ))}
-                          </Select>
-                        </Field>
-                        <Field label="Profissão" required>
-                          <Input
-                            placeholder="Ex: Administrador"
-                            value={socio.socioProfissao}
-                            onChange={(event) => updateSocio(index, "socioProfissao", event.target.value)}
-                            disabled={!formEditable}
-                          />
-                        </Field>
-                        {socio.socioEstadoCivil === "Casado(a)" && (
+                        {!isPessoaJuridica && (
+                          <Field label="Estado civil" required>
+                            <Select
+                              value={socio.socioEstadoCivil}
+                              onChange={(event) => updateSocio(index, "socioEstadoCivil", event.target.value)}
+                              disabled={!formEditable}
+                            >
+                              <option value="">Selecione</option>
+                              {ESTADOS_CIVIS.map((estado) => (
+                                <option key={estado} value={estado}>
+                                  {estado}
+                                </option>
+                              ))}
+                            </Select>
+                          </Field>
+                        )}
+                        {!isPessoaJuridica && (
+                          <Field label="Profissão" required>
+                            <Input
+                              placeholder="Ex: Administrador"
+                              value={socio.socioProfissao}
+                              onChange={(event) => updateSocio(index, "socioProfissao", event.target.value)}
+                              disabled={!formEditable}
+                            />
+                          </Field>
+                        )}
+                        {!isPessoaJuridica && socio.socioEstadoCivil === "Casado(a)" && (
                           <Field label="Regime de casamento" required>
                             <Select
                               value={socio.socioRegimeCasamento}
@@ -795,6 +858,9 @@ export default function ClientProcess() {
                           />
                         </Field>
                       </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>
@@ -948,7 +1014,7 @@ export default function ClientProcess() {
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <p className="text-sm font-semibold text-ink">Documentos do sócio {index + 1}</p>
-                          <p className="text-xs text-slate">{socio.socioNome || socio.socioEmail || "Sem nome"}</p>
+                          <p className="text-xs text-slate">{getSocioDisplayName(socio)}</p>
                         </div>
                         <span className="rounded-full bg-brass/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink">
                           Obrigatório

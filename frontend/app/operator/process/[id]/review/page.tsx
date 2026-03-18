@@ -22,6 +22,10 @@ function formatValue(value: any) {
   return text.length > 0 ? text : "Não informado";
 }
 
+function getSocioTipoPessoa(socio: Record<string, unknown>) {
+  return socio?.tipoPessoa === "CNPJ" ? "CNPJ" : "CPF";
+}
+
 export default function OperatorProcessReview() {
   const params = useParams();
   const router = useRouter();
@@ -241,15 +245,25 @@ export default function OperatorProcessReview() {
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {sociosList.map((socio: any, index: number) => (
             <div key={socio?.socioId ?? index} className="rounded-xl border border-ink/10 bg-white/80 p-4">
-              <p className="text-sm font-semibold text-ink">Sócio {index + 1}</p>
+              <p className="text-sm font-semibold text-ink">
+                {getSocioTipoPessoa(socio ?? {}) === "CNPJ" ? `Empresa sócia ${index + 1}` : `Sócio ${index + 1}`}
+              </p>
               <div className="mt-2 grid gap-2 text-sm text-slate sm:grid-cols-2">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">Nome</p>
-                  <p className="mt-1 text-ink">{formatValue(socio?.socioNome)}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">
+                    {getSocioTipoPessoa(socio ?? {}) === "CNPJ" ? "Razão social" : "Nome"}
+                  </p>
+                  <p className="mt-1 text-ink">
+                    {formatValue(getSocioTipoPessoa(socio ?? {}) === "CNPJ" ? socio?.socioRazaoSocial : socio?.socioNome)}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">CPF</p>
-                  <p className="mt-1 text-ink">{formatValue(socio?.socioCpf)}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">
+                    {getSocioTipoPessoa(socio ?? {}) === "CNPJ" ? "CNPJ" : "CPF"}
+                  </p>
+                  <p className="mt-1 text-ink">
+                    {formatValue(getSocioTipoPessoa(socio ?? {}) === "CNPJ" ? socio?.socioCnpj : socio?.socioCpf)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">E-mail</p>

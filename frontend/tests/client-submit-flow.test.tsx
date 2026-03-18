@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("next/navigation", () => ({
@@ -43,6 +43,7 @@ describe("ClientProcess submit flow", () => {
                 quadroSocietario: [
                   {
                     socioId: "s1",
+                    tipoPessoa: "CPF",
                     socioNome: "Joao",
                     socioCpf: "000.000.000-00",
                     socioEmail: "joao@exemplo.com",
@@ -96,5 +97,17 @@ describe("ClientProcess submit flow", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: /recebemos os seus dados/i })).toBeInTheDocument();
     });
+  });
+
+  it("shows the socio type selector with CPF and CNPJ options", async () => {
+    const { default: ClientProcess } = await import("@/app/client/process/[id]/page");
+    render(<ClientProcess />);
+
+    const comboboxes = await screen.findAllByRole("combobox");
+    const tipoSocioSelect = comboboxes.find((element) => within(element).queryByRole("option", { name: "CNPJ" }));
+    expect(tipoSocioSelect).toBeTruthy();
+    const optionValues = Array.from((tipoSocioSelect as HTMLSelectElement).options).map((option) => option.value);
+    expect(optionValues).toContain("CPF");
+    expect(optionValues).toContain("CNPJ");
   });
 });
