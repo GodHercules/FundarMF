@@ -63,7 +63,14 @@ const defaultSocio = {
   responsavelCnpj: "",
   socioEstadoCivil: "",
   socioProfissao: "",
-  socioRegimeCasamento: ""
+  socioRegimeCasamento: "",
+  adminNomeCompleto: "",
+  adminCpf: "",
+  adminEmail: "",
+  adminTelefone: "",
+  adminProfissao: "",
+  adminEstadoCivil: "",
+  adminRegimeCasamento: ""
 };
 
 const defaultEndereco = {
@@ -344,7 +351,9 @@ export default function ClientProcess() {
         if (!socio.socioNome.trim()) missing.push(`${prefix}: nome`);
         if (!socio.socioCpf.trim()) missing.push(`${prefix}: CPF`);
       }
-      if (!socio.socioEmail.trim()) missing.push(`${prefix}: e-mail`);
+      if (!socio.socioEmail.trim()) {
+        missing.push(`${prefix}: ${tipoPessoa === "CNPJ" ? "e-mail corporativo" : "e-mail"}`);
+      }
       if (!socio.socioTelefone.trim()) missing.push(`${prefix}: telefone`);
       if (!socio.socioPercentual.trim()) missing.push(`${prefix}: participação`);
       if (!socio.socioAdministrador.trim()) missing.push(`${prefix}: administrador`);
@@ -353,6 +362,17 @@ export default function ClientProcess() {
       if (tipoPessoa === "CPF" && !socio.socioProfissao.trim()) missing.push(`${prefix}: profissão`);
       if (tipoPessoa === "CPF" && socio.socioEstadoCivil === "Casado(a)" && !socio.socioRegimeCasamento.trim()) {
         missing.push(`${prefix}: regime de casamento`);
+      }
+      if (tipoPessoa === "CNPJ") {
+        if (!socio.adminNomeCompleto.trim()) missing.push(`${prefix}: administrador - nome completo`);
+        if (!socio.adminCpf.trim()) missing.push(`${prefix}: administrador - CPF`);
+        if (!socio.adminEmail.trim()) missing.push(`${prefix}: administrador - e-mail`);
+        if (!socio.adminTelefone.trim()) missing.push(`${prefix}: administrador - telefone`);
+        if (!socio.adminProfissao.trim()) missing.push(`${prefix}: administrador - profissão`);
+        if (!socio.adminEstadoCivil.trim()) missing.push(`${prefix}: administrador - estado civil`);
+        if (socio.adminEstadoCivil === "Casado(a)" && !socio.adminRegimeCasamento.trim()) {
+          missing.push(`${prefix}: administrador - regime de casamento`);
+        }
       }
     });
 
@@ -530,10 +550,20 @@ export default function ClientProcess() {
           } else {
             updated.socioRazaoSocial = "";
             updated.socioCnpj = "";
+            updated.adminNomeCompleto = "";
+            updated.adminCpf = "";
+            updated.adminEmail = "";
+            updated.adminTelefone = "";
+            updated.adminProfissao = "";
+            updated.adminEstadoCivil = "";
+            updated.adminRegimeCasamento = "";
           }
         }
         if (field === "socioEstadoCivil" && value !== "Casado(a)") {
           updated.socioRegimeCasamento = "";
+        }
+        if (field === "adminEstadoCivil" && value !== "Casado(a)") {
+          updated.adminRegimeCasamento = "";
         }
         return updated;
       })
@@ -714,155 +744,271 @@ export default function ClientProcess() {
                   </div>
                 </div>
                 <div className="mt-4 flex flex-col gap-6">
-                  {socios.map((socio, index) => (
-                    <div key={socio.socioId ?? index} className="rounded-2xl border border-ink/10 bg-white/80 p-4">
-                      {(() => {
-                        const tipoPessoa = getSocioTipoPessoa(socio);
-                        const isPessoaJuridica = tipoPessoa === "CNPJ";
-                        return (
-                          <>
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <p className="text-sm font-semibold text-ink">Sócio {index + 1}</p>
-                        {index > 0 && (
-                          <Button className="bg-clay" onClick={() => removeSocio(index)} disabled={!formEditable}>
-                            Remover sócio
-                          </Button>
-                        )}
-                      </div>
-                      <div className="mt-4 grid gap-4 md:grid-cols-2">
-                        <Field label="Tipo de sócio" required hint="Escolha se o sócio é pessoa física ou jurídica.">
-                          <Select
-                            value={tipoPessoa}
-                            onChange={(event) => updateSocio(index, "tipoPessoa", event.target.value)}
-                            disabled={!formEditable}
-                          >
-                            <option value="CPF">CPF</option>
-                            <option value="CNPJ">CNPJ</option>
-                          </Select>
-                        </Field>
-                        <Field
-                          label={isPessoaJuridica ? "Razão social" : "Nome completo"}
-                          required
-                          hint={isPessoaJuridica ? "Como consta no cartão CNPJ." : "Como consta no documento oficial."}
-                        >
-                          <Input
-                            placeholder={isPessoaJuridica ? "Razão social do sócio" : "Nome do sócio"}
-                            value={isPessoaJuridica ? socio.socioRazaoSocial : socio.socioNome}
-                            onChange={(event) =>
-                              updateSocio(index, isPessoaJuridica ? "socioRazaoSocial" : "socioNome", event.target.value)
-                            }
-                            disabled={!formEditable}
-                          />
-                        </Field>
-                        <Field label={isPessoaJuridica ? "CNPJ" : "CPF"} required hint="Somente números.">
-                          <Input
-                            placeholder={isPessoaJuridica ? "00.000.000/0000-00" : "000.000.000-00"}
-                            value={isPessoaJuridica ? socio.socioCnpj : socio.socioCpf}
-                            onChange={(event) =>
-                              updateSocio(
-                                index,
-                                isPessoaJuridica ? "socioCnpj" : "socioCpf",
-                                isPessoaJuridica ? maskCnpj(event.target.value) : maskCpf(event.target.value)
-                              )
-                            }
-                            disabled={!formEditable}
-                            inputMode="numeric"
-                            maxLength={isPessoaJuridica ? 18 : 14}
-                          />
-                        </Field>
-                        <Field label="E-mail do sócio" required hint="Usado para autenticações futuras.">
-                          <Input
-                            type="email"
-                            placeholder="socio@empresa.com.br"
-                            value={socio.socioEmail}
-                            onChange={(event) => updateSocio(index, "socioEmail", event.target.value)}
-                            disabled={!formEditable}
-                          />
-                        </Field>
-                        <Field label="Telefone do sócio" required hint="Com DDD e WhatsApp se possível.">
-                          <PhoneInput
-                            value={socio.socioTelefone}
-                            onChange={(value) => updateSocio(index, "socioTelefone", value)}
-                            disabled={!formEditable}
-                          />
-                        </Field>
-                        <Field label="Percentual de participação" required hint="Informe o percentual exato.">
-                          <Input
-                            placeholder="Ex: 60%"
-                            value={socio.socioPercentual}
-                            onChange={(event) => updateSocio(index, "socioPercentual", maskPercent(event.target.value))}
-                            disabled={!formEditable}
-                            inputMode="numeric"
-                            maxLength={4}
-                          />
-                        </Field>
-                        {!isPessoaJuridica && (
-                          <Field label="Estado civil" required>
-                            <Select
-                              value={socio.socioEstadoCivil}
-                              onChange={(event) => updateSocio(index, "socioEstadoCivil", event.target.value)}
+                  {socios.map((socio, index) => {
+                    const tipoPessoa = getSocioTipoPessoa(socio);
+                    const isPessoaJuridica = tipoPessoa === "CNPJ";
+                    return (
+                      <div
+                        key={socio.socioId ?? index}
+                        className={`rounded-2xl border border-ink/10 p-4 transition-all duration-300 ${
+                          isPessoaJuridica ? "bg-emerald/5 ring-1 ring-emerald/15" : "bg-white/80 ring-1 ring-brass/10"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-ink">Sócio {index + 1}</p>
+                          {index > 0 && (
+                            <Button className="bg-clay" onClick={() => removeSocio(index)} disabled={!formEditable}>
+                              Remover sócio
+                            </Button>
+                          )}
+                        </div>
+                        <div className="mt-4 grid gap-4 md:grid-cols-2">
+                          <Field label="Tipo de sócio" required hint="Escolha se o sócio é pessoa física ou jurídica.">
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={isPessoaJuridica}
+                              aria-label="Tipo de sócio"
+                              data-testid={`socio-type-toggle-${index}`}
+                              className={`relative flex h-11 w-full items-center rounded-full border border-ink/10 bg-ink/5 p-1 transition ${
+                                !formEditable ? "cursor-not-allowed opacity-70" : "cursor-pointer"
+                              }`}
+                              onClick={() =>
+                                updateSocio(index, "tipoPessoa", isPessoaJuridica ? "CPF" : "CNPJ")
+                              }
                               disabled={!formEditable}
                             >
-                              <option value="">Selecione</option>
-                              {ESTADOS_CIVIS.map((estado) => (
-                                <option key={estado} value={estado}>
-                                  {estado}
-                                </option>
-                              ))}
-                            </Select>
+                              <span
+                                className={`relative z-10 flex-1 text-center text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                                  !isPessoaJuridica ? "text-ink" : "text-slate"
+                                }`}
+                              >
+                                CPF
+                              </span>
+                              <span
+                                className={`relative z-10 flex-1 text-center text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                                  isPessoaJuridica ? "text-ink" : "text-slate"
+                                }`}
+                              >
+                                CNPJ
+                              </span>
+                              <span
+                                className={`absolute left-1 top-1 h-9 w-[calc(50%-0.25rem)] rounded-full bg-white shadow-sm transition-transform duration-300 ${
+                                  isPessoaJuridica ? "translate-x-full" : "translate-x-0"
+                                }`}
+                              />
+                            </button>
                           </Field>
-                        )}
-                        {!isPessoaJuridica && (
-                          <Field label="Profissão" required>
+                          <Field
+                            label={isPessoaJuridica ? "Razão social" : "Nome completo"}
+                            required
+                            hint={isPessoaJuridica ? "Como consta no cartão CNPJ." : "Como consta no documento oficial."}
+                          >
                             <Input
-                              placeholder="Ex: Administrador"
-                              value={socio.socioProfissao}
-                              onChange={(event) => updateSocio(index, "socioProfissao", event.target.value)}
+                              placeholder={isPessoaJuridica ? "Razão social do sócio" : "Nome do sócio"}
+                              value={isPessoaJuridica ? socio.socioRazaoSocial : socio.socioNome}
+                              onChange={(event) =>
+                                updateSocio(index, isPessoaJuridica ? "socioRazaoSocial" : "socioNome", event.target.value)
+                              }
                               disabled={!formEditable}
                             />
                           </Field>
-                        )}
-                        {!isPessoaJuridica && socio.socioEstadoCivil === "Casado(a)" && (
-                          <Field label="Regime de casamento" required>
+                          <Field label={isPessoaJuridica ? "CNPJ" : "CPF"} required hint="Somente números.">
+                            <Input
+                              placeholder={isPessoaJuridica ? "00.000.000/0000-00" : "000.000.000-00"}
+                              value={isPessoaJuridica ? socio.socioCnpj : socio.socioCpf}
+                              onChange={(event) =>
+                                updateSocio(
+                                  index,
+                                  isPessoaJuridica ? "socioCnpj" : "socioCpf",
+                                  isPessoaJuridica ? maskCnpj(event.target.value) : maskCpf(event.target.value)
+                                )
+                              }
+                              disabled={!formEditable}
+                              inputMode="numeric"
+                              maxLength={isPessoaJuridica ? 18 : 14}
+                            />
+                          </Field>
+                          <Field
+                            label={isPessoaJuridica ? "E-mail corporativo" : "E-mail do sócio"}
+                            required
+                            hint={isPessoaJuridica ? "E-mail corporativo da empresa sócia." : "Usado para autenticações futuras."}
+                          >
+                            <Input
+                              type="email"
+                              placeholder={isPessoaJuridica ? "contato@empresa.com.br" : "socio@empresa.com.br"}
+                              value={socio.socioEmail}
+                              onChange={(event) => updateSocio(index, "socioEmail", event.target.value)}
+                              disabled={!formEditable}
+                            />
+                          </Field>
+                          <Field label="Telefone do sócio" required hint="Com DDD e WhatsApp se possível.">
+                            <PhoneInput
+                              value={socio.socioTelefone}
+                              onChange={(value) => updateSocio(index, "socioTelefone", value)}
+                              disabled={!formEditable}
+                            />
+                          </Field>
+                          <Field label="Percentual de participação" required hint="Informe o percentual exato.">
+                            <Input
+                              placeholder="Ex: 60%"
+                              value={socio.socioPercentual}
+                              onChange={(event) => updateSocio(index, "socioPercentual", maskPercent(event.target.value))}
+                              disabled={!formEditable}
+                              inputMode="numeric"
+                              maxLength={4}
+                            />
+                          </Field>
+                          {!isPessoaJuridica && (
+                            <Field label="Estado civil" required>
+                              <Select
+                                value={socio.socioEstadoCivil}
+                                onChange={(event) => updateSocio(index, "socioEstadoCivil", event.target.value)}
+                                disabled={!formEditable}
+                              >
+                                <option value="">Selecione</option>
+                                {ESTADOS_CIVIS.map((estado) => (
+                                  <option key={estado} value={estado}>
+                                    {estado}
+                                  </option>
+                                ))}
+                              </Select>
+                            </Field>
+                          )}
+                          {!isPessoaJuridica && (
+                            <Field label="Profissão" required>
+                              <Input
+                                placeholder="Ex: Administrador"
+                                value={socio.socioProfissao}
+                                onChange={(event) => updateSocio(index, "socioProfissao", event.target.value)}
+                                disabled={!formEditable}
+                              />
+                            </Field>
+                          )}
+                          {!isPessoaJuridica && socio.socioEstadoCivil === "Casado(a)" && (
+                            <Field label="Regime de casamento" required>
+                              <Select
+                                value={socio.socioRegimeCasamento}
+                                onChange={(event) => updateSocio(index, "socioRegimeCasamento", event.target.value)}
+                                disabled={!formEditable}
+                              >
+                                <option value="">Selecione</option>
+                                {REGIMES_CASAMENTO.map((regime) => (
+                                  <option key={regime} value={regime}>
+                                    {regime}
+                                  </option>
+                                ))}
+                              </Select>
+                            </Field>
+                          )}
+                          <Field label="Administrador" required hint="Defina se o sócio será administrador.">
                             <Select
-                              value={socio.socioRegimeCasamento}
-                              onChange={(event) => updateSocio(index, "socioRegimeCasamento", event.target.value)}
+                              value={socio.socioAdministrador}
+                              onChange={(event) => updateSocio(index, "socioAdministrador", event.target.value)}
                               disabled={!formEditable}
                             >
                               <option value="">Selecione</option>
-                              {REGIMES_CASAMENTO.map((regime) => (
-                                <option key={regime} value={regime}>
-                                  {regime}
-                                </option>
-                              ))}
+                              <option value="Sim">Sim</option>
+                              <option value="Não">Não</option>
                             </Select>
                           </Field>
-                        )}
-                        <Field label="Administrador" required hint="Defina se o sócio será administrador.">
-                          <Select
-                            value={socio.socioAdministrador}
-                            onChange={(event) => updateSocio(index, "socioAdministrador", event.target.value)}
-                            disabled={!formEditable}
-                          >
-                            <option value="">Selecione</option>
-                            <option value="Sim">Sim</option>
-                            <option value="Não">Não</option>
-                          </Select>
-                        </Field>
-                        <Field label="Responsável pelo CNPJ" required hint="Nome do responsável legal.">
-                          <Input
-                            placeholder="Nome do responsável"
-                            value={socio.responsavelCnpj}
-                            onChange={(event) => updateSocio(index, "responsavelCnpj", event.target.value)}
-                            disabled={!formEditable}
-                          />
-                        </Field>
+                          <Field label="Responsável pelo CNPJ" required hint="Nome do responsável legal.">
+                            <Input
+                              placeholder="Nome do responsável"
+                              value={socio.responsavelCnpj}
+                              onChange={(event) => updateSocio(index, "responsavelCnpj", event.target.value)}
+                              disabled={!formEditable}
+                            />
+                          </Field>
+                          {isPessoaJuridica && (
+                            <div className="md:col-span-2 rounded-2xl border border-ink/10 bg-white/70 p-4">
+                              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate">
+                                Dados do administrador
+                              </p>
+                              <div className="mt-3 grid gap-4 md:grid-cols-2">
+                                <Field label="Nome completo" required>
+                                  <Input
+                                    placeholder="Nome do administrador"
+                                    value={socio.adminNomeCompleto}
+                                    onChange={(event) => updateSocio(index, "adminNomeCompleto", event.target.value)}
+                                    disabled={!formEditable}
+                                  />
+                                </Field>
+                                <Field label="CPF" required>
+                                  <Input
+                                    placeholder="000.000.000-00"
+                                    value={socio.adminCpf}
+                                    onChange={(event) =>
+                                      updateSocio(index, "adminCpf", maskCpf(event.target.value))
+                                    }
+                                    disabled={!formEditable}
+                                    inputMode="numeric"
+                                    maxLength={14}
+                                  />
+                                </Field>
+                                <Field label="E-mail do administrador" required>
+                                  <Input
+                                    type="email"
+                                    placeholder="admin@empresa.com.br"
+                                    value={socio.adminEmail}
+                                    onChange={(event) => updateSocio(index, "adminEmail", event.target.value)}
+                                    disabled={!formEditable}
+                                  />
+                                </Field>
+                                <Field label="Telefone do administrador" required>
+                                  <PhoneInput
+                                    value={socio.adminTelefone}
+                                    onChange={(value) => updateSocio(index, "adminTelefone", value)}
+                                    disabled={!formEditable}
+                                  />
+                                </Field>
+                                <Field label="Profissão" required>
+                                  <Input
+                                    placeholder="Ex: Administrador"
+                                    value={socio.adminProfissao}
+                                    onChange={(event) => updateSocio(index, "adminProfissao", event.target.value)}
+                                    disabled={!formEditable}
+                                  />
+                                </Field>
+                                <Field label="Estado civil" required>
+                                  <Select
+                                    value={socio.adminEstadoCivil}
+                                    onChange={(event) => updateSocio(index, "adminEstadoCivil", event.target.value)}
+                                    disabled={!formEditable}
+                                  >
+                                    <option value="">Selecione</option>
+                                    {ESTADOS_CIVIS.map((estado) => (
+                                      <option key={estado} value={estado}>
+                                        {estado}
+                                      </option>
+                                    ))}
+                                  </Select>
+                                </Field>
+                                {socio.adminEstadoCivil === "Casado(a)" && (
+                                  <Field label="Regime de casamento" required>
+                                    <Select
+                                      value={socio.adminRegimeCasamento}
+                                      onChange={(event) =>
+                                        updateSocio(index, "adminRegimeCasamento", event.target.value)
+                                      }
+                                      disabled={!formEditable}
+                                    >
+                                      <option value="">Selecione</option>
+                                      {REGIMES_CASAMENTO.map((regime) => (
+                                        <option key={regime} value={regime}>
+                                          {regime}
+                                        </option>
+                                      ))}
+                                    </Select>
+                                  </Field>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className="mt-4">
                   <Button onClick={addSocio} disabled={!formEditable}>

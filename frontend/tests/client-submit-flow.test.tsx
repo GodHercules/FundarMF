@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("next/navigation", () => ({
@@ -101,13 +101,14 @@ describe("ClientProcess submit flow", () => {
 
   it("shows the socio type selector with CPF and CNPJ options", async () => {
     const { default: ClientProcess } = await import("@/app/client/process/[id]/page");
+    const user = userEvent.setup();
     render(<ClientProcess />);
 
-    const comboboxes = await screen.findAllByRole("combobox");
-    const tipoSocioSelect = comboboxes.find((element) => within(element).queryByRole("option", { name: "CNPJ" }));
-    expect(tipoSocioSelect).toBeTruthy();
-    const optionValues = Array.from((tipoSocioSelect as HTMLSelectElement).options).map((option) => option.value);
-    expect(optionValues).toContain("CPF");
-    expect(optionValues).toContain("CNPJ");
+    await screen.findByText(/quadro societário/i);
+    const tipoSocioSwitch = screen.getByTestId("socio-type-toggle-0");
+    expect(tipoSocioSwitch).toBeInTheDocument();
+    expect(tipoSocioSwitch).toHaveAttribute("aria-checked", "false");
+    await user.click(tipoSocioSwitch);
+    expect(tipoSocioSwitch).toHaveAttribute("aria-checked", "true");
   });
 });
