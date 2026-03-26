@@ -31,7 +31,7 @@ export default function OperatorRequestLink() {
         const role = data?.actor?.role;
         if (role === "MASTER") {
           router.replace("/master/dashboard");
-        } else if (role !== "OPERATOR") {
+        } else if (role !== "OPERADOR") {
           router.replace("/");
         }
       } finally {
