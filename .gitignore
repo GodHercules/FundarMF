@@ -10,3 +10,4 @@ backend/**/uploads
 frontend/.next
 frontend/coverage
 frontend/.turbo
+frontend/tsconfig.tsbuildinfo
