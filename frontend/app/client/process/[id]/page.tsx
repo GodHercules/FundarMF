@@ -364,14 +364,14 @@ export default function ClientProcess() {
         missing.push(`${prefix}: regime de casamento`);
       }
       if (tipoPessoa === "CNPJ") {
-        if (!socio.adminNomeCompleto.trim()) missing.push(`${prefix}: administrador - nome completo`);
-        if (!socio.adminCpf.trim()) missing.push(`${prefix}: administrador - CPF`);
-        if (!socio.adminEmail.trim()) missing.push(`${prefix}: administrador - e-mail`);
-        if (!socio.adminTelefone.trim()) missing.push(`${prefix}: administrador - telefone`);
-        if (!socio.adminProfissao.trim()) missing.push(`${prefix}: administrador - profissão`);
-        if (!socio.adminEstadoCivil.trim()) missing.push(`${prefix}: administrador - estado civil`);
+        if (!socio.adminNomeCompleto.trim()) missing.push(`${prefix}: responsável - nome completo`);
+        if (!socio.adminCpf.trim()) missing.push(`${prefix}: responsável - CPF`);
+        if (!socio.adminEmail.trim()) missing.push(`${prefix}: responsável - e-mail`);
+        if (!socio.adminTelefone.trim()) missing.push(`${prefix}: responsável - telefone`);
+        if (!socio.adminProfissao.trim()) missing.push(`${prefix}: responsável - profissão`);
+        if (!socio.adminEstadoCivil.trim()) missing.push(`${prefix}: responsável - estado civil`);
         if (socio.adminEstadoCivil === "Casado(a)" && !socio.adminRegimeCasamento.trim()) {
-          missing.push(`${prefix}: administrador - regime de casamento`);
+          missing.push(`${prefix}: responsável - regime de casamento`);
         }
       }
     });
@@ -901,17 +901,19 @@ export default function ClientProcess() {
                               </Select>
                             </Field>
                           )}
-                          <Field label="Administrador" required hint="Defina se o sócio será administrador.">
-                            <Select
-                              value={socio.socioAdministrador}
-                              onChange={(event) => updateSocio(index, "socioAdministrador", event.target.value)}
-                              disabled={!formEditable}
-                            >
-                              <option value="">Selecione</option>
-                              <option value="Sim">Sim</option>
-                              <option value="Não">Não</option>
-                            </Select>
-                          </Field>
+                          {!isPessoaJuridica && (
+                            <Field label="Administrador" required hint="Defina se o sócio será administrador.">
+                              <Select
+                                value={socio.socioAdministrador}
+                                onChange={(event) => updateSocio(index, "socioAdministrador", event.target.value)}
+                                disabled={!formEditable}
+                              >
+                                <option value="">Selecione</option>
+                                <option value="Sim">Sim</option>
+                                <option value="Não">Não</option>
+                              </Select>
+                            </Field>
+                          )}
                           <Field label="Responsável pelo CNPJ" required hint="Nome do responsável legal.">
                             <Input
                               placeholder="Nome do responsável"
@@ -923,12 +925,23 @@ export default function ClientProcess() {
                           {isPessoaJuridica && (
                             <div className="md:col-span-2 rounded-2xl border border-ink/10 bg-white/70 p-4">
                               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate">
-                                Dados do administrador
+                                Dados do responsável pela empresa
                               </p>
                               <div className="mt-3 grid gap-4 md:grid-cols-2">
+                                <Field label="Administrador" required hint="Defina se o sócio será administrador.">
+                                  <Select
+                                    value={socio.socioAdministrador}
+                                    onChange={(event) => updateSocio(index, "socioAdministrador", event.target.value)}
+                                    disabled={!formEditable}
+                                  >
+                                    <option value="">Selecione</option>
+                                    <option value="Sim">Sim</option>
+                                    <option value="Não">Não</option>
+                                  </Select>
+                                </Field>
                                 <Field label="Nome completo" required>
                                   <Input
-                                    placeholder="Nome do administrador"
+                                    placeholder="Nome do responsável"
                                     value={socio.adminNomeCompleto}
                                     onChange={(event) => updateSocio(index, "adminNomeCompleto", event.target.value)}
                                     disabled={!formEditable}
@@ -946,16 +959,16 @@ export default function ClientProcess() {
                                     maxLength={14}
                                   />
                                 </Field>
-                                <Field label="E-mail do administrador" required>
+                                <Field label="E-mail do responsável" required>
                                   <Input
                                     type="email"
-                                    placeholder="admin@empresa.com.br"
+                                    placeholder="responsavel@empresa.com.br"
                                     value={socio.adminEmail}
                                     onChange={(event) => updateSocio(index, "adminEmail", event.target.value)}
                                     disabled={!formEditable}
                                   />
                                 </Field>
-                                <Field label="Telefone do administrador" required>
+                                <Field label="Telefone do responsável" required>
                                   <PhoneInput
                                     value={socio.adminTelefone}
                                     onChange={(value) => updateSocio(index, "adminTelefone", value)}
