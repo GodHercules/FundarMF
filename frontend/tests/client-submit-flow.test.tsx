@@ -50,7 +50,6 @@ describe("ClientProcess submit flow", () => {
                     socioTelefone: "+5571999999999",
                     socioPercentual: "100%",
                     socioAdministrador: "Sim",
-                    responsavelCnpj: "Joao",
                     socioEstadoCivil: "Solteiro(a)",
                     socioProfissao: "Dev",
                     socioRegimeCasamento: ""
@@ -110,5 +109,15 @@ describe("ClientProcess submit flow", () => {
     expect(tipoSocioSwitch).toHaveAttribute("aria-checked", "false");
     await user.click(tipoSocioSwitch);
     expect(tipoSocioSwitch).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("does not show responsavel CNPJ or responsavel email/telefone fields in quadro societario", async () => {
+    const { default: ClientProcess } = await import("@/app/client/process/[id]/page");
+    render(<ClientProcess />);
+
+    await screen.findByRole("heading", { name: /formul.rio do cliente/i });
+    expect(screen.queryByText(/responsavel pelo cnpj/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/e-mail do responsavel/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/telefone do responsavel/i)).not.toBeInTheDocument();
   });
 });

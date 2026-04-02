@@ -314,8 +314,7 @@ export class ProcessService {
       step4: {
         dadosCompletos: false,
         percentuaisOk: false,
-        administradores: false,
-        responsavelCnpj: false
+        administradores: false
       },
       step5: {
         enderecoOk: false,
@@ -393,7 +392,7 @@ export class ProcessService {
 
     for (const socio of socios) {
       const tipoPessoa = this.getSocioTipoPessoa(socio);
-      const required = ["socioId", "socioEmail", "socioTelefone", "socioPercentual", "socioAdministrador", "responsavelCnpj"];
+      const required = ["socioId", "socioEmail", "socioTelefone", "socioPercentual", "socioAdministrador"];
       if (tipoPessoa === "CNPJ") {
         required.push("socioRazaoSocial", "socioCnpj");
       } else {

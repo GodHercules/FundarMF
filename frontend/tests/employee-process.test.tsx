@@ -54,7 +54,6 @@ const processPayload = {
             socioTelefone: "(71) 90000-0000",
             socioPercentual: "60%",
             socioAdministrador: "Sim",
-            responsavelCnpj: "João"
           }
         ]
       }
@@ -185,7 +184,6 @@ describe("OperatorProcess", () => {
                     socioTelefone: "(71) 90000-0000",
                     socioPercentual: "60%",
                     socioAdministrador: "Sim",
-                    responsavelCnpj: "Maria"
                   }
                 ]
               }
@@ -210,3 +208,5 @@ describe("OperatorProcess", () => {
     expect(screen.getByText(/12.345.678\/0001-99/i)).toBeInTheDocument();
   });
 });
+
+

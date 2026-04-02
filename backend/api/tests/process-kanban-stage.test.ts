@@ -1,4 +1,4 @@
-﻿import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ProcessStatus } from "@prisma/client";
 import { ProcessService } from "../src/modules/process/process.service";
 
@@ -34,7 +34,6 @@ describe("ProcessService updateKanbanStage", () => {
                     socioTelefone: "+5571999999999",
                     socioPercentual: "100%",
                     socioAdministrador: "Sim",
-                    responsavelCnpj: "Joana",
                     socioEstadoCivil: "Solteiro(a)",
                     socioProfissao: "Analista"
                   }
@@ -176,7 +175,6 @@ describe("ProcessService updateKanbanStage", () => {
                       socioTelefone: "+5571999999999",
                       socioPercentual: "100%",
                       socioAdministrador: "Sim",
-                      responsavelCnpj: "Joana",
                       socioEstadoCivil: "Solteiro(a)",
                       socioProfissao: "Analista"
                     }
@@ -247,7 +245,6 @@ describe("ProcessService updateKanbanStage", () => {
                 socioTelefone: "+5571999999999",
                 socioPercentual: "100%",
                 socioAdministrador: "Sim",
-                responsavelCnpj: "Joana",
                 socioEstadoCivil: "Solteiro(a)",
                 socioProfissao: "Analista"
               }
@@ -311,4 +308,5 @@ describe("ProcessService updateKanbanStage", () => {
     expect((list[0] as any).kanbanStage).toBe("DOC_INICIAL_APROVADA");
   });
 });
+
 

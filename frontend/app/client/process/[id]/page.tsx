@@ -357,7 +357,6 @@ export default function ClientProcess() {
       if (!socio.socioTelefone.trim()) missing.push(`${prefix}: telefone`);
       if (!socio.socioPercentual.trim()) missing.push(`${prefix}: participação`);
       if (!socio.socioAdministrador.trim()) missing.push(`${prefix}: administrador`);
-      if (!socio.responsavelCnpj.trim()) missing.push(`${prefix}: responsável CNPJ`);
       if (tipoPessoa === "CPF" && !socio.socioEstadoCivil.trim()) missing.push(`${prefix}: estado civil`);
       if (tipoPessoa === "CPF" && !socio.socioProfissao.trim()) missing.push(`${prefix}: profissão`);
       if (tipoPessoa === "CPF" && socio.socioEstadoCivil === "Casado(a)" && !socio.socioRegimeCasamento.trim()) {
@@ -366,8 +365,6 @@ export default function ClientProcess() {
       if (tipoPessoa === "CNPJ") {
         if (!socio.adminNomeCompleto.trim()) missing.push(`${prefix}: responsável - nome completo`);
         if (!socio.adminCpf.trim()) missing.push(`${prefix}: responsável - CPF`);
-        if (!socio.adminEmail.trim()) missing.push(`${prefix}: responsável - e-mail`);
-        if (!socio.adminTelefone.trim()) missing.push(`${prefix}: responsável - telefone`);
         if (!socio.adminProfissao.trim()) missing.push(`${prefix}: responsável - profissão`);
         if (!socio.adminEstadoCivil.trim()) missing.push(`${prefix}: responsável - estado civil`);
         if (socio.adminEstadoCivil === "Casado(a)" && !socio.adminRegimeCasamento.trim()) {
@@ -914,14 +911,6 @@ export default function ClientProcess() {
                               </Select>
                             </Field>
                           )}
-                          <Field label="Responsável pelo CNPJ" required hint="Nome do responsável legal.">
-                            <Input
-                              placeholder="Nome do responsável"
-                              value={socio.responsavelCnpj}
-                              onChange={(event) => updateSocio(index, "responsavelCnpj", event.target.value)}
-                              disabled={!formEditable}
-                            />
-                          </Field>
                           {isPessoaJuridica && (
                             <div className="md:col-span-2 rounded-2xl border border-ink/10 bg-white/70 p-4">
                               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate">
@@ -957,22 +946,6 @@ export default function ClientProcess() {
                                     disabled={!formEditable}
                                     inputMode="numeric"
                                     maxLength={14}
-                                  />
-                                </Field>
-                                <Field label="E-mail do responsável" required>
-                                  <Input
-                                    type="email"
-                                    placeholder="responsavel@empresa.com.br"
-                                    value={socio.adminEmail}
-                                    onChange={(event) => updateSocio(index, "adminEmail", event.target.value)}
-                                    disabled={!formEditable}
-                                  />
-                                </Field>
-                                <Field label="Telefone do responsável" required>
-                                  <PhoneInput
-                                    value={socio.adminTelefone}
-                                    onChange={(value) => updateSocio(index, "adminTelefone", value)}
-                                    disabled={!formEditable}
                                   />
                                 </Field>
                                 <Field label="Profissão" required>
