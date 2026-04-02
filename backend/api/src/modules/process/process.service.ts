@@ -354,6 +354,123 @@ export class ProcessService {
     return companyKey || null;
   }
 
+  private getStep2MissingFields(data: Record<string, unknown>) {
+    const missing: string[] = [];
+    const missingFields: string[] = [];
+
+    const addMissing = (label: string, field: string) => {
+      missing.push(label);
+      missingFields.push(field);
+    };
+
+    if (!this.hasText(data.razaoSocial1)) addMissing("Razão social 1", "razaoSocial1");
+    if (!this.hasText(data.municipio)) addMissing("Município", "municipio");
+    if (!this.hasText(data.emailCnpj)) addMissing("E-mail CNPJ", "emailCnpj");
+    if (!this.hasText(data.telefoneCnpj)) addMissing("Telefone CNPJ", "telefoneCnpj");
+
+    const endereco = (data.endereco ?? {}) as Record<string, unknown>;
+    const escritorioVirtual = String(endereco.escritorioVirtual ?? "").trim();
+    if (!escritorioVirtual) addMissing("Endereço virtual", "endereco.escritorioVirtual");
+
+    const needsPhysicalAddress = escritorioVirtual !== "Sim";
+    if (needsPhysicalAddress) {
+      const requiredAddress: Array<{ label: string; key: string; field: string }> = [
+        { label: "CEP", key: "cep", field: "endereco.cep" },
+        { label: "Endereço", key: "endereco", field: "endereco.endereco" },
+        { label: "Número", key: "numero", field: "endereco.numero" },
+        { label: "Bairro", key: "bairro", field: "endereco.bairro" },
+        { label: "Cidade", key: "cidade", field: "endereco.cidade" },
+        { label: "UF", key: "uf", field: "endereco.uf" },
+        { label: "IPTU", key: "iptu", field: "endereco.iptu" }
+      ];
+      requiredAddress.forEach(({ label, key, field }) => {
+        if (!this.hasText(endereco[key])) addMissing(label, field);
+      });
+    }
+
+    const socios = this.normalizeSocios(data.quadroSocietario);
+    if (socios.length === 0) {
+      addMissing("Quadro societário", "quadroSocietario");
+    }
+
+    socios.forEach((socio, index) => {
+      const prefix = `Sócio ${index + 1}`;
+      const tipoPessoa = this.getSocioTipoPessoa(socio);
+      const required: Array<{ label: string; key: string; field: string }> = [
+        { label: `${prefix}: identificador`, key: "socioId", field: `quadroSocietario.${index}.socioId` },
+        { label: `${prefix}: e-mail`, key: "socioEmail", field: `quadroSocietario.${index}.socioEmail` },
+        { label: `${prefix}: telefone`, key: "socioTelefone", field: `quadroSocietario.${index}.socioTelefone` },
+        { label: `${prefix}: participação`, key: "socioPercentual", field: `quadroSocietario.${index}.socioPercentual` },
+        { label: `${prefix}: administrador`, key: "socioAdministrador", field: `quadroSocietario.${index}.socioAdministrador` }
+      ];
+
+      if (tipoPessoa === "CNPJ") {
+        required.push({
+          label: `${prefix}: razão social`,
+          key: "socioRazaoSocial",
+          field: `quadroSocietario.${index}.socioRazaoSocial`
+        });
+        required.push({ label: `${prefix}: CNPJ`, key: "socioCnpj", field: `quadroSocietario.${index}.socioCnpj` });
+        required.push({
+          label: `${prefix}: responsável - nome completo`,
+          key: "adminNomeCompleto",
+          field: `quadroSocietario.${index}.adminNomeCompleto`
+        });
+        required.push({
+          label: `${prefix}: responsável - CPF`,
+          key: "adminCpf",
+          field: `quadroSocietario.${index}.adminCpf`
+        });
+        required.push({
+          label: `${prefix}: responsável - profissão`,
+          key: "adminProfissao",
+          field: `quadroSocietario.${index}.adminProfissao`
+        });
+        required.push({
+          label: `${prefix}: responsável - estado civil`,
+          key: "adminEstadoCivil",
+          field: `quadroSocietario.${index}.adminEstadoCivil`
+        });
+      } else {
+        required.push({ label: `${prefix}: nome`, key: "socioNome", field: `quadroSocietario.${index}.socioNome` });
+        required.push({ label: `${prefix}: CPF`, key: "socioCpf", field: `quadroSocietario.${index}.socioCpf` });
+        required.push({
+          label: `${prefix}: estado civil`,
+          key: "socioEstadoCivil",
+          field: `quadroSocietario.${index}.socioEstadoCivil`
+        });
+        required.push({
+          label: `${prefix}: profissão`,
+          key: "socioProfissao",
+          field: `quadroSocietario.${index}.socioProfissao`
+        });
+      }
+
+      required.forEach(({ label, key, field }) => {
+        const value = (socio as Record<string, unknown>)[key];
+        if (!this.hasText(value)) addMissing(label, field);
+      });
+
+      if (
+        tipoPessoa !== "CNPJ" &&
+        String(socio.socioEstadoCivil).trim() === "Casado(a)" &&
+        !this.hasText(socio.socioRegimeCasamento)
+      ) {
+        addMissing(`${prefix}: regime de casamento`, `quadroSocietario.${index}.socioRegimeCasamento`);
+      }
+
+      if (
+        tipoPessoa === "CNPJ" &&
+        String(socio.adminEstadoCivil).trim() === "Casado(a)" &&
+        !this.hasText(socio.adminRegimeCasamento)
+      ) {
+        addMissing(`${prefix}: responsável - regime de casamento`, `quadroSocietario.${index}.adminRegimeCasamento`);
+      }
+    });
+
+    return { missing, missingFields };
+  }
+
   private async ensureCompanyKeyAvailable(companyKey: string, currentProcessId?: string) {
     const duplicate = await this.prisma.process.findFirst({
       where: {
@@ -370,48 +487,8 @@ export class ProcessService {
   }
 
   private isStep2DataComplete(data: Record<string, unknown>) {
-    if (!this.hasText(data.razaoSocial1)) return false;
-    if (!this.hasText(data.municipio)) return false;
-    if (!this.hasText(data.emailCnpj)) return false;
-    if (!this.hasText(data.telefoneCnpj)) return false;
-
-    const endereco = (data.endereco ?? {}) as Record<string, unknown>;
-    const escritorioVirtual = String(endereco.escritorioVirtual ?? "").trim();
-    if (!escritorioVirtual) return false;
-
-    const needsPhysicalAddress = escritorioVirtual !== "Sim";
-    if (needsPhysicalAddress) {
-      const requiredAddress = ["cep", "endereco", "numero", "bairro", "cidade", "uf", "iptu"];
-      if (requiredAddress.some((field) => !this.hasText(endereco[field]))) {
-        return false;
-      }
-    }
-
-    const socios = this.normalizeSocios(data.quadroSocietario);
-    if (socios.length === 0) return false;
-
-    for (const socio of socios) {
-      const tipoPessoa = this.getSocioTipoPessoa(socio);
-      const required = ["socioId", "socioEmail", "socioTelefone", "socioPercentual", "socioAdministrador"];
-      if (tipoPessoa === "CNPJ") {
-        required.push("socioRazaoSocial", "socioCnpj");
-      } else {
-        required.push("socioNome", "socioCpf", "socioEstadoCivil", "socioProfissao");
-      }
-      if (required.some((field) => !this.hasText(socio[field]))) {
-        return false;
-      }
-
-      if (
-        tipoPessoa !== "CNPJ" &&
-        String(socio.socioEstadoCivil).trim() === "Casado(a)" &&
-        !this.hasText(socio.socioRegimeCasamento)
-      ) {
-        return false;
-      }
-    }
-
-    return true;
+    const missing = this.getStep2MissingFields(data);
+    return missing.missing.length === 0;
   }
 
   private isStep3DataComplete(data: Record<string, unknown>) {
@@ -987,8 +1064,14 @@ export class ProcessService {
 
     if (stepKey === StepKey.ETAPA_2) {
       const step2Data = (current.data ?? {}) as Record<string, unknown>;
-      if (!this.isStep2DataComplete(step2Data)) {
-        throw new BadRequestException("Formulário do cliente incompleto.");
+      const missing = this.getStep2MissingFields(step2Data);
+      if (missing.missing.length > 0) {
+        throw new BadRequestException({
+          message: "Formulário do cliente incompleto.",
+          code: "STEP2_INCOMPLETE",
+          missingFields: missing.missingFields,
+          missingLabels: missing.missing
+        });
       }
 
       const step2CompanyKey = this.getStep2CompanyKey(step2Data);

@@ -232,6 +232,10 @@ describe("ProcessService submitStep email", () => {
                 socioTelefone: "+5511999999999",
                 socioPercentual: "100%",
                 socioAdministrador: "Sim",
+                adminNomeCompleto: "Maria Souza",
+                adminCpf: "123.456.789-00",
+                adminProfissao: "Administradora",
+                adminEstadoCivil: "Solteiro(a)"
               }
             ]
           }
@@ -338,7 +342,11 @@ describe("ProcessService submitStep email", () => {
                 socioEmail: "contato@holding.com",
                 socioTelefone: "+5511999999999",
                 socioPercentual: "40%",
-                socioAdministrador: "NÃ£o"
+                socioAdministrador: "NÃ£o",
+                adminNomeCompleto: "Carlos Lima",
+                adminCpf: "987.654.321-00",
+                adminProfissao: "EmpresÃ¡rio",
+                adminEstadoCivil: "Solteiro(a)"
               }
             ]
           }
