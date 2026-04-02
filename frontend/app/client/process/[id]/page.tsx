@@ -40,6 +40,9 @@ const documentTypes = [
   }
 ];
 
+const MAX_UPLOAD_FILE_MB = 8;
+const MAX_UPLOAD_TOTAL_MB = 60;
+
 const defaultStep2 = {
   razaoSocial1: "",
   razaoSocial2: "",
@@ -433,6 +436,21 @@ export default function ClientProcess() {
 
       setUploadErrors((prev) => ({ ...prev, [key]: "" }));
 
+      const totalBytes = (files ?? []).reduce((sum, file) => sum + (file?.size ?? 0), 0);
+      const maxFileBytes = MAX_UPLOAD_FILE_MB * 1024 * 1024;
+      const maxTotalBytes = MAX_UPLOAD_TOTAL_MB * 1024 * 1024;
+      const oversized = (files ?? []).find((file) => (file?.size ?? 0) > maxFileBytes);
+      if (oversized) {
+        const msg = `Arquivo muito grande. Limite por arquivo: ${MAX_UPLOAD_FILE_MB}MB.`;
+        setUploadErrors((prev) => ({ ...prev, [key]: msg }));
+        throw new Error(msg);
+      }
+      if (totalBytes > maxTotalBytes) {
+        const msg = `Total de arquivos excede ${MAX_UPLOAD_TOTAL_MB}MB.`;
+        setUploadErrors((prev) => ({ ...prev, [key]: msg }));
+        throw new Error(msg);
+      }
+
       const query = socioId ? `?socioId=${encodeURIComponent(socioId)}` : "";
       const response = await fetch(`${DOCS_API_BASE}/documents/${processId}/items/${itemKey}/upload${query}`, {
         method: "POST",
@@ -452,6 +470,8 @@ export default function ClientProcess() {
         }
         if (response.status === 401 || response.status === 403) {
           msg = "Sessão expirada. Recarregue a página e tente novamente.";
+        } else if (response.status === 413) {
+          msg = `Arquivo muito grande. Limite por arquivo: ${MAX_UPLOAD_FILE_MB}MB.`;
         }
         setUploadErrors((prev) => ({ ...prev, [key]: msg }));
         throw new Error(msg);
