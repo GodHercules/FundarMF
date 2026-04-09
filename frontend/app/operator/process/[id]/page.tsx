@@ -564,7 +564,7 @@ export default function OperatorProcess() {
               maxLength={9}
             />
           </Field>
-          <Field label="Tributao" required>
+          <Field label="Tributação" required>
             <Select
               value={step3.tributacao}
               onChange={(event) => setStep3((prev) => ({ ...prev, tributacao: event.target.value }))}
