@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+
 import { EmailProvider } from "./notification.types";
 
 export class ResendEmailProvider implements EmailProvider {

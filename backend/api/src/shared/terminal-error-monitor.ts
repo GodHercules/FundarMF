@@ -1,5 +1,6 @@
 import os from "node:os";
-import { NotificationService } from "../modules/notification/notification.service";
+
+import { ErrorObservabilityService } from "./error-observability.service";
 
 type ErrorSource = "console.error" | "uncaughtException" | "unhandledRejection";
 
@@ -19,35 +20,20 @@ const toErrorText = (value: unknown) => {
 
 const formatArgs = (args: unknown[]) => args.map((arg) => toErrorText(arg)).join(" ");
 
-export const installTerminalErrorMonitor = (notificationService: NotificationService) => {
-  const dedupeWindowMs = Number(process.env.N8N_ERROR_DEDUPE_WINDOW_MS ?? 5000);
-  const lastBySignature = new Map<string, number>();
+const isExpectedTerminalError = (raw: string) => /(?:BadRequestException|UnauthorizedException|ForbiddenException|NotFoundException|\bOTP_INVALID\b|\bLINK_INVALID\b)/i.test(raw);
 
-  const shouldSend = (signature: string) => {
-    const now = Date.now();
-    const previous = lastBySignature.get(signature);
-    if (previous && now - previous < dedupeWindowMs) return false;
-    lastBySignature.set(signature, now);
-    return true;
-  };
-
+export const installTerminalErrorMonitor = (observability: ErrorObservabilityService) => {
   const send = (source: ErrorSource, raw: string) => {
     if (!raw || !raw.trim()) return;
-    const message = raw.length > 20_000 ? `${raw.slice(0, 20_000)}\n...truncated` : raw;
-    const signature = `${source}:${message}`;
-    if (!shouldSend(signature)) return;
-
-    void notificationService.sendWebhook({
-      reason: "server_terminal_error",
-      channel: "system",
-      audience: "Error",
-      body: message,
-      process: {
-        source,
-        pid: process.pid,
-        host: os.hostname(),
-        timestamp: new Date().toISOString()
-      }
+    if (isExpectedTerminalError(raw)) return;
+    void observability.capture(new Error(raw), {
+      service: "backend",
+      processType: "api",
+      category: "runtime",
+      severity: source === "uncaughtException" ? "fatal" : "error",
+      operation: source,
+      execution: { processId: process.pid, stderr: source === "console.error" ? raw : undefined, command: process.argv.join(" ") },
+      additionalData: { source, host: os.hostname() }
     });
   };
 

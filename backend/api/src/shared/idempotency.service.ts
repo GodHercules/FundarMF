@@ -1,6 +1,7 @@
-import crypto from "crypto";
 import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
 import { IdempotencyScope, Prisma } from "@prisma/client";
+import crypto from "crypto";
+
 import { PrismaService } from "./prisma.service";
 
 @Injectable()
@@ -42,8 +43,8 @@ export class IdempotencyService {
         }
       });
       recordId = created.id;
-    } catch (error: any) {
-      if (error?.code !== "P2002") throw error;
+    } catch (error: unknown) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
 
       const existing = await this.prisma.idempotencyKey.findUnique({
         where: { scope_key: { scope, key: normalizedKey } }

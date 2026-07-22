@@ -1,7 +1,8 @@
-import dayjs from "dayjs";
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../../shared/prisma.service";
 import { StepKey, StepSide } from "@prisma/client";
+import dayjs from "dayjs";
+
+import { PrismaService } from "../../shared/prisma.service";
 
 @Injectable()
 export class SlaService {

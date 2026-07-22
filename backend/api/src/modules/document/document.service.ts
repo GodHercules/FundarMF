@@ -1,11 +1,12 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { DocumentItemKey, DocumentItemStatus, ProcessStatus } from "@prisma/client";
-import { PrismaService } from "../../shared/prisma.service";
-import { Actor } from "../../common/auth/types";
+
 import { isClientOwner } from "../../common/auth/identity";
+import { Actor } from "../../common/auth/types";
+import { PrismaService } from "../../shared/prisma.service";
 import { AuditService } from "../audit/audit.service";
-import { StorageService } from "../storage/storage.service";
 import { NotificationService } from "../notification/notification.service";
+import { StorageService } from "../storage/storage.service";
 
 const ALLOWED_MIME = ["application/pdf", "image/jpeg", "image/png"];
 const SOCIO_ITEM_KEYS: DocumentItemKey[] = [
@@ -93,8 +94,16 @@ export class DocumentService {
     const step2 = await this.prisma.processStep.findUnique({
       where: { processId_stepKey: { processId, stepKey: "ETAPA_2" } }
     });
-    const endereco = (step2?.data as any)?.endereco ?? {};
-    return endereco?.escritorioVirtual === "Sim";
+    const stepData = step2?.data;
+    const endereco =
+      stepData !== null && typeof stepData === "object" && !Array.isArray(stepData)
+        ? (stepData as Record<string, unknown>).endereco
+        : undefined;
+    const enderecoData =
+      endereco !== null && typeof endereco === "object" && !Array.isArray(endereco)
+        ? (endereco as Record<string, unknown>)
+        : {};
+    return enderecoData.escritorioVirtual === "Sim";
   }
 
   async uploadFiles(
@@ -150,17 +159,8 @@ export class DocumentService {
       throw new BadRequestException("Limite de anexos excedido.");
     }
 
-    const totalProcessSize = await this.prisma.documentFile.aggregate({
-      where: { item: { processId } },
-      _sum: { size: true }
-    });
-    const currentBytes = totalProcessSize._sum.size ?? 0;
     const newBytes = files.reduce((sum, file) => sum + file.size, 0);
     const maxTotalBytes = maxTotalMb * 1024 * 1024;
-
-    if (currentBytes + newBytes > maxTotalBytes) {
-      throw new BadRequestException("Limite total de armazenamento por processo excedido.");
-    }
 
     for (const file of files) {
       const sizeMb = file.size / (1024 * 1024);
@@ -168,47 +168,74 @@ export class DocumentService {
         throw new BadRequestException(`Arquivo ${file.originalname} excede ${maxFileMb}MB.`);
       }
       const normalizedMime = normalizeMimeType(file);
+      const signatureMatches =
+        (normalizedMime === "application/pdf" && looksLikePdf(file.buffer)) ||
+        (normalizedMime === "image/png" && looksLikePng(file.buffer)) ||
+        (normalizedMime === "image/jpeg" && looksLikeJpeg(file.buffer));
+      if (!signatureMatches) {
+        throw new BadRequestException(`Conteúdo do arquivo ${file.originalname} não corresponde ao tipo informado.`);
+      }
       if (!ALLOWED_MIME.includes(normalizedMime)) {
         throw new BadRequestException("Tipo de arquivo não permitido.");
       }
     }
 
     const normalizedSocioId = socioId ?? null;
-    let item = await this.prisma.documentItem.findFirst({
-      where: { processId, itemKey, socioId: normalizedSocioId }
-    });
-    if (!item) {
-      item = await this.prisma.documentItem.create({
-        data: { processId, itemKey, socioId: normalizedSocioId }
+    const { item, version } = await this.prisma.$transaction(async (tx) => {
+      // Updating the parent row first serializes concurrent uploads for the same process
+      // in PostgreSQL, making the quota check and inserts atomic.
+      await tx.process.update({ where: { id: processId }, data: { updatedAt: new Date() } });
+
+      const totalProcessSize = await tx.documentFile.aggregate({
+        where: { item: { processId } },
+        _sum: { size: true }
       });
-    }
-
-    let version = item.version;
-    if (item.status === DocumentItemStatus.REPROVADO) {
-      await this.storageService.deleteFilesByItem(item.id);
-      version += 1;
-    }
-
-    await this.prisma.documentItem.update({
-      where: { id: item.id },
-      data: {
-        status: DocumentItemStatus.AGUARDANDO_VALIDACAO,
-        version,
-        reason: null
+      const currentBytes = totalProcessSize._sum.size ?? 0;
+      if (currentBytes + newBytes > maxTotalBytes) {
+        throw new BadRequestException("Limite total de armazenamento por processo excedido.");
       }
-    });
 
-    for (const file of files) {
-      const normalizedMime = normalizeMimeType(file);
-      await this.storageService.saveFile({
-        itemId: item.id,
-        fileName: file.originalname,
-        mimeType: normalizedMime,
-        size: file.size,
-        data: file.buffer,
-        uploadedByRole: actor.role === "CLIENTE" ? "CLIENTE" : actor.role
+      let currentItem = await tx.documentItem.findFirst({
+        where: { processId, itemKey, socioId: normalizedSocioId }
       });
-    }
+      if (!currentItem) {
+        currentItem = await tx.documentItem.create({
+          data: { processId, itemKey, socioId: normalizedSocioId }
+        });
+      }
+
+      let nextVersion = currentItem.version;
+      if (currentItem.status === DocumentItemStatus.REPROVADO) {
+        await this.storageService.deleteFilesByItem(currentItem.id, tx);
+        nextVersion += 1;
+      }
+
+      await tx.documentItem.update({
+        where: { id: currentItem.id },
+        data: {
+          status: DocumentItemStatus.AGUARDANDO_VALIDACAO,
+          version: nextVersion,
+          reason: null
+        }
+      });
+
+      for (const file of files) {
+        const normalizedMime = normalizeMimeType(file);
+        await this.storageService.saveFile(
+          {
+            itemId: currentItem.id,
+            fileName: file.originalname,
+            mimeType: normalizedMime,
+            size: file.size,
+            data: file.buffer,
+            uploadedByRole: actor.role === "CLIENTE" ? "CLIENTE" : actor.role
+          },
+          tx
+        );
+      }
+
+      return { item: currentItem, version: nextVersion };
+    });
 
     await this.auditService.record(actor, "upload_documents", "DocumentItem", item.id, {
       itemKey,

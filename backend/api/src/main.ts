@@ -1,18 +1,24 @@
 import fs from "node:fs";
 import path from "node:path";
-import dotenv from "dotenv";
-import { NestFactory } from "@nestjs/core";
+
 import { ValidationPipe } from "@nestjs/common";
+import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
-import cookieParser from "cookie-parser";
-import helmet from "helmet";
-import rateLimit from "express-rate-limit";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import cookieParser from "cookie-parser";
+import dotenv from "dotenv";
+import type { NextFunction, Request, Response } from "express";
+import rateLimit from "express-rate-limit";
+import helmet from "helmet";
+
 import { AppModule } from "./modules/app.module";
-import { NotificationService } from "./modules/notification/notification.service";
+import { ErrorObservabilityService } from "./shared/error-observability.service";
+import { ObservabilityExceptionFilter } from "./shared/observability.filter";
 import { requestContextMiddleware } from "./shared/request-context";
 import { RequestLoggingInterceptor } from "./shared/request-logging.interceptor";
 import { installTerminalErrorMonitor } from "./shared/terminal-error-monitor";
+
+const earlyObservability = new ErrorObservabilityService();
 
 function withDbPoolDefaults(urlRaw: string | undefined, defaults: { connectionLimit: number; poolTimeout: number }) {
   if (!urlRaw) return urlRaw;
@@ -50,8 +56,9 @@ async function bootstrap() {
   });
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  const notificationService = app.get(NotificationService);
-  installTerminalErrorMonitor(notificationService);
+  const observability = app.get(ErrorObservabilityService);
+  installTerminalErrorMonitor(observability);
+  app.useGlobalFilters(new ObservabilityExceptionFilter(observability));
 
   // Render (and most hosted platforms) run Node behind a reverse proxy and will set X-Forwarded-For.
   // express-rate-limit validates this header and requires trust proxy to be enabled to avoid IP spoofing.
@@ -71,15 +78,37 @@ async function bootstrap() {
   app.use(requestContextMiddleware);
   app.use(helmet());
   app.use(cookieParser());
+  const allowedOrigins = new Set((process.env.FRONTEND_URL ?? "http://localhost:3000").split(",").map((origin) => origin.trim()));
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+      const origin = req.header("origin");
+      if (origin && !allowedOrigins.has(origin)) {
+        res.status(403).json({ message: "Origem não autorizada." });
+        return;
+      }
+    }
+    next();
+  });
   app.enableCors({
     origin: process.env.FRONTEND_URL?.split(",") ?? "http://localhost:3000",
     credentials: true
   });
 
   app.use(
+    "/auth",
+    rateLimit({
+      windowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS ?? 900000),
+      max: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 10),
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { code: "AUTH_RATE_LIMITED", message: "Muitas tentativas. Aguarde antes de tentar novamente." }
+    })
+  );
+
+  app.use(
     rateLimit({
       windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS ?? 900000),
-      max: Number(process.env.RATE_LIMIT_MAX ?? 5),
+      max: Number(process.env.RATE_LIMIT_MAX ?? 120),
       standardHeaders: true,
       legacyHeaders: false
     })
@@ -93,6 +122,7 @@ async function bootstrap() {
     })
   );
   app.useGlobalInterceptors(new RequestLoggingInterceptor());
+  app.enableShutdownHooks();
 
   const swaggerEnabled =
     (process.env.SWAGGER_ENABLED ?? (process.env.NODE_ENV !== "production" ? "true" : "false")) === "true";
@@ -113,5 +143,12 @@ async function bootstrap() {
 
 bootstrap().catch((error) => {
   console.error("[bootstrap] failed to start API", error);
-  process.exit(1);
+  void earlyObservability.capture(error, {
+    service: "api",
+    processType: "api",
+    category: "configuration",
+    severity: "fatal",
+    operation: "bootstrap",
+    execution: { processId: process.pid, command: process.argv.join(" ") }
+  }).finally(() => process.exit(1));
 });

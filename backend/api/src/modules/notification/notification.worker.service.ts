@@ -1,17 +1,19 @@
+import { NOTIFY_EMAIL_JOB, NOTIFY_WHATSAPP_JOB } from "@fundarmf/shared";
 import { Inject, Injectable, OnModuleInit } from "@nestjs/common";
+
 import { PrismaService } from "../../shared/prisma.service";
+import { ErrorObservabilityService } from "../../shared/error-observability.service";
+import {
+  EmailJobPayload,
+  NotificationQueue,
+  WhatsAppJobPayload
+} from "./notification.queue";
 import {
   EMAIL_PROVIDER,
   EmailProvider,
   WHATSAPP_PROVIDER,
   WhatsAppProvider
 } from "./notification.types";
-import {
-  EmailJobPayload,
-  NotificationQueue,
-  WhatsAppJobPayload
-} from "./notification.queue";
-import { NOTIFY_EMAIL_JOB, NOTIFY_WHATSAPP_JOB } from "@fundarmf/shared";
 
 type BossJob<T> = {
   id: string;
@@ -48,6 +50,7 @@ export class NotificationWorkerService implements OnModuleInit {
   constructor(
     private readonly queue: NotificationQueue,
     private readonly prisma: PrismaService,
+    private readonly observability: ErrorObservabilityService,
     @Inject(EMAIL_PROVIDER) private readonly emailProvider: EmailProvider,
     @Inject(WHATSAPP_PROVIDER) private readonly whatsappProvider: WhatsAppProvider
   ) {}
@@ -64,7 +67,7 @@ export class NotificationWorkerService implements OnModuleInit {
 
     await this.queue.work(
       NOTIFY_EMAIL_JOB,
-      { teamSize: concurrency, includeMetadata: true },
+      { batchSize: Math.max(1, concurrency), includeMetadata: true },
       async (jobs) => {
         for (const job of jobs as BossJob<EmailJobPayload>[]) {
           await this.handleEmail(job);
@@ -74,7 +77,7 @@ export class NotificationWorkerService implements OnModuleInit {
 
     await this.queue.work(
       NOTIFY_WHATSAPP_JOB,
-      { teamSize: concurrency, includeMetadata: true },
+      { batchSize: Math.max(1, concurrency), includeMetadata: true },
       async (jobs) => {
         for (const job of jobs as BossJob<WhatsAppJobPayload>[]) {
           await this.handleWhatsApp(job);
@@ -137,6 +140,7 @@ export class NotificationWorkerService implements OnModuleInit {
           error: err instanceof Error ? err.message : String(err)
         })
       );
+      void this.observability.capture(err, { service: "notification-worker", processType: "worker", category: "integration", operation: "email_dispatch", execution: { processId: process.pid, jobId: job.id, attempt } });
       throw err;
     }
   }
@@ -195,6 +199,7 @@ export class NotificationWorkerService implements OnModuleInit {
           error: err instanceof Error ? err.message : String(err)
         })
       );
+      void this.observability.capture(err, { service: "notification-worker", processType: "worker", category: "integration", operation: "whatsapp_dispatch", execution: { processId: process.pid, jobId: job.id, attempt } });
       throw err;
     }
   }

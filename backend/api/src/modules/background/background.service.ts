@@ -1,8 +1,10 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { ProcessStatus } from "@prisma/client";
 import dayjs from "dayjs";
 import PDFDocument from "pdfkit";
+
 import { PrismaService } from "../../shared/prisma.service";
-import { ProcessStatus } from "@prisma/client";
+import { ErrorObservabilityService } from "../../shared/error-observability.service";
 
 type JobDefinition = {
   name: string;
@@ -32,7 +34,7 @@ export class BackgroundService implements OnModuleInit, OnModuleDestroy {
   private readonly timers: NodeJS.Timeout[] = [];
   private readonly running = new Set<string>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly observability: ErrorObservabilityService) {}
 
   async onModuleInit() {
     const jobs: JobDefinition[] = [
@@ -78,6 +80,7 @@ export class BackgroundService implements OnModuleInit, OnModuleDestroy {
         await job.handler();
       } catch (err) {
         console.error(`[background] ${job.name} failed`, err);
+        void this.observability.capture(err, { service: "background", processType: "cron", category: "worker", operation: job.name, execution: { processId: process.pid } });
       } finally {
         this.running.delete(job.name);
       }
@@ -160,6 +163,8 @@ export class BackgroundService implements OnModuleInit, OnModuleDestroy {
       where: { status: { in: ["ON_TRACK", "AT_RISK"] } },
       include: { process: true }
     });
+    const configs = await this.prisma.slaConfigStep.findMany();
+    const configByKey = new Map(configs.map((config) => [`${config.stepKey}:${config.side}`, config]));
 
     let notified = 0;
 
@@ -195,9 +200,7 @@ export class BackgroundService implements OnModuleInit, OnModuleDestroy {
         continue;
       }
 
-      const config = await this.prisma.slaConfigStep.findUnique({
-        where: { stepKey_side: { stepKey: event.stepKey, side: event.side } }
-      });
+      const config = configByKey.get(`${event.stepKey}:${event.side}`);
 
       const alertPercent = config?.alertPercent ?? 80;
       if (percent >= alertPercent && event.status === "ON_TRACK") {

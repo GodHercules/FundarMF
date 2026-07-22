@@ -138,7 +138,6 @@ export function OperatorKanbanBoard({ onStageChange }: OperatorKanbanBoardProps)
   const [processes, setProcesses] = useState<ProcessCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeProcessId, setActiveProcessId] = useState<string | null>(null);
   const [busyProcessId, setBusyProcessId] = useState<string | null>(null);
 
   const sensors = useSensors(
@@ -158,8 +157,8 @@ export function OperatorKanbanBoard({ onStageChange }: OperatorKanbanBoardProps)
           return bTs - aTs;
         })
       );
-    } catch (err: any) {
-      setError(err?.message ?? "Erro ao carregar processos.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erro ao carregar processos.");
     } finally {
       setLoading(false);
     }
@@ -177,6 +176,7 @@ export function OperatorKanbanBoard({ onStageChange }: OperatorKanbanBoardProps)
       PREPARACAO_DOCUMENTOS: [],
       AGUARDANDO_DOCUMENTOS: [],
       ANALISE_JUCEB: [],
+      EXIGENCIA_JUCEB: [],
       FINALIZADO: []
     };
 
@@ -202,8 +202,6 @@ export function OperatorKanbanBoard({ onStageChange }: OperatorKanbanBoardProps)
   }
 
   async function handleDragEnd(event: DragEndEvent) {
-    setActiveProcessId(null);
-
     const activeId = parseProcessId(event.active.id);
     if (!activeId || !event.over) return;
 
@@ -254,8 +252,6 @@ export function OperatorKanbanBoard({ onStageChange }: OperatorKanbanBoardProps)
   return (
     <DndContext
       sensors={sensors}
-      onDragStart={(event) => setActiveProcessId(parseProcessId(event.active.id))}
-      onDragCancel={() => setActiveProcessId(null)}
       onDragEnd={(event) => void handleDragEnd(event)}
     >
       <section className="overflow-x-auto pb-2">

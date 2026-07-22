@@ -27,7 +27,7 @@ export function Logo({ size = 56, withText = false, className }: LogoProps) {
       {withText && (
         <div className="leading-tight">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate">FundarMF</p>
-          <p className="text-xl font-semibold text-ink">Portal contbil</p>
+          <p className="text-xl font-semibold text-ink">Portal contábil</p>
         </div>
       )}
     </div>

@@ -120,4 +120,55 @@ describe("ClientProcess submit flow", () => {
     expect(screen.queryByText(/e-mail do responsavel/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/telefone do responsavel/i)).not.toBeInTheDocument();
   });
+
+  it("mostra o atalho de alteração contratual quando o processo já está concluído", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/processes/process-123") {
+        return Promise.resolve({
+          id: "process-123",
+          status: "CONCLUIDO",
+          currentStep: "ETAPA_6",
+          steps: [
+            {
+              stepKey: "ETAPA_2",
+              locked: true,
+              data: {
+                razaoSocial1: "Empresa Teste",
+                municipio: "Salvador - BA",
+                emailCnpj: "cliente@exemplo.com",
+                telefoneCnpj: "+5571999999999",
+                endereco: { escritorioVirtual: "Sim" },
+                quadroSocietario: [
+                  {
+                    socioId: "s1",
+                    tipoPessoa: "CPF",
+                    socioNome: "Joao",
+                    socioCpf: "000.000.000-00",
+                    socioEmail: "joao@exemplo.com",
+                    socioTelefone: "+5571999999999",
+                    socioPercentual: "100%",
+                    socioAdministrador: "Sim",
+                    socioEstadoCivil: "Solteiro(a)",
+                    socioProfissao: "Dev",
+                    socioRegimeCasamento: ""
+                  }
+                ]
+              }
+            }
+          ],
+          documents: []
+        });
+      }
+      if (path === "/chats/process-123") return Promise.resolve({ messages: [] });
+      return Promise.resolve({ ok: true });
+    });
+
+    const { default: ClientProcess } = await import("@/app/client/process/[id]/page");
+    render(<ClientProcess />);
+
+    expect(await screen.findByRole("link", { name: /abrir alteração/i })).toHaveAttribute(
+      "href",
+      "/client/process/process-123/alteracao-contratual"
+    );
+  });
 });

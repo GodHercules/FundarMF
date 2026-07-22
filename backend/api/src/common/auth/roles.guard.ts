@@ -1,8 +1,10 @@
+import { performance } from "node:perf_hooks";
+
 import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { ActorRole } from "./types";
-import { performance } from "node:perf_hooks";
+
 import { addPerfTime } from "../../shared/request-context";
+import { ActorRole } from "./types";
 
 export const ROLES_KEY = "roles";
 

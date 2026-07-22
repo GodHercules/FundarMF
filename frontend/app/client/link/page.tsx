@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
 import { Card } from "@/components/Card";
@@ -25,10 +25,11 @@ function ClientLinkInner() {
   const [otpStatus, setOtpStatus] = useState<string | null>(null);
   const [sendingOtp, setSendingOtp] = useState(false);
 
-  function parseError(error: any) {
-    const raw = error?.message ?? "";
-    if (error?.code && typeof error.code === "string") {
-      return { code: error.code, message: error?.raw ?? raw };
+  function parseError(error: unknown) {
+    const details = error instanceof ApiError ? error : error instanceof Error ? error : null;
+    const raw = details?.message ?? "";
+    if (error instanceof ApiError && error.code) {
+      return { code: error.code, message: error.raw ?? raw };
     }
     if (["OTP_INVALID", "OTP_EXPIRED", "OTP_REQUIRED", "LINK_INVALID", "OTP_TOO_SOON", "OTP_LIMIT_REACHED"].includes(raw)) {
       return { code: raw, message: raw };
@@ -66,7 +67,7 @@ function ClientLinkInner() {
       });
       notifySuccess("Acesso confirmado com sucesso.");
       await redirectToProcess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       const parsed = parseError(error);
       let displayMessage = parsed.message || "Erro ao validar link.";
       if (parsed.code === "OTP_INVALID") {
@@ -105,14 +106,14 @@ function ClientLinkInner() {
       setOtp("");
       setOtpStatus("Novo OTP enviado para o e-mail cadastrado.");
       notifySuccess("Novo OTP enviado para o e-mail cadastrado.");
-    } catch (error: any) {
+    } catch (error: unknown) {
       const parsed = parseError(error);
       if (parsed.code === "OTP_TOO_SOON") {
         setOtpStatus("Aguarde alguns minutos para solicitar um novo OTP.");
       } else if (parsed.code === "OTP_LIMIT_REACHED") {
         setOtpStatus("Limite de OTP atingido. Solicite um novo processo ao operador.");
       } else {
-        setMessage(error.message ?? "Erro ao reenviar OTP.");
+        setMessage(error instanceof Error ? error.message : "Erro ao reenviar OTP.");
       }
     } finally {
       setSendingOtp(false);

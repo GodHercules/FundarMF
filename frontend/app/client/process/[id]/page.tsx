@@ -15,6 +15,7 @@ import { Logo } from "@/components/Logo";
 import { SupportChat } from "@/components/SupportChat";
 import { notifySuccess } from "@/lib/notify";
 import { maskCep, maskCnpj, maskCpf, maskIptu, maskPercent } from "@/lib/masks";
+import type { MunicipalityData, ProcessChatMessage, ProcessData, ProcessDocument, ProcessStep, ProcessStepData } from "@/lib/process-types";
 
 const steps = ["ETAPA_1", "ETAPA_2", "ETAPA_3", "ETAPA_4", "ETAPA_5", "ETAPA_6"];
 const ESTADOS_CIVIS = ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União estável"];
@@ -109,8 +110,8 @@ const EMPTY_ADDRESS = {
   iptu: ""
 };
 
-function getStepData(process: any, stepKey: string) {
-  return (process?.steps ?? []).find((step: any) => step.stepKey === stepKey)?.data ?? {};
+function getStepData(process: ProcessData | null, stepKey: string): ProcessStepData {
+  return process?.steps.find((step: ProcessStep) => step.stepKey === stepKey)?.data ?? {};
 }
 
 function normalizeStep<T extends Record<string, string>>(defaults: T, data: Record<string, unknown>) {
@@ -172,9 +173,9 @@ function buildDocumentKey(itemKey: string, socioId?: string) {
   return socioId ? `${itemKey}:${socioId}` : itemKey;
 }
 
-function findDocumentItem(process: any, itemKey: string, socioId?: string) {
+function findDocumentItem(process: ProcessData | null, itemKey: string, socioId?: string) {
   return (process?.documents ?? []).find(
-    (doc: any) => doc.itemKey === itemKey && (doc.socioId ?? null) === (socioId ?? null)
+    (doc: ProcessDocument) => doc.itemKey === itemKey && (doc.socioId ?? null) === (socioId ?? null)
   );
 }
 
@@ -182,7 +183,7 @@ export default function ClientProcess() {
   const params = useParams();
   const processId = params?.id as string;
   const submitStartRef = useRef<number>(0);
-  const [process, setProcess] = useState<any>(null);
+  const [process, setProcess] = useState<ProcessData | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [step2, setStep2] = useState(defaultStep2);
   const [socios, setSocios] = useState([createEmptySocio()]);
@@ -193,18 +194,18 @@ export default function ClientProcess() {
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
   const [submittingAll, setSubmittingAll] = useState(false);
   const [submittedAll, setSubmittedAll] = useState(false);
-  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatMessages, setChatMessages] = useState<ProcessChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
 
   async function load() {
     const [processData, chatData] = await Promise.all([
-      api(`/processes/${processId}`),
-      api(`/chats/${processId}`)
+      api<ProcessData>(`/processes/${processId}`),
+      api<{ messages?: ProcessChatMessage[] }>(`/chats/${processId}`)
     ]);
     setProcess(processData);
-    const chat = chatData as { messages?: any[] } | undefined | null;
+    const chat = chatData as { messages?: ProcessChatMessage[] } | undefined | null;
     setChatMessages(chat?.messages ?? []);
   }
 
@@ -249,7 +250,7 @@ export default function ClientProcess() {
         if (!response.ok) throw new Error("Falha ao carregar municípios.");
         const data = await response.json();
         const list = (data ?? [])
-          .map((municipio: any) => {
+          .map((municipio: MunicipalityData) => {
             const uf = municipio?.microrregiao?.mesorregiao?.UF?.sigla ?? municipio?.UF?.sigla ?? "";
             return uf ? `${municipio.nome} - ${uf}` : municipio.nome;
           })
@@ -259,7 +260,7 @@ export default function ClientProcess() {
           setMunicipalities(list);
           setMunicipalityNote("Digite para filtrar e selecione a opção desejada.");
         }
-      } catch (error) {
+      } catch {
         if (active) setMunicipalityNote("Não foi possível carregar a lista completa. Você pode digitar manualmente.");
       }
     }
@@ -316,7 +317,7 @@ export default function ClientProcess() {
     const filtered: Record<string, unknown> = {};
     correctionFields.forEach((field) => {
       if (field in payload) {
-        filtered[field] = (payload as any)[field];
+        filtered[field] = (payload as Record<string, unknown>)[field];
       }
     });
     return filtered;
@@ -608,8 +609,12 @@ export default function ClientProcess() {
     return <div className="p-8">Carregando...</div>;
   }
 
-  const step2Record = (process.steps ?? []).find((step: any) => step.stepKey === "ETAPA_2");
-  const correctionFields = (step2Record?.data as any)?.correction?.fields ?? [];
+  const step2Record = process.steps.find((step: ProcessStep) => step.stepKey === "ETAPA_2");
+  const correction = step2Record?.data.correction;
+  const correctionFields =
+    correction && typeof correction === "object" && !Array.isArray(correction) && Array.isArray(correction.fields)
+      ? correction.fields
+      : [];
   const correctionActive = Boolean(step2Record?.locked && correctionFields.length > 0);
   const formUnlocked = !step2Record?.locked || correctionActive;
   const formEditable = process.currentStep === "ETAPA_2" && formUnlocked;
@@ -642,6 +647,25 @@ export default function ClientProcess() {
             Cancelar processo
           </Button>
         </div>
+        {process.status === "CONCLUIDO" && (
+          <Card className="mt-2 border border-emerald/20 bg-emerald/5 p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate">Novo fluxo disponível</p>
+                <h2 className="mt-1 text-xl font-semibold text-ink">Solicitar alteração contratual</h2>
+                <p className="mt-2 text-sm text-slate">
+                  Como a criação já foi concluída, esta empresa já pode abrir uma solicitação de alteração.
+                </p>
+              </div>
+              <Link
+                href={`/client/process/${process.id}/alteracao-contratual`}
+                className="inline-flex items-center justify-center rounded-xl bg-emerald px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.14em] text-white shadow-lift transition hover:-translate-y-0.5 hover:bg-emerald/90"
+              >
+                Abrir alteração
+              </Link>
+            </div>
+          </Card>
+        )}
       </header>
 
       {message && <p className="text-sm text-slate">{message}</p>}

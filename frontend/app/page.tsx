@@ -34,8 +34,8 @@ export default function LoginPage() {
       } else {
         router.push("/operator/start");
       }
-    } catch (error: any) {
-      setMessage(error.message ?? "Erro ao entrar.");
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : "Erro ao entrar.");
     } finally {
       setLoading(false);
     }
@@ -51,12 +51,12 @@ export default function LoginPage() {
       </div>
       <Card className="p-6 space-y-4">
         <div>
-          <label className="text-sm font-semibold text-slate">E-mail</label>
-          <Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" />
+          <label htmlFor="login-email" className="text-sm font-semibold text-slate">E-mail</label>
+          <Input id="login-email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" />
         </div>
         <div>
-          <label className="text-sm font-semibold text-slate">Senha</label>
-          <PasswordField value={password} onChange={setPassword} placeholder="Digite sua senha" showStrength={false} />
+          <label htmlFor="login-password" className="text-sm font-semibold text-slate">Senha</label>
+          <PasswordField id="login-password" value={password} onChange={setPassword} placeholder="Digite sua senha" showStrength={false} />
         </div>
         <Button onClick={handleLogin} className="w-full" disabled={loading}>
           {loading ? "Entrando..." : "Entrar"}

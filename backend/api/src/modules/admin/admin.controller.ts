@@ -1,11 +1,12 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
-import { Response, Request } from "express";
+import { Request,Response } from "express";
+
 import { AuthGuard } from "../../common/auth/auth.guard";
-import { RolesGuard } from "../../common/auth/roles.guard";
 import { Roles } from "../../common/auth/roles.decorator";
+import { RolesGuard } from "../../common/auth/roles.guard";
 import { AdminService } from "./admin.service";
-import { CreateUserDto } from "./create-user.dto";
 import { AssignOwnerDto } from "./assign-owner.dto";
+import { CreateUserDto } from "./create-user.dto";
 import { DeleteProcessDto } from "./delete-process.dto";
 
 @Controller("admin")
@@ -53,7 +54,14 @@ export class AdminController {
   async report(@Param("processId") processId: string, @Res() res: Response) {
     const report = await this.adminService.getReport(processId);
     res.setHeader("Content-Type", report.mimeType);
-    res.setHeader("Content-Disposition", `attachment; filename="${report.fileName}"`);
+    const fileName = [...report.fileName]
+      .map((character) => {
+        const code = character.charCodeAt(0);
+        return character === '"' || character === "\\" || code <= 31 || code === 127 ? "_" : character;
+      })
+      .join("")
+      .slice(0, 180) || "report";
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
     res.send(report.data);
   }
 }

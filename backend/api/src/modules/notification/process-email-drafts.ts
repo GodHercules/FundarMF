@@ -1,4 +1,5 @@
 import { ProcessStatus, StepKey } from "@prisma/client";
+
 import { renderBaseEmail } from "./email.template";
 
 export type EmailDraft = {
@@ -73,10 +74,6 @@ function buildUrls(processId: string) {
 function hello(name?: string | null) {
   const clean = name?.trim();
   return clean && clean.length > 0 ? `Ol\u00e1, ${clean},` : "Ol\u00e1,";
-}
-
-function asLines(value: string | string[]) {
-  return Array.isArray(value) ? value : value.split("\n");
 }
 
 function joinLines(lines: string[]) {

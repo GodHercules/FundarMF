@@ -5,7 +5,7 @@ import { AuthService } from "../src/modules/auth/auth.service";
 
 describe("AuthService login", () => {
   it("logs in master user with correct password", async () => {
-    const passwordHash = await bcrypt.hash("Master@123", 10);
+    const passwordHash = await bcrypt.hash("test-password-only-123456", 10);
     const prisma = {
       user: {
         findUnique: vi.fn().mockResolvedValue({
@@ -24,12 +24,12 @@ describe("AuthService login", () => {
     const auditService = { record: vi.fn() };
     const service = new AuthService(prisma as any, sessionService as any, notificationService, auditService as any);
 
-    const result = await service.loginUser("master@fundarmf.local", "Master@123", "MASTER");
+    const result = await service.loginUser("master@fundarmf.local", "test-password-only-123456", "MASTER");
     expect(result.token).toBe("token-123");
   });
 
   it("rejects login with invalid password", async () => {
-    const passwordHash = await bcrypt.hash("Master@123", 10);
+    const passwordHash = await bcrypt.hash("test-password-only-123456", 10);
     const prisma = {
       user: {
         findUnique: vi.fn().mockResolvedValue({

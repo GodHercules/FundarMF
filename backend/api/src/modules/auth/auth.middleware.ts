@@ -1,8 +1,9 @@
 import { Injectable, NestMiddleware } from "@nestjs/common";
-import { NextFunction, Request, Response } from "express";
 import dayjs from "dayjs";
-import { SessionService } from "./session.service";
+import { NextFunction, Request, Response } from "express";
+
 import { PrismaService } from "../../shared/prisma.service";
+import { SessionService } from "./session.service";
 
 @Injectable()
 export class AuthMiddleware implements NestMiddleware {

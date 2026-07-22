@@ -15,6 +15,9 @@ import { Field } from "@/components/Field";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { maskCnae, maskCurrency } from "@/lib/masks";
 import { FiCheck, FiCheckCircle, FiX, FiXCircle } from "react-icons/fi";
+import { toProcessRecords } from "@/lib/process-types";
+import { OperatorClientDataEditor } from "@/components/OperatorClientDataEditor";
+import type { ProcessChatMessage, ProcessData, ProcessDocument, ProcessFile, ProcessRecord, ProcessStep, ProcessStepData } from "@/lib/process-types";
 
 const defaultStep3 = {
   tipoAtividade: "",
@@ -30,8 +33,8 @@ function buildDocumentKey(itemKey: string, socioId?: string | null) {
   return socioId ? `${itemKey}:${socioId}` : itemKey;
 }
 
-function getStepData(process: any, stepKey: string) {
-  return (process?.steps ?? []).find((step: any) => step.stepKey === stepKey)?.data ?? {};
+function getStepData(process: ProcessData | null, stepKey: string): ProcessStepData {
+  return process?.steps.find((step: ProcessStep) => step.stepKey === stepKey)?.data ?? {};
 }
 
 function normalizeStep<T extends Record<string, string>>(defaults: T, data: Record<string, unknown>) {
@@ -58,18 +61,20 @@ export default function OperatorProcess() {
   const params = useParams();
   const router = useRouter();
   const processId = params?.id as string;
-  const [process, setProcess] = useState<any>(null);
+  const [process, setProcess] = useState<ProcessData | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [step3, setStep3] = useState(defaultStep3);
   const [showDetails, setShowDetails] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<{ itemKey: string; file: any } | null>(null);
+  const [editingClient, setEditingClient] = useState(false);
+  const [savingClient, setSavingClient] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<{ itemKey: string; file: ProcessFile } | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [docLoading, setDocLoading] = useState<string | null>(null);
   const [fieldDecisions, setFieldDecisions] = useState<Record<string, "approved" | "rejected" | undefined>>({});
   const [docDecisions, setDocDecisions] = useState<Record<string, "APROVADO" | "REPROVADO" | undefined>>({});
-  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatMessages, setChatMessages] = useState<ProcessChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [fachadaFiles, setFachadaFiles] = useState<File[]>([]);
@@ -87,9 +92,9 @@ export default function OperatorProcess() {
 
   async function load() {
     const [processData, chatData, documentsData] = await Promise.all([
-      api<any>(`/processes/${processId}`),
-      api<{ messages?: any[] }>(`/chats/${processId}`),
-      api<any[]>(`/documents/${processId}/items`)
+      api<ProcessData>(`/processes/${processId}`),
+      api<{ messages?: ProcessChatMessage[] }>(`/chats/${processId}`),
+      api<ProcessDocument[]>(`/documents/${processId}/items`)
     ]);
     setProcess({ ...processData, documents: documentsData });
     setChatMessages(chatData?.messages ?? []);
@@ -106,9 +111,9 @@ export default function OperatorProcess() {
     setDocDecisions(
       Object.fromEntries(
         (process.documents ?? [])
-          .filter((doc: any) => doc.status === "APROVADO" || doc.status === "REPROVADO")
-          .map((doc: any) => [buildDocumentKey(doc.itemKey, doc.socioId), doc.status])
-      )
+          .filter((doc: ProcessDocument) => doc.status === "APROVADO" || doc.status === "REPROVADO")
+          .map((doc: ProcessDocument) => [buildDocumentKey(doc.itemKey, doc.socioId), doc.status as "APROVADO" | "REPROVADO"])
+      ) as Record<string, "APROVADO" | "REPROVADO" | undefined>
     );
   }, [process]);
 
@@ -134,9 +139,9 @@ export default function OperatorProcess() {
         objectUrlToRevoke = objectUrl;
         if (!active) return;
         setPreviewUrl(objectUrl);
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!active) return;
-        const msg = err?.message || "Erro ao carregar documento.";
+        const msg = err instanceof Error ? err.message : "Erro ao carregar documento.";
         setPreviewError(msg);
         notifyError(msg);
       } finally {
@@ -179,7 +184,7 @@ export default function OperatorProcess() {
   }
 
   async function approveAllDocs() {
-    const items = docsForChecklist.map((doc: any) => ({ itemKey: doc.itemKey, socioId: doc.socioId }));
+    const items = docsForChecklist.map((doc: ProcessDocument) => ({ itemKey: doc.itemKey, socioId: doc.socioId ?? undefined }));
     if (items.length === 0) return;
     setDocLoading("ALL");
     try {
@@ -224,6 +229,21 @@ export default function OperatorProcess() {
     setMessage("Estrutura jurídica salva.");
     notifySuccess("Estrutura jurídica salva.");
     load();
+  }
+
+  async function saveClientData(data: ProcessStepData) {
+    setSavingClient(true);
+    try {
+      await api(`/processes/${processId}/steps`, {
+        method: "PUT",
+        body: JSON.stringify({ stepKey: "ETAPA_2", data })
+      });
+      notifySuccess("Dados do cliente atualizados.");
+      setEditingClient(false);
+      await load();
+    } finally {
+      setSavingClient(false);
+    }
   }
 
   async function markAsValidated() {
@@ -317,8 +337,8 @@ export default function OperatorProcess() {
       notifySuccess("Foto da fachada enviada.");
       setFachadaFiles([]);
       load();
-    } catch (error: any) {
-      setFachadaError(error.message ?? "Erro ao enviar foto da fachada.");
+    } catch (error: unknown) {
+      setFachadaError(error instanceof Error ? error.message : "Erro ao enviar foto da fachada.");
     } finally {
       setDocLoading(null);
     }
@@ -364,13 +384,9 @@ export default function OperatorProcess() {
 
   const step2 = getStepData(process, "ETAPA_2");
   const endereco = step2.endereco ?? {};
-  const sociosList = Array.isArray(step2.quadroSocietario)
-    ? step2.quadroSocietario
-    : step2.quadroSocietario
-      ? [step2.quadroSocietario]
-      : [];
+  const sociosList = toProcessRecords(step2.quadroSocietario);
   const socioMap = new Map(
-    sociosList.map((socio: any, index: number) => [
+    sociosList.map((socio: ProcessRecord, index: number) => [
       socio?.socioId ?? `index-${index}`,
       getSocioDisplayName(socio ?? {}, index)
     ])
@@ -388,33 +404,33 @@ export default function OperatorProcess() {
     { key: "quadroSocietario", label: "Quadro societário", value: sociosList.length ? `${sociosList.length} sócio(s)` : "Não informado" }
   ];
   const documentos = process.documents ?? [];
-  const formatValue = (value: any) => (value ? String(value) : "Não informado");
-  const resolveDocStatus = (doc: any) =>
+  const formatValue = (value: unknown) => (value ? String(value) : "Não informado");
+  const resolveDocStatus = (doc: ProcessDocument) =>
     String(docDecisions[buildDocumentKey(doc.itemKey, doc.socioId)] ?? doc.status ?? "")
       .trim()
       .toUpperCase();
   // When the address is virtual, `FOTO_FACHADA` is an internal attachment and should not block
   // client checklist completion (and should not be shown as "sent by the client").
-  const docsForChecklist = isVirtual ? documentos.filter((doc: any) => doc.itemKey !== "FOTO_FACHADA") : documentos;
+  const docsForChecklist = isVirtual ? documentos.filter((doc: ProcessDocument) => doc.itemKey !== "FOTO_FACHADA") : documentos;
 
   const approvalsComplete =
     approvalFields.every((field) => fieldDecisions[field.key] === "approved") &&
-    docsForChecklist.every((doc: any) => resolveDocStatus(doc) === "APROVADO");
+    docsForChecklist.every((doc: ProcessDocument) => resolveDocStatus(doc) === "APROVADO");
   const fieldsApprovedCount = approvalFields.filter((field) => fieldDecisions[field.key] === "approved").length;
   const fieldsRejectedCount = approvalFields.filter((field) => fieldDecisions[field.key] === "rejected").length;
-  const docsApprovedCount = docsForChecklist.filter((doc: any) => resolveDocStatus(doc) === "APROVADO").length;
-  const docsRejectedCount = docsForChecklist.filter((doc: any) => resolveDocStatus(doc) === "REPROVADO").length;
+  const docsApprovedCount = docsForChecklist.filter((doc: ProcessDocument) => resolveDocStatus(doc) === "APROVADO").length;
+  const docsRejectedCount = docsForChecklist.filter((doc: ProcessDocument) => resolveDocStatus(doc) === "REPROVADO").length;
 
-  const getClientFiles = (doc: any) =>
-    (doc.files ?? []).filter((file: any) => !file.uploadedByRole || file.uploadedByRole === "CLIENTE");
+  const getClientFiles = (doc: ProcessDocument) =>
+    (doc.files ?? []).filter((file: ProcessFile) => !file.uploadedByRole || file.uploadedByRole === "CLIENTE");
 
-  const docsWithClientFiles = docsForChecklist.map((doc: any) => ({
+  const docsWithClientFiles = docsForChecklist.map((doc: ProcessDocument) => ({
     ...doc,
     clientFiles: getClientFiles(doc)
   }));
 
-  const clientSentDocs = docsWithClientFiles.filter((doc: any) => (doc.clientFiles ?? []).length > 0);
-  const clientMissingDocs = docsWithClientFiles.filter((doc: any) => (doc.clientFiles ?? []).length === 0);
+  const clientSentDocs = docsWithClientFiles.filter((doc) => doc.clientFiles.length > 0);
+  const clientMissingDocs = docsWithClientFiles.filter((doc) => doc.clientFiles.length === 0);
   const step3Enabled = process.currentStep === "ETAPA_3" || (step2Enabled && approvalsComplete);
   const persistedStep3 = getStepData(process, "ETAPA_3");
   const canViewDocuments =
@@ -496,6 +512,13 @@ export default function OperatorProcess() {
           <div className="mt-4 flex flex-wrap gap-3">
             <Button variant="primary" onClick={() => setShowDetails(true)}>
               Ver dados do cliente
+            </Button>
+            <Button
+              variant="accent"
+              onClick={() => setEditingClient(true)}
+              disabled={process.currentStep !== "ETAPA_2" || process.status === "CONCLUIDO" || process.status === "CANCELADO"}
+            >
+              Editar dados do cliente
             </Button>
           </div>
         </Card>
@@ -784,7 +807,7 @@ export default function OperatorProcess() {
                     <h3 className="text-sm font-semibold text-ink">Quadro societário</h3>
                     <p className="mt-1 text-xs text-slate">Conferência rápida dos dados informados.</p>
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
-                      {sociosList.map((socio: any, index: number) => (
+                      {sociosList.map((socio: ProcessRecord, index: number) => (
                         <div key={index} className="rounded-2xl border border-ink/10 bg-white/80 p-4">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="text-sm font-semibold text-ink">Sócio {index + 1}</p>
@@ -949,7 +972,7 @@ export default function OperatorProcess() {
                     </p>
 
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
-                      {clientSentDocs.map((doc: any) => {
+                      {clientSentDocs.map((doc) => {
                         const status = resolveDocStatus(doc);
                         const badge =
                           status === "APROVADO"
@@ -984,8 +1007,8 @@ export default function OperatorProcess() {
                                     "inline-flex h-9 w-9 items-center justify-center rounded-full text-lg",
                                     status === "APROVADO" ? "bg-emerald text-white" : "bg-emerald/10 text-emerald"
                                   )}
-                                  onClick={() => validateDocument(doc.itemKey, doc.socioId, "APROVADO")}
-                                  disabled={docLoading === buildDocumentKey(doc.itemKey, doc.socioId)}
+                                  onClick={() => validateDocument(doc.itemKey, doc.socioId ?? undefined, "APROVADO")}
+                                  disabled={docLoading === buildDocumentKey(doc.itemKey, doc.socioId ?? undefined)}
                                   aria-label="Aprovar documento"
                                 >
                                   <FiCheck />
@@ -998,9 +1021,9 @@ export default function OperatorProcess() {
                                   )}
                                   onClick={() => {
                                     setRejectReason("");
-                                    setRejectModal({ type: "document", documentKey: doc.itemKey, documentSocioId: doc.socioId });
+                                    setRejectModal({ type: "document", documentKey: doc.itemKey, documentSocioId: doc.socioId ?? undefined });
                                   }}
-                                  disabled={docLoading === buildDocumentKey(doc.itemKey, doc.socioId)}
+                                  disabled={docLoading === buildDocumentKey(doc.itemKey, doc.socioId ?? undefined)}
                                   aria-label="Reprovar documento"
                                 >
                                   <FiX />
@@ -1009,7 +1032,7 @@ export default function OperatorProcess() {
                             </div>
 
                             <div className="mt-4 space-y-2">
-                              {(doc.clientFiles ?? []).map((file: any) => (
+                              {doc.clientFiles.map((file: ProcessFile) => (
                                 <div key={file.id} className="flex items-center justify-between gap-3">
                                   <span className="truncate text-xs text-slate">{file.fileName}</span>
                                   <Button variant="primary" onClick={() => setSelectedFile({ itemKey: doc.itemKey, file })}>
@@ -1037,7 +1060,7 @@ export default function OperatorProcess() {
                       <div className="mt-3 rounded-2xl border border-ink/10 bg-white/80 p-4">
                         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">Pendências</p>
                         <ul className="mt-2 space-y-1 text-sm text-slate">
-                          {clientMissingDocs.map((doc: any) => (
+                          {clientMissingDocs.map((doc) => (
                             <li key={doc.id} className="flex items-center justify-between gap-3">
                               <span className="truncate">
                                 {doc.itemKey}
@@ -1083,6 +1106,18 @@ export default function OperatorProcess() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {editingClient && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-ink/40 px-4 py-6" role="dialog" aria-modal="true" aria-labelledby="edit-client-title">
+          <div className="mx-auto w-full max-w-6xl rounded-2xl bg-white p-6 shadow-soft">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-ink/10 pb-4">
+              <div><h2 id="edit-client-title" className="text-xl font-semibold">Editar dados do cliente</h2><p className="text-sm text-slate">Alterações persistidas no processo e registradas na auditoria.</p></div>
+              <span className="badge bg-brass/15 text-ink">Validação interna</span>
+            </div>
+            <OperatorClientDataEditor initialData={getStepData(process, "ETAPA_2")} saving={savingClient} onSave={saveClientData} onCancel={() => setEditingClient(false)} />
           </div>
         </div>
       )}

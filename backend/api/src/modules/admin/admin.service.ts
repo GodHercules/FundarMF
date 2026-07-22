@@ -1,8 +1,9 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import bcrypt from "bcryptjs";
+
+import { timeAsync } from "../../shared/perf";
 import { PrismaService } from "../../shared/prisma.service";
 import { AuditService } from "../audit/audit.service";
-import { timeAsync } from "../../shared/perf";
 
 @Injectable()
 export class AdminService {
@@ -24,7 +25,12 @@ export class AdminService {
   async listUsers(limit?: number, offset?: number) {
     const take = Number.isFinite(limit) && limit && limit > 0 ? Math.min(limit, 200) : 100;
     const skip = Number.isFinite(offset) && offset && offset > 0 ? offset : 0;
-    return this.prisma.user.findMany({ orderBy: { createdAt: "desc" }, take, skip });
+    return this.prisma.user.findMany({
+      orderBy: { createdAt: "desc" },
+      take,
+      skip,
+      select: { id: true, email: true, name: true, whatsapp: true, role: true, createdAt: true, updatedAt: true }
+    });
   }
 
   async createOperator(email: string, name: string, password: string, whatsapp?: string) {
@@ -34,15 +40,17 @@ export class AdminService {
     }
     this.ensureStrongPassword(password);
     const passwordHash = await timeAsync("hashMs", () => bcrypt.hash(password, 10));
-    return this.prisma.user.create({
+    const user = await this.prisma.user.create({
       data: {
         email,
         name,
         passwordHash,
         whatsapp,
         role: "OPERATOR"
-      }
+      },
+      select: { id: true, email: true, name: true, whatsapp: true, role: true, createdAt: true, updatedAt: true }
     });
+    return user;
   }
 
   async deleteOperator(userId: string, actorId?: string) {

@@ -3,6 +3,7 @@ import clsx from "clsx";
 import { Input } from "@/components/Input";
 
 type PasswordFieldProps = {
+  id?: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -29,6 +30,7 @@ function getStrength(value: string) {
 }
 
 export function PasswordField({
+  id,
   value,
   onChange,
   placeholder,
@@ -45,6 +47,7 @@ export function PasswordField({
     <div className={clsx("space-y-2", className)}>
       <div className="relative">
       <Input
+        id={id}
         type={visible ? "text" : "password"}
         value={value}
         onChange={(event) => onChange(event.target.value)}

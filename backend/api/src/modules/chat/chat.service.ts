@@ -1,11 +1,13 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import fs from "fs";
 import path from "path";
-import { PrismaService } from "../../shared/prisma.service";
-import { Actor } from "../../common/auth/types";
+
 import { isClientOwner } from "../../common/auth/identity";
-import { NotificationService } from "../notification/notification.service";
+import { Actor } from "../../common/auth/types";
+import { PrismaService } from "../../shared/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { NotificationService } from "../notification/notification.service";
 
 type FaqIntent = {
   id: string;
@@ -26,6 +28,11 @@ type BotState = {
   lastIntent?: string | null;
   handoff?: boolean;
 };
+
+type ChatStepData = Record<string, unknown>;
+
+const asRecord = (value: unknown): ChatStepData =>
+  value !== null && typeof value === "object" && !Array.isArray(value) ? (value as ChatStepData) : {};
 
 const URGENCY_KEYWORDS = ["urgente", "imediato", "agora", "hoje", "procon", "reclamação", "reclamacao"];
 const FRUSTRATION_KEYWORDS = ["não funcionou", "nao funcionou", "já tentei", "ja tentei", "não resolve", "nao resolve", "erro", "falha", "travou"];
@@ -76,8 +83,9 @@ function buildBotMessage(intent?: FaqIntent) {
   return `${intent.answer}${extra}`;
 }
 
-function getSocioDisplayName(socio: any) {
-  return socio?.tipoPessoa === "CNPJ" ? socio?.socioRazaoSocial : socio?.socioNome;
+function getSocioDisplayName(socio: unknown) {
+  const record = asRecord(socio);
+  return record.tipoPessoa === "CNPJ" ? record.socioRazaoSocial : record.socioNome;
 }
 
 @Injectable()
@@ -129,8 +137,8 @@ export class ChatService {
     const step2 = await this.prisma.processStep.findUnique({
       where: { processId_stepKey: { processId, stepKey: "ETAPA_2" } }
     });
-    const step2Data = (step2?.data ?? {}) as any;
-    const endereco = step2Data.endereco ?? {};
+    const step2Data = asRecord(step2?.data);
+    const endereco = asRecord(step2Data.endereco);
     const socios = Array.isArray(step2Data.quadroSocietario)
       ? step2Data.quadroSocietario
       : step2Data.quadroSocietario
@@ -154,7 +162,7 @@ export class ChatService {
       `Município: ${step2Data.municipio ?? "-"}`,
       `Endereço virtual: ${endereco.escritorioVirtual ?? "-"}`,
       `Sócios: ${socios.length || 0}`,
-      `Sócios (nomes): ${socios.map((s: any) => getSocioDisplayName(s)).filter(Boolean).join(", ") || "-"}`,
+      `Sócios (nomes): ${socios.map(getSocioDisplayName).filter(Boolean).join(", ") || "-"}`,
       `E-mail CNPJ: ${step2Data.emailCnpj ?? "-"}`,
       `Telefone CNPJ: ${step2Data.telefoneCnpj ?? "-"}`,
       `Transcrição recente:\n${transcript || "-"}`
@@ -179,7 +187,7 @@ export class ChatService {
     const thread = await this.prisma.chatThread.upsert({
       where: { processId },
       update: {},
-      create: { processId, botState: { attempts: 0 } as any }
+      create: { processId, botState: { attempts: 0 } satisfies Prisma.InputJsonObject }
     });
 
     const message = await this.prisma.chatMessage.create({

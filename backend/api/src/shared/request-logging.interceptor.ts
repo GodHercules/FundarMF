@@ -1,9 +1,11 @@
-import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from "@nestjs/common";
-import { Observable, tap, finalize } from "rxjs";
 import { performance } from "node:perf_hooks";
-import type { Request, Response } from "express";
-import { getRequestContext } from "./request-context";
+
+import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from "@nestjs/common";
+import type { Response } from "express";
+import { finalize,Observable, tap } from "rxjs";
+
 import { logEvent } from "./logger";
+import { getRequestContext, type RequestWithContext } from "./request-context";
 
 const coldStartWindowMs = (() => {
   const parsed = Number(process.env.COLD_START_WINDOW_MS ?? 60_000);
@@ -13,7 +15,7 @@ const coldStartWindowMs = (() => {
 @Injectable()
 export class RequestLoggingInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const req = context.switchToHttp().getRequest<Request>();
+    const req = context.switchToHttp().getRequest<RequestWithContext>();
     const res = context.switchToHttp().getResponse<Response>();
     const ctx = getRequestContext();
     const handlerStart = performance.now();
@@ -42,7 +44,7 @@ export class RequestLoggingInterceptor implements NestInterceptor {
         }
         const uptimeMs = Math.round(process.uptime() * 1000);
         logEvent("info", "http_request", {
-          correlationId: ctxFinalize?.correlationId ?? (req as any).correlationId,
+          correlationId: ctxFinalize?.correlationId ?? req.correlationId,
           method: req.method,
           path: req.originalUrl ?? req.url,
           statusCode: res.statusCode,

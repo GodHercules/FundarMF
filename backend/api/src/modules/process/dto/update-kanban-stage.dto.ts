@@ -1,5 +1,5 @@
-﻿import { IsIn } from "class-validator";
-import { KanbanStage } from "@fundarmf/shared";
+﻿import { KanbanStage } from "@fundarmf/shared";
+import { IsIn } from "class-validator";
 
 export class UpdateKanbanStageDto {
   @IsIn([
@@ -9,6 +9,7 @@ export class UpdateKanbanStageDto {
     "PREPARACAO_DOCUMENTOS",
     "AGUARDANDO_DOCUMENTOS",
     "ANALISE_JUCEB",
+    "EXIGENCIA_JUCEB",
     "FINALIZADO"
   ])
   kanbanStage: KanbanStage;

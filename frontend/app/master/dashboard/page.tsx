@@ -14,10 +14,25 @@ import { notifyError, notifySuccess } from "@/lib/notify";
 import { logClientPerf } from "@/lib/perf";
 import { FiAlertTriangle, FiTrash2, FiUserX, FiX } from "react-icons/fi";
 
+type DashboardProcess = {
+  id: string;
+  status: string;
+  clientName?: string;
+  currentStep?: string;
+  ownerId?: string | null;
+};
+
+type DashboardUser = {
+  id: string;
+  name: string;
+  email?: string;
+  role: string;
+};
+
 export default function MasterDashboard() {
-  const [processes, setProcesses] = useState<any[]>([]);
-  const [unassigned, setUnassigned] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
+  const [processes, setProcesses] = useState<DashboardProcess[]>([]);
+  const [unassigned, setUnassigned] = useState<DashboardProcess[]>([]);
+  const [users, setUsers] = useState<DashboardUser[]>([]);
   const [newUser, setNewUser] = useState({ name: "", email: "", whatsapp: "", password: "", confirmPassword: "" });
   const [message, setMessage] = useState<string | null>(null);
   const [showCreateUser, setShowCreateUser] = useState(false);
@@ -30,8 +45,8 @@ export default function MasterDashboard() {
   const [hasMoreUsers, setHasMoreUsers] = useState(true);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const initialLoadStart = useRef<number | null>(null);
-  const [processToDelete, setProcessToDelete] = useState<any | null>(null);
-  const [operatorToDelete, setOperatorToDelete] = useState<any | null>(null);
+  const [processToDelete, setProcessToDelete] = useState<DashboardProcess | null>(null);
+  const [operatorToDelete, setOperatorToDelete] = useState<DashboardUser | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
   const [confirmProcessText, setConfirmProcessText] = useState("");
   const [confirmOperatorText, setConfirmOperatorText] = useState("");
@@ -43,8 +58,7 @@ export default function MasterDashboard() {
   async function loadProcesses(nextOffset = 0, append = false) {
     setLoadingProcesses(true);
     try {
-      const data = await api(`/processes?limit=${processPageSize}&offset=${nextOffset}`);
-      const list = data as any[];
+      const list = await api<DashboardProcess[]>(`/processes?limit=${processPageSize}&offset=${nextOffset}`);
       setProcesses((prev) => (append ? [...prev, ...list] : list));
       setHasMoreProcesses(list.length === processPageSize);
       setProcessOffset(nextOffset + list.length);
@@ -56,8 +70,7 @@ export default function MasterDashboard() {
   async function loadUsers(nextOffset = 0, append = false) {
     setLoadingUsers(true);
     try {
-      const data = await api(`/admin/users?limit=${userPageSize}&offset=${nextOffset}`);
-      const list = data as any[];
+      const list = await api<DashboardUser[]>(`/admin/users?limit=${userPageSize}&offset=${nextOffset}`);
       setUsers((prev) => (append ? [...prev, ...list] : list));
       setHasMoreUsers(list.length === userPageSize);
       setUserOffset(nextOffset + list.length);
@@ -67,8 +80,8 @@ export default function MasterDashboard() {
   }
 
   async function loadUnassigned() {
-    const data = await api("/admin/processes/unassigned");
-    setUnassigned(data as any[]);
+    const data = await api<DashboardProcess[]>("/admin/processes/unassigned");
+    setUnassigned(data);
   }
 
   async function loadAll() {

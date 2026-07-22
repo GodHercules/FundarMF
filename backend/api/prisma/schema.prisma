@@ -37,6 +37,15 @@ enum KanbanStage {
   PREPARACAO_DOCUMENTOS
   AGUARDANDO_DOCUMENTOS
   ANALISE_JUCEB
+  EXIGENCIA_JUCEB
+  FINALIZADO
+}
+
+enum AlteracaoContratualStage {
+  SOLICITACAO_RECEBIDA
+  ANALISE_JURIDICA
+  AJUSTES_DOCUMENTAIS
+  PROTOCOLO
   FINALIZADO
 }
 
@@ -123,15 +132,16 @@ model Process {
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
-  steps         ProcessStep[]
-  checklists    Checklist[]
-  documents     DocumentItem[]
-  chats         ChatThread[]
-  ownerHistory  ProcessOwnerHistory[]
-  slaEvents     SlaEvent[]
-  reports       Report[]
-  notifications UserNotification[]
-  fileObjects   FileObject[]
+  steps                 ProcessStep[]
+  checklists            Checklist[]
+  documents             DocumentItem[]
+  chats                 ChatThread[]
+  ownerHistory          ProcessOwnerHistory[]
+  slaEvents             SlaEvent[]
+  reports               Report[]
+  notifications         UserNotification[]
+  fileObjects           FileObject[]
+  alteracoesContratuais AlteracaoContratual[]
 
   @@index([ownerId, createdAt])
   @@index([kanbanStage, ownerId, createdAt])
@@ -139,6 +149,42 @@ model Process {
   @@index([companyKey, createdAt])
   @@index([clientPhone, createdAt])
   @@index([status, createdAt])
+}
+
+model AlteracaoContratual {
+  id              String                   @id @default(uuid())
+  processId       String
+  alterationType  String
+  stage           AlteracaoContratualStage @default(SOLICITACAO_RECEBIDA)
+  version         Int                      @default(1)
+  requestedByRole AuditActorRole
+  requestedById   String?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  process Process                      @relation(fields: [processId], references: [id])
+  history AlteracaoContratualHistory[]
+
+  @@unique([processId, alterationType])
+  @@index([stage, updatedAt])
+  @@index([processId, updatedAt])
+}
+
+model AlteracaoContratualHistory {
+  id          String                    @id @default(uuid())
+  alteracaoId String
+  fromStage   AlteracaoContratualStage?
+  toStage     AlteracaoContratualStage
+  version     Int
+  actorRole   AuditActorRole
+  actorId     String?
+  comment     String?
+  createdAt   DateTime                  @default(now())
+
+  alteracao AlteracaoContratual @relation(fields: [alteracaoId], references: [id], onDelete: Cascade)
+
+  @@unique([alteracaoId, version])
+  @@index([alteracaoId, createdAt])
 }
 
 model ProcessStep {
@@ -200,6 +246,8 @@ model DocumentFile {
   uploadedById   String?
 
   item DocumentItem @relation(fields: [itemId], references: [id])
+
+  @@index([itemId, createdAt])
 }
 
 model ChatThread {
@@ -224,6 +272,8 @@ model ChatMessage {
   createdAt  DateTime       @default(now())
 
   thread ChatThread @relation(fields: [threadId], references: [id])
+
+  @@index([threadId, createdAt])
 }
 
 model Session {
@@ -244,17 +294,19 @@ model Session {
 }
 
 model CustomerLinkToken {
-  id             String    @id @default(uuid())
-  email          String?
-  whatsapp       String?
-  tokenHash      String    @unique
-  tokenExpiresAt DateTime
-  otpHash        String?
-  otpExpiresAt   DateTime?
-  otpSentCount   Int       @default(0)
-  lastOtpSentAt  DateTime?
-  usedAt         DateTime?
-  createdAt      DateTime  @default(now())
+  id                String    @id @default(uuid())
+  email             String?
+  whatsapp          String?
+  tokenHash         String    @unique
+  tokenExpiresAt    DateTime
+  otpHash           String?
+  otpExpiresAt      DateTime?
+  otpSentCount      Int       @default(0)
+  otpFailedAttempts Int       @default(0)
+  otpBlockedUntil   DateTime?
+  lastOtpSentAt     DateTime?
+  usedAt            DateTime?
+  createdAt         DateTime  @default(now())
 
   @@index([email, usedAt, tokenExpiresAt, createdAt(sort: Desc)])
   @@index([whatsapp, usedAt, tokenExpiresAt, createdAt(sort: Desc)])
@@ -268,6 +320,9 @@ model ProcessOwnerHistory {
   assignedBy String?
 
   process Process @relation(fields: [processId], references: [id])
+
+  @@index([ownerId, assignedAt])
+  @@index([processId, assignedAt])
 }
 
 model AuditEvent {
@@ -313,6 +368,7 @@ model SlaEvent {
   process Process @relation(fields: [processId], references: [id])
 
   @@unique([processId, stepKey, side])
+  @@index([status, dueAt])
 }
 
 model Report {
@@ -324,6 +380,8 @@ model Report {
   createdAt DateTime @default(now())
 
   process Process @relation(fields: [processId], references: [id])
+
+  @@index([processId, createdAt(sort: Desc)])
 }
 
 model Notification {

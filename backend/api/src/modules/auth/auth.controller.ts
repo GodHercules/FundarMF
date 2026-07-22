@@ -1,14 +1,15 @@
 import { Body, Controller, Get, Post, Req, Res, UseGuards } from "@nestjs/common";
-import { Response, Request } from "express";
-import { AuthService } from "./auth.service";
-import { RequestLinkDto } from "./dto/request-link.dto";
-import { VerifyLinkDto } from "./dto/verify-link.dto";
-import { LoginDto } from "./dto/login.dto";
-import { SessionService } from "./session.service";
+import { Request,Response } from "express";
+
 import { AuthGuard } from "../../common/auth/auth.guard";
-import { RolesGuard } from "../../common/auth/roles.guard";
 import { Roles } from "../../common/auth/roles.decorator";
+import { RolesGuard } from "../../common/auth/roles.guard";
+import { AuthService } from "./auth.service";
+import { LoginDto } from "./dto/login.dto";
+import { RequestLinkDto } from "./dto/request-link.dto";
 import { ResendOtpDto } from "./dto/resend-otp.dto";
+import { VerifyLinkDto } from "./dto/verify-link.dto";
+import { SessionService } from "./session.service";
 
 @Controller("auth")
 export class AuthController {

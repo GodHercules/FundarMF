@@ -73,8 +73,8 @@ export default function OperatorRequestLink() {
       } else {
         router.push("/operator/dashboard");
       }
-    } catch (error: any) {
-      setMessage(error.message ?? "Erro ao solicitar link.");
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : "Erro ao solicitar link.");
     }
   }
 

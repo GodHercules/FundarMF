@@ -16,6 +16,7 @@ export type KanbanStage =
   | "PREPARACAO_DOCUMENTOS"
   | "AGUARDANDO_DOCUMENTOS"
   | "ANALISE_JUCEB"
+  | "EXIGENCIA_JUCEB"
   | "FINALIZADO";
 
 export type StepSide = "CLIENTE" | "OPERADOR";
@@ -47,6 +48,7 @@ export const KANBAN_STAGE_ORDER: KanbanStage[] = [
   "PREPARACAO_DOCUMENTOS",
   "AGUARDANDO_DOCUMENTOS",
   "ANALISE_JUCEB",
+  "EXIGENCIA_JUCEB",
   "FINALIZADO"
 ];
 

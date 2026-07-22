@@ -1,6 +1,6 @@
 import fs from "fs";
-import path from "path";
 import mjml2html from "mjml";
+import path from "path";
 
 type EmailTemplatePayload = {
   title: string;

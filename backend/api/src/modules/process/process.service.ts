@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import {
+  AlteracaoContratualStage,
   DocumentItemKey,
   DocumentItemStatus,
   IdempotencyScope,
@@ -9,18 +10,56 @@ import {
   StepKey,
   StepSide
 } from "@prisma/client";
-import { PrismaService } from "../../shared/prisma.service";
-import { Actor } from "../../common/auth/types";
+
 import { isClientOwner, normalizePhone } from "../../common/auth/identity";
-import { SlaService } from "../sla/sla.service";
-import { AuditService } from "../audit/audit.service";
-import { NotificationService } from "../notification/notification.service";
-import { AuthService } from "../auth/auth.service";
-import { buildProcessEmailDrafts, ProcessEventDetails, ProcessEventKey } from "../notification/process-email-drafts";
+import { Actor } from "../../common/auth/types";
 import { IdempotencyService } from "../../shared/idempotency.service";
+import { PrismaService } from "../../shared/prisma.service";
+import { AuditService } from "../audit/audit.service";
+import { AuthService } from "../auth/auth.service";
+import { NotificationService } from "../notification/notification.service";
+import { buildProcessEmailDrafts, ProcessEventDetails, ProcessEventKey } from "../notification/process-email-drafts";
+import { SlaService } from "../sla/sla.service";
 
 const CLIENT_STEPS: StepKey[] = ["ETAPA_1", "ETAPA_2", "ETAPA_4", "ETAPA_5", "ETAPA_6"];
 const OPERATOR_STEPS: StepKey[] = ["ETAPA_3"];
+const EDITABLE_CLIENT_STEP2_FIELDS = new Set([
+  "razaoSocial1", "razaoSocial2", "razaoSocial3", "municipio", "emailCnpj", "telefoneCnpj", "endereco", "quadroSocietario"
+]);
+const EDITABLE_ADDRESS_FIELDS = new Set(["cep", "endereco", "numero", "complemento", "bairro", "cidade", "uf", "iptu", "escritorioVirtual"]);
+const EDITABLE_SOCIO_FIELDS = new Set([
+  "socioId", "tipoPessoa", "socioNome", "socioCpf", "socioRazaoSocial", "socioCnpj", "socioEmail", "socioTelefone",
+  "socioPercentual", "socioAdministrador", "responsavelCnpj", "socioEstadoCivil", "socioProfissao", "socioRegimeCasamento",
+  "adminNomeCompleto", "adminCpf", "adminEmail", "adminTelefone", "adminProfissao", "adminEstadoCivil", "adminRegimeCasamento"
+]);
+
+function sanitizeClientStep2(data: Record<string, unknown>) {
+  const unknown = Object.keys(data).filter((key) => !EDITABLE_CLIENT_STEP2_FIELDS.has(key));
+  if (unknown.length > 0) throw new BadRequestException(`Campos não permitidos: ${unknown.join(", ")}.`);
+  const result: Record<string, unknown> = {};
+  for (const key of ["razaoSocial1", "razaoSocial2", "razaoSocial3", "municipio", "emailCnpj", "telefoneCnpj"]) {
+    if (key in data && typeof data[key] !== "string") throw new BadRequestException(`Campo inválido: ${key}.`);
+    if (key in data) result[key] = String(data[key]).trim();
+  }
+  if (data.endereco !== undefined) {
+    if (!data.endereco || typeof data.endereco !== "object" || Array.isArray(data.endereco)) throw new BadRequestException("Endereço inválido.");
+    const address = data.endereco as Record<string, unknown>;
+    const invalid = Object.keys(address).filter((key) => !EDITABLE_ADDRESS_FIELDS.has(key));
+    if (invalid.length > 0) throw new BadRequestException(`Campos de endereço não permitidos: ${invalid.join(", ")}.`);
+    result.endereco = Object.fromEntries(Object.entries(address).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value]));
+  }
+  if (data.quadroSocietario !== undefined) {
+    if (!Array.isArray(data.quadroSocietario)) throw new BadRequestException("Quadro societário inválido.");
+    result.quadroSocietario = data.quadroSocietario.map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) throw new BadRequestException("Sócio inválido.");
+      const socio = item as Record<string, unknown>;
+      const invalid = Object.keys(socio).filter((key) => !EDITABLE_SOCIO_FIELDS.has(key));
+      if (invalid.length > 0) throw new BadRequestException(`Campos de sócio não permitidos: ${invalid.join(", ")}.`);
+      return Object.fromEntries(Object.entries(socio).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value]));
+    });
+  }
+  return result;
+}
 const KANBAN_STAGE_EMAILS: Record<KanbanStage, (clientName: string) => string> = {
   VIABILIDADE: (clientName) =>
     `Olá, ${clientName}. Seu processo acaba de ser iniciado e encontra-se em análise na Junta Comercial / Sedur - Viabilidade Regin.`,
@@ -34,6 +73,8 @@ const KANBAN_STAGE_EMAILS: Record<KanbanStage, (clientName: string) => string> =
     `Olá, ${clientName}. Os documentos foram enviados para proceder com as assinaturas, favor verificar o seu e-mail.`,
   ANALISE_JUCEB: (clientName) =>
     `Olá, ${clientName}. O seu processo acaba de ser protocolado na Junta Comercial para liberação do Contrato Social registrado e CNPJ.`,
+  EXIGENCIA_JUCEB: (clientName) =>
+    `AtualizaÃ§Ã£o: ${clientName}, seu processo entrou em exigÃªncia JUCEB e estÃ¡ sendo tratado pela nossa equipe.`,
   FINALIZADO: (clientName) =>
     `Olá, ${clientName}. Excelente notícia! O seu processo acaba de ser liberado. Parabéns! Favor verificar as documentações enviadas no e-mail.`
 };
@@ -242,6 +283,15 @@ export class ProcessService {
   private async sendKanbanStageEmail(processId: string, stage: KanbanStage, actor: Actor) {
     const process = await this.prisma.process.findUnique({ where: { id: processId } });
     if (!process) return;
+
+    if (stage === KanbanStage.EXIGENCIA_JUCEB) {
+      await this.auditService.record(actor, "kanban_stage_email_suppressed", "Process", processId, {
+        kanbanStage: stage,
+        recipient: "client",
+        reason: "stage_notification_policy"
+      });
+      return;
+    }
 
     const clientName = process.clientName?.trim() || "cliente";
     const body = KANBAN_STAGE_EMAILS[stage](clientName);
@@ -540,7 +590,9 @@ export class ProcessService {
     const step2 = process.steps.find((step) => step.stepKey === StepKey.ETAPA_2);
     const step3 = process.steps.find((step) => step.stepKey === StepKey.ETAPA_3);
     const kanbanEligible = this.isKanbanEligible(step2, step3, process.documents);
-    const { steps, documents, ...rest } = process;
+    const { steps: _steps, documents: _documents, ...rest } = process;
+    void _steps;
+    void _documents;
     const kanbanStage =
       kanbanEligible && rest.kanbanStage === KanbanStage.VIABILIDADE
         ? KanbanStage.DOC_INICIAL_APROVADA
@@ -947,6 +999,107 @@ export class ProcessService {
     return process;
   }
 
+  async createAlteracaoContratual(processId: string, actor: Actor, alterationType: string) {
+    if (actor.role !== "CLIENTE") {
+      throw new ForbiddenException();
+    }
+
+    const process = await this.getProcess(processId, actor);
+    if (process.status !== ProcessStatus.CONCLUIDO) {
+      throw new BadRequestException("A alteração contratual só pode ser solicitada após a conclusão do processo.");
+    }
+
+    const request = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.alteracaoContratual.upsert({
+        where: { processId_alterationType: { processId, alterationType } },
+        update: {},
+        create: { processId, alterationType, requestedByRole: actor.role, requestedById: actor.userId }
+      });
+      await tx.alteracaoContratualHistory.createMany({
+        skipDuplicates: true,
+        data: [{ alteracaoId: created.id, toStage: created.stage, version: created.version, actorRole: actor.role, actorId: actor.userId }]
+      });
+      return created;
+    });
+
+    await this.auditService.record(actor, "alteracao_contratual_requested", "AlteracaoContratual", request.id, {
+      processId,
+      alterationType
+    });
+
+    return request;
+  }
+
+  async listAlteracaoContratual(processId: string, actor: Actor) {
+    await this.getProcess(processId, actor);
+    return this.prisma.alteracaoContratual.findMany({
+      where: { processId },
+      orderBy: { updatedAt: "desc" }
+    });
+  }
+
+  async listAllAlteracaoContratual(actor: Actor) {
+    if (actor.role !== "OPERADOR" && actor.role !== "MASTER") {
+      throw new ForbiddenException();
+    }
+
+    return this.prisma.alteracaoContratual.findMany({
+      where: actor.role === "OPERADOR" ? { process: { ownerId: actor.userId } } : undefined,
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+      include: { process: { select: { id: true, clientName: true, clientEmail: true, ownerId: true } } }
+    });
+  }
+
+  async updateAlteracaoContratualStage(id: string, actor: Actor, stage: AlteracaoContratualStage, expectedVersion: number) {
+    if (actor.role !== "OPERADOR" && actor.role !== "MASTER") {
+      throw new ForbiddenException();
+    }
+
+    const current = await this.prisma.alteracaoContratual.findUnique({
+      where: { id },
+      include: { process: { select: { ownerId: true } } }
+    });
+    if (!current) throw new NotFoundException("Solicitação de alteração não encontrada.");
+    if (actor.role === "OPERADOR" && current.process.ownerId !== actor.userId) {
+      throw new ForbiddenException();
+    }
+    if (current.stage === stage) return { ok: true, alreadyInStage: true, request: current };
+
+    const stages: AlteracaoContratualStage[] = [
+      AlteracaoContratualStage.SOLICITACAO_RECEBIDA,
+      AlteracaoContratualStage.ANALISE_JURIDICA,
+      AlteracaoContratualStage.AJUSTES_DOCUMENTAIS,
+      AlteracaoContratualStage.PROTOCOLO,
+      AlteracaoContratualStage.FINALIZADO
+    ];
+    if (Math.abs(stages.indexOf(stage) - stages.indexOf(current.stage)) !== 1) {
+      throw new BadRequestException("Transição de etapa inválida.");
+    }
+    if (expectedVersion !== current.version) {
+      throw new BadRequestException("A solicitação foi alterada por outro operador. Atualize a tela.");
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.alteracaoContratual.updateMany({
+        where: { id, stage: current.stage, version: expectedVersion },
+        data: { stage, version: { increment: 1 } }
+      });
+      if (result.count !== 1) throw new BadRequestException("A solicitação foi alterada por outro operador. Atualize a tela.");
+      const updatedRequest = await tx.alteracaoContratual.findUniqueOrThrow({ where: { id } });
+      await tx.alteracaoContratualHistory.create({
+        data: { alteracaoId: id, fromStage: current.stage, toStage: stage, version: updatedRequest.version, actorRole: actor.role, actorId: actor.userId }
+      });
+      return updatedRequest;
+    });
+
+    await this.auditService.record(actor, "alteracao_contratual_stage_updated", "AlteracaoContratual", id, {
+      from: current.stage,
+      to: stage
+    });
+    return { ok: true, request: updated };
+  }
+
   private ensureNotReadOnly(process: { status: ProcessStatus }) {
     if (process.status === ProcessStatus.CANCELADO || process.status === ProcessStatus.CONCLUIDO) {
       throw new BadRequestException("Processo somente leitura.");
@@ -961,6 +1114,9 @@ export class ProcessService {
       throw new ForbiddenException();
     }
 
+    const operatorEditingClientStep =
+      actor.role === "OPERADOR" && stepKey === StepKey.ETAPA_2 && process.currentStep === StepKey.ETAPA_2;
+
     const operatorPreStep3 =
       actor.role === "OPERADOR" && stepKey === "ETAPA_3" && process.currentStep === "ETAPA_2";
 
@@ -971,17 +1127,29 @@ export class ProcessService {
     if (actor.role === "CLIENTE" && !CLIENT_STEPS.includes(stepKey)) {
       throw new ForbiddenException();
     }
-    if (actor.role === "OPERADOR" && !OPERATOR_STEPS.includes(stepKey)) {
+    if (actor.role === "OPERADOR" && !OPERATOR_STEPS.includes(stepKey) && !operatorEditingClientStep) {
       throw new ForbiddenException();
     }
+
+    const safeData = operatorEditingClientStep ? sanitizeClientStep2(data) : data;
 
     const existing = await this.prisma.processStep.findUnique({
       where: { processId_stepKey: { processId, stepKey } }
     });
 
     if (existing?.locked && actor.role === "CLIENTE") {
-      const allowedFields = (existing.data as any)?.correction?.fields ?? [];
-      const invalid = Object.keys(data).filter((key) => !allowedFields.includes(key));
+      const existingData =
+        existing.data !== null && typeof existing.data === "object" && !Array.isArray(existing.data)
+          ? (existing.data as Record<string, unknown>)
+          : {};
+      const correction =
+        existingData.correction !== null &&
+        typeof existingData.correction === "object" &&
+        !Array.isArray(existingData.correction)
+          ? (existingData.correction as Record<string, unknown>)
+          : {};
+      const allowedFields = Array.isArray(correction.fields) ? correction.fields : [];
+      const invalid = Object.keys(safeData).filter((key) => !allowedFields.includes(key));
       if (invalid.length > 0) {
         throw new BadRequestException("Campos não liberados para correção.");
       }
@@ -990,7 +1158,7 @@ export class ProcessService {
     const existingData = (existing?.data ?? {}) as Record<string, unknown>;
     const merged = {
       ...existingData,
-      ...data
+      ...safeData
     } as Prisma.InputJsonValue;
 
     const updated = await this.prisma.processStep.upsert({
@@ -1034,7 +1202,11 @@ export class ProcessService {
       });
     }
 
-    await this.auditService.record(actor, "update_step", "ProcessStep", updated.id, { stepKey });
+    await this.auditService.record(actor, "update_step", "ProcessStep", updated.id, {
+      stepKey,
+      actorMode: operatorEditingClientStep ? "client_data_validation_edit" : "standard",
+      changedFields: Object.keys(safeData)
+    });
 
     return updated;
   }
@@ -1290,7 +1462,9 @@ export class ProcessService {
           status: ProcessStatus.CORRECAO_SOLICITADA,
           locked: false,
           data: {
-            ...(step.data as any),
+            ...(step.data !== null && typeof step.data === "object" && !Array.isArray(step.data)
+              ? (step.data as Record<string, unknown>)
+              : {}),
             correction: {
               fields,
               reason

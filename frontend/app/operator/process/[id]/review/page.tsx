@@ -11,12 +11,14 @@ import { Logo } from "@/components/Logo";
 import { StatusBadge } from "@/components/Stepper";
 import { notifyError } from "@/lib/notify";
 import { FiCheckCircle, FiFileText, FiXCircle } from "react-icons/fi";
+import { toProcessRecords } from "@/lib/process-types";
+import type { ProcessData, ProcessDocument, ProcessFile, ProcessStep, ProcessStepData } from "@/lib/process-types";
 
-function getStepData(process: any, stepKey: string) {
-  return (process?.steps ?? []).find((step: any) => step.stepKey === stepKey)?.data ?? {};
+function getStepData(process: ProcessData | null, stepKey: string): ProcessStepData {
+  return process?.steps.find((step: ProcessStep) => step.stepKey === stepKey)?.data ?? {};
 }
 
-function formatValue(value: any) {
+function formatValue(value: unknown) {
   if (value === null || value === undefined) return "Não informado";
   const text = String(value).trim();
   return text.length > 0 ? text : "Não informado";
@@ -31,17 +33,17 @@ export default function OperatorProcessReview() {
   const router = useRouter();
   const processId = params?.id as string;
 
-  const [process, setProcess] = useState<any>(null);
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [selectedFile, setSelectedFile] = useState<{ itemKey: string; file: any } | null>(null);
+  const [process, setProcess] = useState<ProcessData | null>(null);
+  const [documents, setDocuments] = useState<ProcessDocument[]>([]);
+  const [selectedFile, setSelectedFile] = useState<{ itemKey: string; file: ProcessFile } | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
   async function load() {
     const [processData, documentsData] = await Promise.all([
-      api<any>(`/processes/${processId}`),
-      api<any[]>(`/documents/${processId}/items`)
+      api<ProcessData>(`/processes/${processId}`),
+      api<ProcessDocument[]>(`/documents/${processId}/items`)
     ]);
     setProcess(processData);
     setDocuments(documentsData ?? []);
@@ -72,9 +74,9 @@ export default function OperatorProcessReview() {
         objectUrlToRevoke = objectUrl;
         if (!active) return;
         setPreviewUrl(objectUrl);
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!active) return;
-        const msg = err?.message || "Erro ao carregar documento.";
+        const msg = err instanceof Error ? err.message : "Erro ao carregar documento.";
         setPreviewError(msg);
         notifyError(msg);
       } finally {
@@ -101,13 +103,11 @@ export default function OperatorProcessReview() {
 
   const sociosList = useMemo(() => {
     const raw = step2?.quadroSocietario;
-    if (Array.isArray(raw)) return raw;
-    if (raw && typeof raw === "object") return [raw];
-    return [];
+    return toProcessRecords(raw);
   }, [step2]);
 
   const docsApproved = useMemo(
-    () => (documents ?? []).length > 0 && (documents ?? []).every((doc: any) => doc.status === "APROVADO"),
+    () => documents.length > 0 && documents.every((doc: ProcessDocument) => doc.status === "APROVADO"),
     [documents]
   );
 
@@ -243,8 +243,8 @@ export default function OperatorProcessReview() {
         <h2 className="text-lg font-semibold">Quadro societário</h2>
         {sociosList.length === 0 && <p className="mt-2 text-sm text-slate">Nenhum sócio informado.</p>}
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {sociosList.map((socio: any, index: number) => (
-            <div key={socio?.socioId ?? index} className="rounded-xl border border-ink/10 bg-white/80 p-4">
+          {sociosList.map((socio, index: number) => (
+            <div key={String(socio?.socioId ?? index)} className="rounded-xl border border-ink/10 bg-white/80 p-4">
               <p className="text-sm font-semibold text-ink">
                 {getSocioTipoPessoa(socio ?? {}) === "CNPJ" ? `Empresa sócia ${index + 1}` : `Sócio ${index + 1}`}
               </p>
@@ -316,7 +316,7 @@ export default function OperatorProcessReview() {
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {documents.map((doc: any) => (
+          {documents.map((doc: ProcessDocument) => (
             <div key={doc.id} className="rounded-xl border border-ink/10 bg-white/80 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -327,7 +327,7 @@ export default function OperatorProcessReview() {
               </div>
               <div className="mt-3 space-y-2">
                 {(doc.files ?? []).length === 0 && <p className="text-xs text-slate">Sem anexos</p>}
-                {(doc.files ?? []).map((file: any) => (
+                {(doc.files ?? []).map((file: ProcessFile) => (
                   <div key={file.id} className="flex items-center justify-between gap-3">
                     <span className="text-xs text-slate">{file.fileName}</span>
                     <Button variant="primary" onClick={() => setSelectedFile({ itemKey: doc.itemKey, file })}>

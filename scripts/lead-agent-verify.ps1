@@ -16,7 +16,16 @@ function Invoke-Step {
   Write-Host "==> $Name"
   Push-Location $Workdir
   try {
-    Invoke-Expression $Command
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+      Invoke-Expression $Command 2>&1
+    } finally {
+      $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($LASTEXITCODE -ne 0) {
+      throw "Step '$Name' failed with exit code $LASTEXITCODE."
+    }
   } finally {
     Pop-Location
   }
@@ -39,6 +48,10 @@ function Assert-Remote {
 }
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+
+if ($SkipBackend -and $SkipFrontend) {
+  throw "At least one verification scope must remain enabled."
+}
 
 Write-Host "Lead agent verification started in $repoRoot"
 

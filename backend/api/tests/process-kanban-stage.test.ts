@@ -144,6 +144,34 @@ describe("ProcessService updateKanbanStage", () => {
     expect(prisma.process.update).not.toHaveBeenCalled();
   });
 
+  it("suppresses client email and records an intentional audit for Exigência JUCEB", async () => {
+    const prisma = {
+      process: {
+        findUnique: vi.fn(async () => ({
+          id: "p1", status: ProcessStatus.EM_ANDAMENTO, currentStep: "ETAPA_3", kanbanStage: "ANALISE_JUCEB", ownerId: "op-1",
+          clientName: "Joana", clientEmail: "cliente@teste.com",
+          steps: [
+            { stepKey: "ETAPA_2", locked: true, status: ProcessStatus.AGUARDANDO_OPERADOR, data: { razaoSocial1: "Empresa", municipio: "Salvador", emailCnpj: "cliente@teste.com", telefoneCnpj: "+5571999999999", endereco: { escritorioVirtual: "Sim" }, quadroSocietario: [{ socioId: "s1", socioNome: "Joana", socioCpf: "000.000.000-00", socioEmail: "joana@teste.com", socioTelefone: "+5571999999999", socioPercentual: "100%", socioAdministrador: "Sim" }] } },
+            { stepKey: "ETAPA_3", data: { tipoAtividade: "Servico", naturezaJuridica: "Ltda", capitalSocial: "100", cnae: "6201-5/01", tributacao: "Simples Nacional" } }
+          ],
+          documents: [{ itemKey: "IDENTIFICACAO_SOCIOS", socioId: "s1", status: "APROVADO" }, { itemKey: "COMPROVANTE_RESIDENCIA", socioId: "s1", status: "APROVADO" }]
+        })),
+        update: vi.fn(async () => ({ id: "p1", kanbanStage: "EXIGENCIA_JUCEB" }))
+      }
+    };
+    const auditService = { record: vi.fn(async () => undefined) };
+    const notificationService = { sendEmail: vi.fn(), sendWebhook: vi.fn() };
+    const service = new ProcessService(prisma as any, {} as any, auditService as any, notificationService as any, {} as any, {} as any);
+    (service as any).isKanbanEligible = vi.fn().mockReturnValue(true);
+    const actor = { role: "OPERADOR", userId: "op-1", email: "op@teste.com" } as any;
+
+    await service.updateKanbanStage("p1", actor, "EXIGENCIA_JUCEB" as any);
+
+    expect(notificationService.sendEmail).not.toHaveBeenCalled();
+    expect(notificationService.sendWebhook).not.toHaveBeenCalled();
+    expect(auditService.record).toHaveBeenCalledWith(actor, "kanban_stage_email_suppressed", "Process", "p1", expect.objectContaining({ kanbanStage: "EXIGENCIA_JUCEB" }));
+  });
+
   it("normalizes eligible VIABILIDADE cards to DOC_INICIAL_APROVADA in process list", async () => {
     const prisma = {
       process: {

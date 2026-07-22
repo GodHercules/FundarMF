@@ -1,16 +1,17 @@
-﻿import crypto from "crypto";
-import bcrypt from "bcryptjs";
-import dayjs from "dayjs";
-import { BadRequestException, Injectable, UnauthorizedException } from "@nestjs/common";
-import { PrismaService } from "../../shared/prisma.service";
-import { SessionService } from "./session.service";
-import { NotificationService } from "../notification/notification.service";
-import { AuditService } from "../audit/audit.service";
-import { Actor } from "../../common/auth/types";
-import { timeAsync } from "../../shared/perf";
-import { renderBaseEmail } from "../notification/email.template";
-import { IdempotencyService } from "../../shared/idempotency.service";
+﻿import { BadRequestException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { IdempotencyScope } from "@prisma/client";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import dayjs from "dayjs";
+
+import { Actor } from "../../common/auth/types";
+import { IdempotencyService } from "../../shared/idempotency.service";
+import { timeAsync } from "../../shared/perf";
+import { PrismaService } from "../../shared/prisma.service";
+import { AuditService } from "../audit/audit.service";
+import { renderBaseEmail } from "../notification/email.template";
+import { NotificationService } from "../notification/notification.service";
+import { SessionService } from "./session.service";
 
 @Injectable()
 export class AuthService {
@@ -23,7 +24,9 @@ export class AuthService {
   ) {}
 
   private shouldSendAuthWebhook() {
-    return (process.env.N8N_WEBHOOK_AUTH_ENABLED ?? "false").trim().toLowerCase() === "true";
+    // Access links and OTPs are credentials; they must never leave the API process.
+    // Delivery is handled by the configured email/WhatsApp providers.
+    return false;
   }
 
   private linkDedupSeconds() {
@@ -52,6 +55,10 @@ export class AuthService {
     return crypto.createHash("sha256").update(value).digest("hex");
   }
 
+  private generateOtp() {
+    return crypto.randomInt(100000, 1000000).toString();
+  }
+
   private normalizeWhatsApp(value: string) {
     const cleaned = value.replace(/[^\d+]/g, "");
     if (cleaned.startsWith("+")) return cleaned;
@@ -63,7 +70,7 @@ export class AuthService {
     const brand = process.env.WHATSAPP_BRAND ?? process.env.COMPANY_NAME ?? "MF Contabilidade";
     const location = process.env.COMPANY_LOCATION ?? "Bahia, Brazil";
     const linkTtl = Number(process.env.LINK_TTL_HOURS ?? 120);
-    const otpTtl = Number(process.env.OTP_TTL_MINUTES ?? 1440);
+    const otpTtl = Number(process.env.OTP_TTL_MINUTES ?? 10);
     return [
       `${brand} | Acesso ao portal`,
       name ? `Olá, ${name}!` : "Olá!",
@@ -80,7 +87,7 @@ export class AuthService {
 
   private buildCustomerAccessEmail(linkUrl: string, otp?: string, name?: string) {
     const linkTtl = Number(process.env.LINK_TTL_HOURS ?? 120);
-    const otpTtl = Number(process.env.OTP_TTL_MINUTES ?? 1440);
+    const otpTtl = Number(process.env.OTP_TTL_MINUTES ?? 10);
 
     const lines = [
       name ? `Olá, ${name},` : "Olá,",
@@ -163,9 +170,9 @@ export class AuthService {
     const tokenHash = this.hash(token);
     const tokenExpiresAt = dayjs().add(Number(process.env.LINK_TTL_HOURS ?? 120), "hour").toDate();
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = this.generateOtp();
     const otpHash = this.hash(otp);
-    const otpExpiresAt = dayjs().add(Number(process.env.OTP_TTL_MINUTES ?? 1440), "minute").toDate();
+    const otpExpiresAt = dayjs().add(Number(process.env.OTP_TTL_MINUTES ?? 10), "minute").toDate();
 
     await this.prisma.customerLinkToken.create({
       data: {
@@ -275,9 +282,9 @@ export class AuthService {
       throw new BadRequestException({ code: "LINK_INVALID" });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = this.generateOtp();
     const otpHash = this.hash(otp);
-    const otpExpiresAt = dayjs().add(Number(process.env.OTP_TTL_MINUTES ?? 1440), "minute").toDate();
+    const otpExpiresAt = dayjs().add(Number(process.env.OTP_TTL_MINUTES ?? 10), "minute").toDate();
 
     const updatedLink = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "CustomerLinkToken" WHERE id = ${link.id} FOR UPDATE`;
@@ -295,6 +302,8 @@ export class AuthService {
         data: {
           otpHash,
           otpExpiresAt,
+          otpFailedAttempts: 0,
+          otpBlockedUntil: null,
           otpSentCount: { increment: 1 },
           lastOtpSentAt: new Date()
         }
@@ -337,34 +346,51 @@ export class AuthService {
 
   async verifyCustomerLink(token: string, otp?: string) {
     const tokenHash = this.hash(token);
-    const link = await this.prisma.customerLinkToken.findUnique({ where: { tokenHash } });
-    if (!link || link.usedAt || dayjs(link.tokenExpiresAt).isBefore(dayjs())) {
-      throw new BadRequestException({ code: "LINK_INVALID" });
-    }
-
-    if (link.otpHash) {
-      if (!otp) {
-        throw new BadRequestException({ code: "OTP_REQUIRED" });
+    const verification = await this.prisma.$transaction(async (tx) => {
+      // Serialize verification attempts for this token so failed-attempt limits
+      // cannot be bypassed by concurrent requests.
+      const candidate = await tx.customerLinkToken.findUnique({ where: { tokenHash } });
+      if (candidate) {
+        await tx.$queryRaw`SELECT id FROM "CustomerLinkToken" WHERE id = ${candidate.id} FOR UPDATE`;
       }
-      if (dayjs(link.otpExpiresAt).isBefore(dayjs())) {
-        throw new BadRequestException({ code: "OTP_EXPIRED" });
+      const current = await tx.customerLinkToken.findUnique({ where: { tokenHash } });
+      if (!current || current.usedAt || dayjs(current.tokenExpiresAt).isBefore(dayjs())) {
+        throw new BadRequestException({ code: "LINK_INVALID" });
       }
-      if (this.hash(otp) !== link.otpHash) {
-        throw new BadRequestException({ code: "OTP_INVALID" });
+      if (current.otpHash) {
+        if (!otp) throw new BadRequestException({ code: "OTP_REQUIRED" });
+        if (current.otpBlockedUntil && dayjs(current.otpBlockedUntil).isAfter(dayjs())) {
+          throw new BadRequestException({ code: "OTP_LIMIT_REACHED" });
+        }
+        if (dayjs(current.otpExpiresAt).isBefore(dayjs())) throw new BadRequestException({ code: "OTP_EXPIRED" });
+        const expectedHash = Buffer.from(current.otpHash, "hex");
+        const receivedHash = Buffer.from(this.hash(otp), "hex");
+        const valid = expectedHash.length === receivedHash.length && crypto.timingSafeEqual(expectedHash, receivedHash);
+        if (!valid) {
+          const failedAttempts = current.otpFailedAttempts + 1;
+          await tx.customerLinkToken.update({
+            where: { id: current.id },
+            data: { otpFailedAttempts: failedAttempts, otpBlockedUntil: failedAttempts >= 5 ? dayjs().add(15, "minute").toDate() : null }
+          });
+          return {
+            link: current,
+            errorCode: failedAttempts >= 5 ? "OTP_LIMIT_REACHED" : "OTP_INVALID"
+          } as const;
+        }
       }
-    }
-
-    const consume = await this.prisma.customerLinkToken.updateMany({
-      where: {
-        id: link.id,
-        usedAt: null,
-        tokenExpiresAt: { gt: new Date() }
-      },
-      data: { usedAt: new Date() }
+      const consumed = await tx.customerLinkToken.updateMany({
+        where: { id: current.id, usedAt: null, tokenExpiresAt: { gt: new Date() } },
+        data: { usedAt: new Date(), otpFailedAttempts: 0 }
+      });
+      if (consumed.count === 0) throw new BadRequestException({ code: "LINK_INVALID" });
+      return { link: current } as const;
     });
-    if (consume.count === 0) {
-      throw new BadRequestException({ code: "LINK_INVALID" });
+
+    if (verification.errorCode) {
+      throw new BadRequestException({ code: verification.errorCode });
     }
+
+    const link = verification.link;
 
     const actor: Actor = { role: "CLIENTE", email: link.email ?? undefined, whatsapp: link.whatsapp ?? undefined };
     const { token: sessionToken } = await this.sessionService.createSession(
@@ -387,9 +413,9 @@ export class AuthService {
       throw new BadRequestException({ code: "LINK_INVALID" });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = this.generateOtp();
     const otpHash = this.hash(otp);
-    const otpExpiresAt = dayjs().add(Number(process.env.OTP_TTL_MINUTES ?? 1440), "minute").toDate();
+    const otpExpiresAt = dayjs().add(Number(process.env.OTP_TTL_MINUTES ?? 10), "minute").toDate();
 
     const updatedLink = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "CustomerLinkToken" WHERE id = ${link.id} FOR UPDATE`;
@@ -410,6 +436,8 @@ export class AuthService {
         data: {
           otpHash,
           otpExpiresAt,
+          otpFailedAttempts: 0,
+          otpBlockedUntil: null,
           otpSentCount: { increment: 1 },
           lastOtpSentAt: new Date()
         }

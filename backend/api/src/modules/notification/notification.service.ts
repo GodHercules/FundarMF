@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { PrismaService } from "../../shared/prisma.service";
+
 import { timeAsync } from "../../shared/perf";
+import { PrismaService } from "../../shared/prisma.service";
 import { getRequestContext } from "../../shared/request-context";
 import { renderBaseEmail } from "./email.template";
 import { NotificationQueue } from "./notification.queue";
@@ -63,6 +64,10 @@ export class NotificationService {
     private readonly prisma: PrismaService
   ) {}
 
+  private webhookEmailMirrorEnabled() {
+    return (process.env.N8N_WEBHOOK_EMAIL_MIRROR_ENABLED ?? "false").trim().toLowerCase() === "true";
+  }
+
   private async resolveAudience(email: string) {
     try {
       const user = await this.prisma.user.findUnique({ where: { email } });
@@ -98,6 +103,7 @@ export class NotificationService {
         );
       }
 
+      if (!this.webhookEmailMirrorEnabled()) return;
       const audience = await this.resolveAudience(to);
       const emailDraftClient: WebhookEmailDraft = { target: "client", to, subject, text, html, from, replyTo };
       const emailDraftOperator: WebhookEmailDraft = { target: "operator", to, subject, text, html, from, replyTo };
@@ -156,6 +162,7 @@ export class NotificationService {
       }
 
       // Webhook mirror: keep the exact draft so n8n can replay it.
+      if (!this.webhookEmailMirrorEnabled()) return;
       const audience = await this.resolveAudience(to);
       void this.sendWebhook({
         channel: "email",
@@ -237,7 +244,14 @@ export class NotificationService {
     if (!enabled || !url) return;
 
     const correlationId = getRequestContext()?.correlationId;
-    const secret = process.env.N8N_WEBHOOK_SECRET;
+    const secret = process.env.N8N_WEBHOOK_SECRET?.trim();
+    const authRequired =
+      process.env.NODE_ENV === "production" ||
+      (process.env.N8N_WEBHOOK_AUTH_ENABLED ?? "true").trim().toLowerCase() === "true";
+    if (authRequired && !secret) {
+      console.error("[notify] webhook disabled because N8N_WEBHOOK_SECRET is missing");
+      return;
+    }
     const controller = new AbortController();
     const timeoutMs = Number(process.env.N8N_WEBHOOK_TIMEOUT_MS ?? 5000);
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -260,10 +274,10 @@ export class NotificationService {
         const text = await response.text().catch(() => "");
         // Include URL to confirm the deployed env var value (Render sometimes keeps old values until a redeploy/restart).
         const preview = text.length > 800 ? `${text.slice(0, 800)}...` : text;
-        console.warn("[notify] webhook failed", response.status, url, preview);
+        console.warn("[notify] webhook failed", response.status, preview);
       }
     } catch (err) {
-      console.warn("[notify] webhook error", url, err);
+      console.warn("[notify] webhook error", err instanceof Error ? err.name : "unknown_error");
     } finally {
       clearTimeout(timeout);
     }

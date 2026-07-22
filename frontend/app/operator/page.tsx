@@ -26,8 +26,8 @@ export default function OperatorLogin() {
       });
       notifySuccess("Login realizado com sucesso.");
       router.push("/operator/dashboard");
-    } catch (error: any) {
-      setMessage(error.message ?? "Erro ao entrar.");
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : "Erro ao entrar.");
     }
   }
 

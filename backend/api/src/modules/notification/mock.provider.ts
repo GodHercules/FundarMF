@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+
 import { PrismaService } from "../../shared/prisma.service";
 import { EmailProvider, WhatsAppProvider } from "./notification.types";
 

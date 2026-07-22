@@ -12,6 +12,7 @@ declare global {
     interface Request {
       actor?: Actor;
       sessionId?: string;
+      correlationId?: string;
     }
   }
 }

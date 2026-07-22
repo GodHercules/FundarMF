@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import nodemailer, { Transporter } from "nodemailer";
 import twilio, { Twilio } from "twilio";
+
 import { EmailProvider, WhatsAppProvider } from "./notification.types";
 
 @Injectable()

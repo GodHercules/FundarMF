@@ -1,10 +1,11 @@
 import { Body, Controller, Get, Put, UseGuards } from "@nestjs/common";
 import { StepKey, StepSide } from "@prisma/client";
 import { IsEnum, IsInt, Max, Min } from "class-validator";
+
+import { AuthGuard } from "../../common/auth/auth.guard";
 import { Roles } from "../../common/auth/roles.decorator";
 import { RolesGuard } from "../../common/auth/roles.guard";
 import { SlaService } from "./sla.service";
-import { AuthGuard } from "../../common/auth/auth.guard";
 
 class UpdateSlaDto {
   @IsEnum(StepKey)

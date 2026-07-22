@@ -1,8 +1,9 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { Request } from "express";
+
 import { AuthGuard } from "../../common/auth/auth.guard";
-import { RolesGuard } from "../../common/auth/roles.guard";
 import { Roles } from "../../common/auth/roles.decorator";
+import { RolesGuard } from "../../common/auth/roles.guard";
 import { NotificationService } from "./notification.service";
 import { TestEmailDto, TestWhatsAppDto } from "./notification-test.dto";
 

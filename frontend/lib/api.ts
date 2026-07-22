@@ -1,8 +1,22 @@
 ﻿export const API_BASE = "/api";
 export const DOCS_API_BASE = "/apix";
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status?: number,
+    public readonly code?: string,
+    public readonly correlationId?: string,
+    public readonly raw?: string
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 import { notifyError } from "@/lib/notify";
 import { logClientPerf } from "@/lib/perf";
+import { reportClientError } from "@/lib/observability";
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   try {
@@ -75,18 +89,31 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
         errorMessage = codeMessages[errorCode];
       }
 
+      if (response.status >= 500) {
+        errorMessage = "Serviço temporariamente indisponível. Tente novamente em instantes.";
+        reportClientError({ message: `API ${response.status}: ${path}`, operation: `${method} ${path}`, route: typeof window !== "undefined" ? window.location.pathname : undefined, correlationId: response.headers.get("x-correlation-id") ?? undefined });
+      }
+
       notifyError(errorMessage);
-      const err = new Error(errorMessage);
-      (err as any).handled = true;
-      (err as any).code = errorCode;
-      (err as any).raw = errorText;
+      const err = new ApiError(
+        errorMessage,
+        response.status,
+        errorCode,
+        response.headers.get("x-correlation-id") ?? undefined,
+        errorText
+      );
+      (err as ApiError & { handled?: boolean }).handled = true;
       throw err;
     }
 
     return response.json();
-  } catch (error: any) {
-    if (error?.message && !error?.handled) {
-      notifyError(error.message);
+  } catch (error: unknown) {
+    const message = error instanceof ApiError
+      ? error.message
+      : "Não foi possível conectar ao serviço. Tente novamente em instantes.";
+    const handled = error instanceof Error && "handled" in error && error.handled === true;
+    if (!handled) {
+      notifyError(message);
     }
     throw error;
   }

@@ -1,4 +1,6 @@
 import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+
 import { PrismaService } from "../../shared/prisma.service";
 
 export interface StoredFileInput {
@@ -15,12 +17,12 @@ export interface StoredFileInput {
 export class StorageService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async deleteFilesByItem(itemId: string) {
-    await this.prisma.documentFile.deleteMany({ where: { itemId } });
+  async deleteFilesByItem(itemId: string, db: PrismaService | Prisma.TransactionClient = this.prisma) {
+    await db.documentFile.deleteMany({ where: { itemId } });
   }
 
-  async saveFile(input: StoredFileInput) {
-    return this.prisma.documentFile.create({
+  async saveFile(input: StoredFileInput, db: PrismaService | Prisma.TransactionClient = this.prisma) {
+    return db.documentFile.create({
       data: {
         itemId: input.itemId,
         fileName: input.fileName,

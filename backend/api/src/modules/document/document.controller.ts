@@ -11,13 +11,14 @@ import {
   UseGuards,
   UseInterceptors
 } from "@nestjs/common";
+import { FilesInterceptor } from "@nestjs/platform-express";
 import { DocumentItemKey } from "@prisma/client";
 import { Request, Response } from "express";
-import { FilesInterceptor } from "@nestjs/platform-express";
 import multer from "multer";
-import { DocumentService } from "./document.service";
+
 import { AuthGuard } from "../../common/auth/auth.guard";
 import { RolesGuard } from "../../common/auth/roles.guard";
+import { DocumentService } from "./document.service";
 import { ValidateItemDto } from "./dto/validate-item.dto";
 
 @Controller("documents")
@@ -26,7 +27,12 @@ export class DocumentController {
   constructor(private readonly documentService: DocumentService) {}
 
   @Post(":processId/items/:itemKey/upload")
-  @UseInterceptors(FilesInterceptor("files", 12, { storage: multer.memoryStorage() }))
+  @UseInterceptors(
+    FilesInterceptor("files", 12, {
+      storage: multer.memoryStorage(),
+      limits: { fileSize: 8 * 1024 * 1024, files: 12 }
+    })
+  )
   async upload(
     @Param("processId") processId: string,
     @Param("itemKey") itemKey: DocumentItemKey,
@@ -62,7 +68,9 @@ export class DocumentController {
   ) {
     const file = await this.documentService.getFile(processId, itemKey, fileId, req.actor!, "preview_document");
     res.setHeader("Content-Type", file.mimeType);
-    res.setHeader("Content-Disposition", `inline; filename="${file.fileName}"`);
+    res.setHeader("Cache-Control", "private, no-store, max-age=0");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Disposition", `inline; filename="${this.safeFileName(file.fileName)}"`);
     res.send(file.data);
   }
 
@@ -76,7 +84,17 @@ export class DocumentController {
   ) {
     const file = await this.documentService.getFile(processId, itemKey, fileId, req.actor!, "download_document");
     res.setHeader("Content-Type", file.mimeType);
-    res.setHeader("Content-Disposition", `attachment; filename="${file.fileName}"`);
+    res.setHeader("Cache-Control", "private, no-store, max-age=0");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Disposition", `attachment; filename="${this.safeFileName(file.fileName)}"`);
     res.send(file.data);
+  }
+
+  private safeFileName(fileName: string) {
+    const safe = [...fileName].map((character) => {
+      const code = character.charCodeAt(0);
+      return character === '"' || character === "\\" || code <= 31 || code === 127 ? "_" : character;
+    });
+    return safe.join("").slice(0, 180) || "document";
   }
 }

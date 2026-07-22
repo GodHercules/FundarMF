@@ -1,12 +1,18 @@
-import dayjs from "dayjs";
 import { Injectable } from "@nestjs/common";
 import { DocumentItemStatus, ProcessStatus, SlaStatus } from "@prisma/client";
-import { PrismaService } from "../../shared/prisma.service";
+
 import { timeAsync } from "../../shared/perf";
+import { PrismaService } from "../../shared/prisma.service";
 
 type MunicipalityCache = {
   value: string[];
   expiresAt: number;
+};
+
+type IbgeMunicipality = {
+  nome?: string;
+  UF?: { sigla?: string };
+  microrregiao?: { mesorregiao?: { UF?: { sigla?: string } } };
 };
 
 let municipalitiesCache: MunicipalityCache | null = null;
@@ -22,19 +28,14 @@ export class PublicService {
       this.prisma.documentItem.count({
         where: { status: { in: [DocumentItemStatus.APROVADO, DocumentItemStatus.REPROVADO] } }
       }),
-      this.prisma.process.findMany({
-        where: { status: ProcessStatus.CONCLUIDO },
-        select: { createdAt: true, updatedAt: true }
-      })
+      this.prisma.$queryRaw<Array<{ avg_days: number | null }>>`
+        SELECT AVG(EXTRACT(EPOCH FROM ("updatedAt" - "createdAt")) / 86400.0)::float8 AS avg_days
+        FROM "Process"
+        WHERE "status" = ${ProcessStatus.CONCLUIDO}::"ProcessStatus"
+      `
     ]);
 
-    let avgCompletionDays = 0;
-    if (completedProcesses.length > 0) {
-      const totalDays = completedProcesses.reduce((sum, process) => {
-        return sum + dayjs(process.updatedAt).diff(process.createdAt, "day", true);
-      }, 0);
-      avgCompletionDays = totalDays / completedProcesses.length;
-    }
+    const avgCompletionDays = Number(completedProcesses[0]?.avg_days ?? 0);
 
     return {
       criticalSteps: slaConfigs,
@@ -59,11 +60,11 @@ export class PublicService {
       if (!response.ok) {
         throw new Error("IBGE unavailable");
       }
-      const data = (await response.json()) as Array<Record<string, any>>;
+      const data = (await response.json()) as IbgeMunicipality[];
       const list = data
         .map((municipio) => {
           const uf = municipio?.microrregiao?.mesorregiao?.UF?.sigla ?? municipio?.UF?.sigla ?? "";
-          return uf ? `${municipio.nome} - ${uf}` : municipio.nome;
+          return uf ? `${municipio.nome ?? ""} - ${uf}` : municipio.nome ?? "";
         })
         .filter(Boolean)
         .sort((a, b) => String(a).localeCompare(String(b), "pt-BR"));

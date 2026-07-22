@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { performance } from "node:perf_hooks";
 import { randomUUID } from "node:crypto";
+import { performance } from "node:perf_hooks";
+
 import type { NextFunction, Request, Response } from "express";
 
 export type RequestPerf = {
@@ -21,6 +22,11 @@ export type RequestContext = {
   startHrTime: number;
 };
 
+export type RequestWithContext = Request & {
+  correlationId?: string;
+  perf?: RequestPerf;
+};
+
 const storage = new AsyncLocalStorage<RequestContext>();
 
 export const getRequestContext = () => storage.getStore();
@@ -38,8 +44,11 @@ export const addPerfTime = (field: keyof RequestPerf, deltaMs: number) => {
 
 export const requestContextMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const incomingId = req.headers["x-correlation-id"];
+  const normalizedIncomingId = typeof incomingId === "string" ? incomingId.trim() : "";
   const correlationId =
-    typeof incomingId === "string" && incomingId.trim().length > 0 ? incomingId : randomUUID();
+    normalizedIncomingId.length > 0 && normalizedIncomingId.length <= 128 && /^[A-Za-z0-9._:-]+$/.test(normalizedIncomingId)
+      ? normalizedIncomingId
+      : randomUUID();
 
   const perf: RequestPerf = {
     startTime: Date.now()
@@ -51,8 +60,9 @@ export const requestContextMiddleware = (req: Request, res: Response, next: Next
   };
 
   storage.run(ctx, () => {
-    (req as any).correlationId = correlationId;
-    (req as any).perf = perf;
+    const request = req as RequestWithContext;
+    request.correlationId = correlationId;
+    request.perf = perf;
     res.setHeader("x-correlation-id", correlationId);
     next();
   });

@@ -1,8 +1,9 @@
+import { Injectable } from "@nestjs/common";
 import crypto from "crypto";
 import dayjs from "dayjs";
-import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../../shared/prisma.service";
+
 import { Actor } from "../../common/auth/types";
+import { PrismaService } from "../../shared/prisma.service";
 
 const SESSION_COOKIE = "fundarmf_session";
 
@@ -71,10 +72,11 @@ export class SessionService {
   buildCookieOptions() {
     const cookieSecureRaw = process.env.COOKIE_SECURE?.trim();
     const defaultSecure = process.env.NODE_ENV === "production" || Boolean(process.env.RENDER);
-    const secure =
+    const configuredSecure =
       cookieSecureRaw === undefined || cookieSecureRaw.length === 0
         ? defaultSecure
         : cookieSecureRaw.toLowerCase() === "true";
+    const secure = defaultSecure || configuredSecure;
 
     return {
       httpOnly: true,

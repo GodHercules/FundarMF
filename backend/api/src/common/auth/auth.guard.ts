@@ -1,5 +1,7 @@
-import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
 import { performance } from "node:perf_hooks";
+
+import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
+
 import { addPerfTime } from "../../shared/request-context";
 
 @Injectable()

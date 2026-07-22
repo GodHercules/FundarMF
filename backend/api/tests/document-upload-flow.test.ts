@@ -22,7 +22,8 @@ describe("Document upload flow", () => {
 
     const prisma = {
       process: {
-        findUnique: vi.fn(async ({ where }: any) => (where?.id === db.process.id ? db.process : null))
+        findUnique: vi.fn(async ({ where }: any) => (where?.id === db.process.id ? db.process : null)),
+        update: vi.fn(async () => db.process)
       },
       processStep: {
         findUnique: vi.fn(async ({ where }: any) => {
@@ -98,6 +99,7 @@ describe("Document upload flow", () => {
       },
       user: { findUnique: vi.fn(async () => null) }
     };
+    (prisma as any).$transaction = vi.fn(async (callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma as any));
 
     const auditService = { record: vi.fn(async () => undefined) };
     const notificationService = {
