@@ -24,9 +24,11 @@ export class AuthService {
   ) {}
 
   private shouldSendAuthWebhook() {
-    // Access links and OTPs are credentials; they must never leave the API process.
-    // Delivery is handled by the configured email/WhatsApp providers.
-    return false;
+    // This is intentionally separate from N8N_WEBHOOK_AUTH_ENABLED, which controls
+    // whether the transport itself must include x-webhook-secret. The n8n workflow
+    // is the configured customer-mail delivery path, so it must receive link + OTP
+    // when explicitly enabled.
+    return (process.env.N8N_WEBHOOK_AUTH_EVENTS_ENABLED ?? "false").trim().toLowerCase() === "true";
   }
 
   private linkDedupSeconds() {

@@ -245,9 +245,10 @@ export class NotificationService {
 
     const correlationId = getRequestContext()?.correlationId;
     const secret = process.env.N8N_WEBHOOK_SECRET?.trim();
-    const authRequired =
-      process.env.NODE_ENV === "production" ||
-      (process.env.N8N_WEBHOOK_AUTH_ENABLED ?? "true").trim().toLowerCase() === "true";
+    // Keep transport authentication configurable. Production deployments that use
+    // a secret remain protected by the default; the n8n webhook used by this
+    // installation is explicitly configured without one.
+    const authRequired = (process.env.N8N_WEBHOOK_AUTH_ENABLED ?? "true").trim().toLowerCase() === "true";
     if (authRequired && !secret) {
       console.error("[notify] webhook disabled because N8N_WEBHOOK_SECRET is missing");
       return;
