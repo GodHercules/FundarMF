@@ -42,6 +42,8 @@ export type ErrorCaptureContext = {
 };
 
 export type ErrorEventPayload = {
+  /** n8n routing key for the internal-error notification branch. */
+  audience: "Error";
   eventId: string;
   eventType: "application_error";
   timestamp: string;

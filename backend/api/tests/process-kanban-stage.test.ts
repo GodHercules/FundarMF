@@ -100,6 +100,13 @@ describe("ProcessService updateKanbanStage", () => {
       expect.stringContaining("Joana"),
       expect.stringContaining("DBE")
     );
+    expect(notificationService.sendWebhook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        audience: "client",
+        reason: "kanban_stage_changed",
+        to: "cliente@teste.com"
+      })
+    );
     expect(auditService.record).toHaveBeenCalledWith(
       { role: "OPERADOR", userId: "op-1", email: "op@teste.com" },
       "kanban_stage_updated",

@@ -208,6 +208,7 @@ export class AuthService {
       // Enable this only if you want webhook mirroring for auth events.
       if (this.shouldSendAuthWebhook()) {
         void this.notificationService.sendWebhook({
+          audience: "client",
           email,
           whatsapp: normalizedWhatsapp,
           link: linkUrl,
@@ -244,6 +245,7 @@ export class AuthService {
       // If there's no email, still notify webhook with link + otp metadata.
       if (this.shouldSendAuthWebhook()) {
         void this.notificationService.sendWebhook({
+          audience: "client",
           email,
           whatsapp: normalizedWhatsapp,
           link: linkUrl,
@@ -327,6 +329,7 @@ export class AuthService {
 
     if (this.shouldSendAuthWebhook()) {
       void this.notificationService.sendWebhook({
+        audience: "client",
         email: updatedLink.email ?? undefined,
         whatsapp: updatedLink.whatsapp ?? undefined,
         otp,
@@ -459,6 +462,7 @@ export class AuthService {
 
     if (this.shouldSendAuthWebhook()) {
       void this.notificationService.sendWebhook({
+        audience: "client",
         email: updatedLink.email ?? undefined,
         whatsapp: updatedLink.whatsapp ?? undefined,
         link: linkUrl,

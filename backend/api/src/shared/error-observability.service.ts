@@ -83,6 +83,7 @@ export class ErrorObservabilityService {
     const execution = context.execution ?? {};
     const stack = details.stack ? sanitizeObservabilityString(details.stack) : null;
     return {
+      audience: "Error",
       eventId: randomUUID(), eventType: "application_error", timestamp: new Date().toISOString(), severity: values.severity,
       environment: process.env.NODE_ENV ?? "development", application: process.env.ERROR_WEBHOOK_APPLICATION ?? "fundarmf",
       service: context.service ?? "backend", version: process.env.APP_VERSION ?? process.env.RENDER_GIT_COMMIT ?? null,

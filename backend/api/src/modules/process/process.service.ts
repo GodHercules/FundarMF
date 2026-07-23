@@ -255,6 +255,7 @@ export class ProcessService {
       });
 
       await this.notificationService.sendWebhook({
+        audience: drafts.client && drafts.operator ? "both" : drafts.client ? "client" : "operator",
         reason: event,
         channel: "system",
         requestedBy: { email: actor.email, role: actor.role },
@@ -307,6 +308,7 @@ export class ProcessService {
 
       // Fallback channel for environments with n8n enabled: if provider delivery fails, webhook can replay.
       await this.notificationService.sendWebhook({
+        audience: "client",
         reason: "kanban_stage_changed",
         channel: "system",
         requestedBy: { email: actor.email, role: actor.role },

@@ -95,6 +95,7 @@ describe("AuthService customer link", () => {
     expect(notificationService.sendWebhook).toHaveBeenCalledTimes(1);
     const payload = notificationService.sendWebhook.mock.calls[0][0];
     expect(payload).toMatchObject({
+      audience: "client",
       email: "cliente@x.com",
       reason: "link_created",
       requestedBy: { email: "op@x.com", role: "OPERADOR" },
