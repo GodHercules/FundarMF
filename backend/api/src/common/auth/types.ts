@@ -5,6 +5,7 @@ export interface Actor {
   userId?: string;
   email?: string;
   whatsapp?: string;
+  tenantKey?: string;
 }
 
 declare global {

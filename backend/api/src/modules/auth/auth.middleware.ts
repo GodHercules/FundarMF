@@ -32,7 +32,8 @@ export class AuthMiddleware implements NestMiddleware {
       role: session.role,
       userId: session.userId ?? undefined,
       email: session.clientEmail ?? undefined,
-      whatsapp: session.clientWhatsapp ?? undefined
+      whatsapp: session.clientWhatsapp ?? undefined,
+      tenantKey: session.user?.tenantKey ?? "default"
     };
 
     const rotationMinutes = Number(process.env.SESSION_ROTATE_MINUTES ?? 60);

@@ -25,11 +25,12 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     const perfUrl =
       typeof window !== "undefined" ? new URL(requestUrl, window.location.origin).toString() : requestUrl;
     const start = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
     const response = await fetch(requestUrl, {
       ...options,
       credentials: "include",
       headers: {
-        "Content-Type": "application/json",
+        ...(isFormData ? {} : { "Content-Type": "application/json" }),
         ...(options.headers ?? {})
       }
     });

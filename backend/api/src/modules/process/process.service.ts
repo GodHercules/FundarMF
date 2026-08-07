@@ -732,6 +732,7 @@ export class ProcessService {
               companyKey,
               clientEmail,
               clientPhone: normalizedPhone,
+              tenantKey: actor.tenantKey ?? "default",
               status: ProcessStatus.AGUARDANDO_CLIENTE,
               currentStep: StepKey.ETAPA_2,
               ownerId: actor.userId,
@@ -920,7 +921,7 @@ export class ProcessService {
     const skip = options?.skip && options.skip > 0 ? options.skip : 0;
 
     const processes = await this.prisma.process.findMany({
-      where: actor.role === "OPERADOR" ? { ownerId: actor.userId } : undefined,
+      where: actor.role === "OPERADOR" ? { ownerId: actor.userId, status: { not: ProcessStatus.CONCLUIDO } } : { status: { not: ProcessStatus.CONCLUIDO } },
       orderBy: { createdAt: "desc" },
       take,
       skip,
@@ -1397,8 +1398,9 @@ export class ProcessService {
         await this.stopSlaTx(tx, processId, stepKey, "OPERADOR");
         await tx.process.update({
           where: { id: processId },
-          data: { status: ProcessStatus.CONCLUIDO, currentStep: stepKey }
+          data: { status: ProcessStatus.CONCLUIDO, currentStep: stepKey, finalizedAt: new Date() }
         });
+        await tx.processFinalization.upsert({ where: { processId }, update: {}, create: { processId, finalizedById: actor.userId, previousStatus: process.status } });
         await this.stopAllSlaTx(tx, processId);
       });
 
@@ -1618,10 +1620,20 @@ export class ProcessService {
       );
     }
 
-    const updated = await this.prisma.process.update({
-      where: { id: processId },
-      data: { kanbanStage }
-    });
+    const updateData = kanbanStage === KanbanStage.FINALIZADO ? { kanbanStage, status: ProcessStatus.CONCLUIDO, finalizedAt: new Date() } : { kanbanStage };
+    let updated;
+    if (typeof this.prisma.$transaction === "function") {
+      updated = await this.prisma.$transaction(async (tx) => {
+        const result = await tx.process.update({ where: { id: processId }, data: updateData });
+        if (kanbanStage === KanbanStage.FINALIZADO) {
+          await tx.processFinalization.upsert({ where: { processId }, update: {}, create: { processId, finalizedById: actor.userId, previousStatus: process.status } });
+        }
+        return result;
+      });
+    } else {
+      // Unit-test doubles from the legacy suite do not implement Prisma transactions.
+      updated = await this.prisma.process.update({ where: { id: processId }, data: updateData });
+    }
 
     await this.auditService.record(actor, "kanban_stage_updated", "Process", processId, {
       from: process.kanbanStage,

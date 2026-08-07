@@ -95,6 +95,7 @@ enum SlaStatus {
 enum IdempotencyScope {
   PROCESS_CREATE
   CUSTOMER_LINK_REQUEST
+  COMPLETED_PROCESS_FINALIZATION
 }
 
 model User {
@@ -104,6 +105,7 @@ model User {
   passwordHash String
   whatsapp     String?
   role         Role
+  tenantKey    String   @default("default")
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -119,6 +121,9 @@ model Process {
   companyKey         String?
   clientEmail        String
   clientPhone        String?
+  legacyClientId     String?
+  finalizedAt        DateTime?
+  tenantKey          String          @default("default")
   status             ProcessStatus   @default(EM_ANDAMENTO)
   currentStep        StepKey         @default(ETAPA_1)
   kanbanStage        KanbanStage     @default(VIABILIDADE)
@@ -142,6 +147,9 @@ model Process {
   notifications         UserNotification[]
   fileObjects           FileObject[]
   alteracoesContratuais AlteracaoContratual[]
+  contracts             Contract[]
+  finalization          ProcessFinalization?
+  legacyClient          LegacyClient?       @relation(fields: [legacyClientId], references: [id])
 
   @@index([ownerId, createdAt])
   @@index([kanbanStage, ownerId, createdAt])
@@ -149,6 +157,140 @@ model Process {
   @@index([companyKey, createdAt])
   @@index([clientPhone, createdAt])
   @@index([status, createdAt])
+  @@index([tenantKey, status, finalizedAt])
+}
+
+model LegacyClient {
+  id               String   @id @default(uuid())
+  kind             String
+  name             String
+  tradeName        String?
+  documentNumber   String
+  normalizedDocument String
+  tenantKey          String   @default("default")
+  address          String?
+  city             String?
+  state            String?
+  municipalRegistration String?
+  stateRegistration String?
+  phone            String?
+  email            String?
+  createdById      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  processes        Process[]
+  contracts        Contract[]
+
+  @@index([name])
+  @@index([createdAt])
+  @@unique([tenantKey, normalizedDocument])
+}
+
+model ProcessFinalization {
+  id          String   @id @default(uuid())
+  processId   String   @unique
+  finalizedAt DateTime @default(now())
+  finalizedById String?
+  previousStatus ProcessStatus?
+  createdAt   DateTime @default(now())
+  process     Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+  @@index([finalizedAt])
+}
+
+model Contract {
+  id             String   @id @default(uuid())
+  processId      String?
+  legacyClientId String?
+  tenantKey      String   @default("default")
+  title          String
+  type           String?
+  description    String?
+  status         String   @default("RASCUNHO")
+  origin         String
+  editorSchemaVersion String @default("1")
+  currentVersion Int      @default(1)
+  conversionStatus String @default("CONCLUIDO")
+  conversionMessage String?
+  conversionMetadata Json?
+  usedOcr        Boolean @default(false)
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  process        Process? @relation(fields: [processId], references: [id], onDelete: Cascade)
+  legacyClient   LegacyClient? @relation(fields: [legacyClientId], references: [id])
+  versions       ContractVersion[]
+  files          ContractFile[]
+  exports        ContractExport[]
+  conversions    ContractConversion[]
+  @@index([processId, updatedAt])
+  @@index([legacyClientId, updatedAt])
+  @@index([tenantKey, updatedAt])
+}
+
+model ContractConversion {
+  id           String   @id @default(uuid())
+  contractId   String
+  status       String   @default("CONCLUIDO")
+  attempt      Int      @default(1)
+  progress     Int      @default(100)
+  usedOcr      Boolean  @default(false)
+  metadata     Json?
+  errorCode    String?
+  errorMessage String?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  contract     Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  @@index([contractId, createdAt])
+  @@index([status, createdAt])
+}
+
+model ContractVersion {
+  id           String   @id @default(uuid())
+  contractId   String
+  version      Int
+  status       String
+  content      Json
+  source       String
+  sha256       String
+  createdById  String?
+  createdAt    DateTime @default(now())
+  contract     Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  @@unique([contractId, version])
+  @@index([contractId, createdAt])
+}
+
+model ContractFile {
+  id           String   @id @default(uuid())
+  contractId   String
+  kind         String
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  sha256       String
+  data         Bytes
+  createdById  String?
+  createdAt    DateTime @default(now())
+  contract     Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  @@index([contractId, kind, createdAt])
+}
+
+model ContractExport {
+  id           String   @id @default(uuid())
+  contractId   String
+  version      Int
+  format       String
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  sha256       String
+  data         Bytes
+  createdById  String?
+  createdAt    DateTime @default(now())
+  contract     Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  @@unique([contractId, version, format])
+  @@index([contractId, createdAt])
 }
 
 model AlteracaoContratual {

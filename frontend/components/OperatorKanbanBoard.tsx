@@ -177,7 +177,7 @@ export function OperatorKanbanBoard({ onStageChange }: OperatorKanbanBoardProps)
       AGUARDANDO_DOCUMENTOS: [],
       ANALISE_JUCEB: [],
       EXIGENCIA_JUCEB: [],
-      FINALIZADO: []
+
     };
 
     for (const process of processes) {
@@ -185,7 +185,7 @@ export function OperatorKanbanBoard({ onStageChange }: OperatorKanbanBoardProps)
         continue;
       }
       const stage = process.kanbanStage;
-      map[stage].push(process);
+      if (stage in map) map[stage].push(process);
     }
     return map;
   }, [processes]);

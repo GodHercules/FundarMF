@@ -5,8 +5,7 @@
   "PREPARACAO_DOCUMENTOS",
   "AGUARDANDO_DOCUMENTOS",
   "ANALISE_JUCEB",
-  "EXIGENCIA_JUCEB",
-  "FINALIZADO"
+  "EXIGENCIA_JUCEB"
 ] as const;
 
 export type KanbanStage = (typeof KANBAN_STAGES)[number];
@@ -18,6 +17,5 @@ export const KANBAN_STAGE_LABELS: Record<KanbanStage, string> = {
   PREPARACAO_DOCUMENTOS: "Preparacao Documentos",
   AGUARDANDO_DOCUMENTOS: "Aguardando Documentos",
   ANALISE_JUCEB: "Analise JUCEB",
-  EXIGENCIA_JUCEB: "Exigência JUCEB",
-  FINALIZADO: "Finalizado"
+  EXIGENCIA_JUCEB: "Exigência JUCEB"
 };

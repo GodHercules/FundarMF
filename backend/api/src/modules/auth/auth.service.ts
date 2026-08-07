@@ -503,7 +503,7 @@ export class AuthService {
       throw new UnauthorizedException("Credenciais inválidas.");
     }
 
-    const actor: Actor = { role: role === "OPERATOR" ? "OPERADOR" : "MASTER", userId: user.id, email: user.email };
+    const actor: Actor = { role: role === "OPERATOR" ? "OPERADOR" : "MASTER", userId: user.id, email: user.email, tenantKey: user.tenantKey };
     const { token } = await this.sessionService.createSession(actor, Number(process.env.SESSION_TTL_HOURS ?? 48));
 
     await this.auditService.record(actor, "user_login", "Session", undefined, { email: user.email });
@@ -525,7 +525,8 @@ export class AuthService {
     const actor: Actor = {
       role: user.role === "OPERATOR" ? "OPERADOR" : "MASTER",
       userId: user.id,
-      email: user.email
+      email: user.email,
+      tenantKey: user.tenantKey
     };
     const { token } = await this.sessionService.createSession(actor, Number(process.env.SESSION_TTL_HOURS ?? 48));
 

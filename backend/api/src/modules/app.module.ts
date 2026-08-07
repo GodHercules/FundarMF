@@ -14,6 +14,7 @@ import { ProcessModule } from "./process/process.module";
 import { PublicModule } from "./public/public.module";
 import { SlaModule } from "./sla/sla.module";
 import { ObservabilityModule } from "../shared/observability.module";
+import { CompletedModule } from "./completed/completed.module";
 
 @Module({
   // Module load order is explicit to keep startup behavior predictable.
@@ -23,6 +24,7 @@ import { ObservabilityModule } from "../shared/observability.module";
     DatabaseModule,
     AuthModule,
     ProcessModule,
+    CompletedModule,
     AdminModule,
     DocumentModule,
     ChecklistModule,
