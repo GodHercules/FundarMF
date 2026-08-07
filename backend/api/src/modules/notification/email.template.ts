@@ -17,6 +17,7 @@ type RenderedEmail = {
 
 const cache = new Map<string, string>();
 const logoCacheKey = "mf-logo-data-uri";
+const fundarLogoCacheKey = "fundar-logo-data-uri";
 
 const resolveTemplatePath = (name: string) => {
   const envDir = process.env.NOTIFY_TEMPLATE_DIR?.trim();
@@ -47,25 +48,29 @@ const loadTemplate = (name: string) => {
   return content;
 };
 
-const loadLogo = () => {
-  const configuredLogo = process.env.EMAIL_LOGO_URL?.trim();
-  if (configuredLogo) return configuredLogo;
-
-  const cached = cache.get(logoCacheKey);
+const loadAssetDataUri = (fileName: string, mimeType: string, cacheKey: string) => {
+  const cached = cache.get(cacheKey);
   if (cached) return cached;
 
   const candidates = [
-    path.join(process.cwd(), "src", "modules", "notification", "templates", "email", "assets", "mf-logo.png"),
-    path.join(process.cwd(), "api", "src", "modules", "notification", "templates", "email", "assets", "mf-logo.png"),
-    path.join(process.cwd(), "backend", "api", "src", "modules", "notification", "templates", "email", "assets", "mf-logo.png")
+    path.join(process.cwd(), "src", "modules", "notification", "templates", "email", "assets", fileName),
+    path.join(process.cwd(), "api", "src", "modules", "notification", "templates", "email", "assets", fileName),
+    path.join(process.cwd(), "backend", "api", "src", "modules", "notification", "templates", "email", "assets", fileName)
   ];
-  const logoPath = candidates.find((candidate) => fs.existsSync(candidate));
-  if (!logoPath) return "";
+  const assetPath = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!assetPath) return "";
 
-  const dataUri = `data:image/png;base64,${fs.readFileSync(logoPath).toString("base64")}`;
-  cache.set(logoCacheKey, dataUri);
+  const dataUri = `data:${mimeType};base64,${fs.readFileSync(assetPath).toString("base64")}`;
+  cache.set(cacheKey, dataUri);
   return dataUri;
 };
+
+const loadLogo = () => {
+  const configuredLogo = process.env.EMAIL_LOGO_URL?.trim();
+  return configuredLogo || loadAssetDataUri("mf-logo.png", "image/png", logoCacheKey);
+};
+
+const loadFundarLogo = () => loadAssetDataUri("fundar-logo.png", "image/png", fundarLogoCacheKey);
 
 const escapeHtml = (value: string) =>
   value
@@ -89,6 +94,7 @@ export const renderBaseEmail = (payload: EmailTemplatePayload): RenderedEmail =>
   const companyName = process.env.COMPANY_NAME ?? "FundarMF";
   const companyLocation = process.env.COMPANY_LOCATION ?? "Brasil";
   const logoUrl = loadLogo();
+  const fundarLogoUrl = loadFundarLogo();
   const preheader = payload.preheader ?? payload.title;
   const bodyHtml = toHtmlBody(payload.body);
   const ctaBlock =
@@ -103,6 +109,7 @@ export const renderBaseEmail = (payload: EmailTemplatePayload): RenderedEmail =>
     .replace(/{{companyName}}/g, escapeHtml(companyName))
     .replace(/{{companyLocation}}/g, escapeHtml(companyLocation))
     .replace(/{{logoUrl}}/g, escapeHtml(logoUrl))
+    .replace(/{{fundarLogoUrl}}/g, escapeHtml(fundarLogoUrl))
     .replace(/{{bodyHtml}}/g, bodyHtml)
     .replace(/{{ctaBlock}}/g, ctaBlock);
 

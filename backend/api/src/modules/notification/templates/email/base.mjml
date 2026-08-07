@@ -17,13 +17,6 @@
         color: #6b7280;
         font-size: 12px;
       }
-      .brand-name {
-        color: #0f172a;
-        font-size: 13px;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
       .eyebrow {
         color: #155eef;
         font-size: 12px;
@@ -34,12 +27,12 @@
     </mj-style>
   </mj-head>
   <mj-body background-color="#f5f7fb">
-    <mj-section background-color="#ffffff" padding="24px 16px 18px" border-bottom="1px solid #e5eaf2">
-      <mj-column width="72%">
-        <mj-image src="{{logoUrl}}" alt="MF Contabilidade" width="170px" align="left" padding="0" />
-      </mj-column>
+    <mj-section background-color="#ffffff" padding="22px 22px 20px" border-bottom="1px solid #e5eaf2">
       <mj-column width="28%" vertical-align="middle">
-        <mj-text align="right" css-class="brand-name" padding="0">{{brandName}}</mj-text>
+        <mj-image src="{{fundarLogoUrl}}" alt="FundarMF" width="104px" align="left" padding="0" />
+      </mj-column>
+      <mj-column width="72%" vertical-align="middle">
+        <mj-image src="{{logoUrl}}" alt="MF Contabilidade" width="270px" align="right" padding="0" />
       </mj-column>
     </mj-section>
     <mj-section padding="34px 16px 20px">

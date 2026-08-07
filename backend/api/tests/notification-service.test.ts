@@ -19,6 +19,7 @@ describe("NotificationService", () => {
     expect(payload.html).toContain("<html");
     expect(payload.html).toContain("MF Contabilidade");
     expect(payload.html).not.toContain("{{logoUrl}}");
+    expect(payload.html).not.toContain("{{fundarLogoUrl}}");
   });
 
   it("enqueues whatsapp", async () => {
