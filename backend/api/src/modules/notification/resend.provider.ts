@@ -15,8 +15,8 @@ export class ResendEmailProvider implements EmailProvider {
     this.from = process.env.EMAIL_FROM ?? "no-reply@fundarmf.local";
   }
 
-  async sendEmail(to: string, subject: string, body: string) {
-    const html = body
+  async sendEmail(to: string, subject: string, body: string, html?: string) {
+    const renderedHtml = html ?? body
       .split("\n")
       .map((line) => line.trim())
       .map((line) => (line ? `<p style="margin:0 0 8px;">${line}</p>` : "<br/>"))
@@ -27,7 +27,7 @@ export class ResendEmailProvider implements EmailProvider {
       to,
       subject,
       text: body,
-      html,
+      html: renderedHtml,
       headers: {
         "Content-Type": "text/html; charset=UTF-8"
       }

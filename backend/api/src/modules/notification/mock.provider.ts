@@ -7,7 +7,7 @@ import { EmailProvider, WhatsAppProvider } from "./notification.types";
 export class MockEmailProvider implements EmailProvider {
   constructor(private readonly prisma: PrismaService) {}
 
-  async sendEmail(to: string, subject: string, body: string) {
+  async sendEmail(to: string, subject: string, body: string, _html?: string) {
     await this.prisma.notification.create({
       data: {
         channel: "EMAIL",
@@ -23,8 +23,8 @@ export class MockEmailProvider implements EmailProvider {
 
 @Injectable()
 export class TerminalEmailProvider implements EmailProvider {
-  async sendEmail(to: string, subject: string, body: string) {
-    const htmlPreview = body
+  async sendEmail(to: string, subject: string, body: string, html?: string) {
+    const htmlPreview = html ?? body
       .split("\n")
       .map((line) => line.trim())
       .map((line) => (line ? `<p style="margin:0 0 8px;">${line}</p>` : "<br/>"))

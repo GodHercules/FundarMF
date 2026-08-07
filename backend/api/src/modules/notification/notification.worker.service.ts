@@ -105,7 +105,7 @@ export class NotificationWorkerService implements OnModuleInit {
 
     try {
       await withTimeout(
-        this.emailProvider.sendEmail(payload.to, payload.subject, payload.text),
+        this.emailProvider.sendEmail(payload.to, payload.subject, payload.text, payload.html),
         toNumber(process.env.NOTIFY_SEND_TIMEOUT_MS, 15_000)
       );
 

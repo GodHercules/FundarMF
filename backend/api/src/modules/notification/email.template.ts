@@ -16,6 +16,7 @@ type RenderedEmail = {
 };
 
 const cache = new Map<string, string>();
+const logoCacheKey = "mf-logo-data-uri";
 
 const resolveTemplatePath = (name: string) => {
   const envDir = process.env.NOTIFY_TEMPLATE_DIR?.trim();
@@ -46,6 +47,26 @@ const loadTemplate = (name: string) => {
   return content;
 };
 
+const loadLogo = () => {
+  const configuredLogo = process.env.EMAIL_LOGO_URL?.trim();
+  if (configuredLogo) return configuredLogo;
+
+  const cached = cache.get(logoCacheKey);
+  if (cached) return cached;
+
+  const candidates = [
+    path.join(process.cwd(), "src", "modules", "notification", "templates", "email", "assets", "mf-logo.png"),
+    path.join(process.cwd(), "api", "src", "modules", "notification", "templates", "email", "assets", "mf-logo.png"),
+    path.join(process.cwd(), "backend", "api", "src", "modules", "notification", "templates", "email", "assets", "mf-logo.png")
+  ];
+  const logoPath = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!logoPath) return "";
+
+  const dataUri = `data:image/png;base64,${fs.readFileSync(logoPath).toString("base64")}`;
+  cache.set(logoCacheKey, dataUri);
+  return dataUri;
+};
+
 const escapeHtml = (value: string) =>
   value
     .replace(/&/g, "&amp;")
@@ -67,6 +88,7 @@ export const renderBaseEmail = (payload: EmailTemplatePayload): RenderedEmail =>
   const brandName = process.env.WHATSAPP_BRAND ?? process.env.COMPANY_NAME ?? "FundarMF";
   const companyName = process.env.COMPANY_NAME ?? "FundarMF";
   const companyLocation = process.env.COMPANY_LOCATION ?? "Brasil";
+  const logoUrl = loadLogo();
   const preheader = payload.preheader ?? payload.title;
   const bodyHtml = toHtmlBody(payload.body);
   const ctaBlock =
@@ -80,13 +102,18 @@ export const renderBaseEmail = (payload: EmailTemplatePayload): RenderedEmail =>
     .replace(/{{brandName}}/g, escapeHtml(brandName))
     .replace(/{{companyName}}/g, escapeHtml(companyName))
     .replace(/{{companyLocation}}/g, escapeHtml(companyLocation))
+    .replace(/{{logoUrl}}/g, escapeHtml(logoUrl))
     .replace(/{{bodyHtml}}/g, bodyHtml)
     .replace(/{{ctaBlock}}/g, ctaBlock);
+
+  if (mjml.includes("{{")) {
+    throw new Error("Email template contains unresolved placeholders.");
+  }
 
   const { html, errors } = mjml2html(mjml, { validationLevel: "soft" });
   if (errors.length > 0) {
     console.warn("[notify] MJML warnings", errors);
   }
 
-  return { html, text: payload.body };
+  return { html: html.replace(/^<html>/i, '<html lang="pt-BR">'), text: payload.body };
 };

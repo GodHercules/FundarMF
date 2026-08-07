@@ -202,7 +202,7 @@ export class AuthService {
         ctaUrl: linkUrl
       });
       notifyTasks.push(
-        this.notificationService.sendEmail(email, subject, emailText)
+        this.notificationService.sendEmail(email, subject, emailText, emailRendered.html)
       );
       // Avoid double-delivery: in some setups n8n also sends the email/whatsapp when it receives the webhook.
       // Enable this only if you want webhook mirroring for auth events.
@@ -458,7 +458,7 @@ export class AuthService {
       ctaLabel: "Abrir acesso",
       ctaUrl: linkUrl
     });
-    void this.notificationService.sendEmail(updatedLink.email!, subject, emailText);
+    void this.notificationService.sendEmail(updatedLink.email!, subject, emailText, emailRendered.html);
 
     if (this.shouldSendAuthWebhook()) {
       void this.notificationService.sendWebhook({
