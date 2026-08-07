@@ -1117,7 +1117,15 @@ export default function OperatorProcess() {
               <div><h2 id="edit-client-title" className="text-xl font-semibold">Editar dados do cliente</h2><p className="text-sm text-slate">Alterações persistidas no processo e registradas na auditoria.</p></div>
               <span className="badge bg-brass/15 text-ink">Validação interna</span>
             </div>
-            <OperatorClientDataEditor initialData={getStepData(process, "ETAPA_2")} saving={savingClient} onSave={saveClientData} onCancel={() => setEditingClient(false)} />
+            <OperatorClientDataEditor
+              initialData={getStepData(process, "ETAPA_2")}
+              processId={processId}
+              documents={process.documents ?? []}
+              onDocumentsChanged={load}
+              saving={savingClient}
+              onSave={saveClientData}
+              onCancel={() => setEditingClient(false)}
+            />
           </div>
         </div>
       )}

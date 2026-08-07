@@ -6,11 +6,15 @@ import { Field } from "@/components/Field";
 import { Input } from "@/components/Input";
 import { PhoneInput } from "@/components/PhoneInput";
 import { Select } from "@/components/Select";
+import { DOCS_API_BASE } from "@/lib/api";
 import { maskCep, maskCnpj, maskCpf, maskIptu, maskPercent } from "@/lib/masks";
-import { ProcessRecord, ProcessStepData, toProcessRecords } from "@/lib/process-types";
+import { ProcessDocument, ProcessRecord, ProcessStepData, toProcessRecords } from "@/lib/process-types";
 
 type Props = {
   initialData: ProcessStepData;
+  processId: string;
+  documents: ProcessDocument[];
+  onDocumentsChanged?: () => Promise<void>;
   saving?: boolean;
   onSave: (data: ProcessStepData) => Promise<void>;
   onCancel: () => void;
@@ -34,17 +38,27 @@ const VIRTUAL_ADDRESS = {
   cep: "41500-300"
 };
 const EMPTY_ADDRESS = { cep: "", endereco: "", numero: "", complemento: "", bairro: "", cidade: "", uf: "", iptu: "" };
+const documentTypes = [
+  { key: "IDENTIFICACAO_SOCIOS", title: "Documento de identificação", description: "RG, CNH ou Documento Profissional. Para pessoa jurídica, inclua contrato social/alteração e documento do representante." },
+  { key: "COMPROVANTE_RESIDENCIA", title: "Comprovante de residência", description: "Comprovante de residência do sócio." }
+];
+const MAX_UPLOAD_FILE_MB = 8;
+const MAX_UPLOAD_TOTAL_MB = 60;
 
 const text = (value: unknown) => (value === null || value === undefined ? "" : String(value));
 const cloneRecord = (value: ProcessRecord) => Object.fromEntries(Object.entries(value).map(([key, item]) => [key, text(item)]));
+const createSocioId = () => `socio-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+const documentKey = (itemKey: string, socioId?: string) => socioId ? `${itemKey}:${socioId}` : itemKey;
 
-export function OperatorClientDataEditor({ initialData, saving, onSave, onCancel }: Props) {
+export function OperatorClientDataEditor({ initialData, processId, documents, onDocumentsChanged, saving, onSave, onCancel }: Props) {
   const [draft, setDraft] = useState<ProcessStepData>({});
   const [error, setError] = useState<string | null>(null);
+  const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
+  const [uploadingKey, setUploadingKey] = useState<string | null>(null);
 
   useEffect(() => {
     const address = initialData.endereco && typeof initialData.endereco === "object" ? initialData.endereco : {};
-    const socios = toProcessRecords(initialData.quadroSocietario).map(cloneRecord);
+    const socios = toProcessRecords(initialData.quadroSocietario).map((socio) => ({ ...cloneRecord(socio), socioId: text(socio.socioId) || createSocioId() }));
     setDraft({
       ...initialData,
       razaoSocial1: text(initialData.razaoSocial1),
@@ -92,6 +106,43 @@ export function OperatorClientDataEditor({ initialData, saving, onSave, onCancel
     else setAddress("escritorioVirtual", value);
   }
 
+  async function uploadFiles(itemKey: string, socioId: string | undefined, files: File[]) {
+    if (!files.length) return;
+    const key = documentKey(itemKey, socioId);
+    const oversized = files.find((file) => file.size > MAX_UPLOAD_FILE_MB * 1024 * 1024);
+    const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+    if (oversized) {
+      setUploadErrors((current) => ({ ...current, [key]: `Arquivo muito grande. Limite por arquivo: ${MAX_UPLOAD_FILE_MB}MB.` }));
+      return;
+    }
+    if (totalBytes > MAX_UPLOAD_TOTAL_MB * 1024 * 1024) {
+      setUploadErrors((current) => ({ ...current, [key]: `Total de arquivos excede ${MAX_UPLOAD_TOTAL_MB}MB.` }));
+      return;
+    }
+    setUploadErrors((current) => ({ ...current, [key]: "" }));
+    setUploadingKey(key);
+    try {
+      const formData = new FormData();
+      files.forEach((file) => formData.append("files", file));
+      const query = socioId ? `?socioId=${encodeURIComponent(socioId)}` : "";
+      const response = await fetch(`${DOCS_API_BASE}/documents/${processId}/items/${itemKey}/upload${query}`, {
+        method: "POST",
+        credentials: "include",
+        body: formData
+      });
+      if (!response.ok) throw new Error((await response.text()) || "Erro ao enviar documentos.");
+      await onDocumentsChanged?.();
+    } catch (uploadError) {
+      setUploadErrors((current) => ({ ...current, [key]: uploadError instanceof Error ? uploadError.message : "Erro ao enviar documentos." }));
+    } finally {
+      setUploadingKey(null);
+    }
+  }
+
+  function findDocument(itemKey: string, socioId?: string) {
+    return documents.find((document) => document.itemKey === itemKey && (document.socioId ?? undefined) === socioId);
+  }
+
   async function submit() {
     setError(null);
     if (["razaoSocial1", "municipio", "emailCnpj", "telefoneCnpj"].some((key) => !text(draft[key]).trim())) return setError("Preencha os campos empresariais obrigatórios.");
@@ -122,7 +173,7 @@ export function OperatorClientDataEditor({ initialData, saving, onSave, onCancel
       <Field label="Endereço é virtual?" required hint="Selecione para auto-preenchimento." className="md:col-span-2"><Select value={text(address.escritorioVirtual)} onChange={(event) => updateAddressType(event.target.value)}><option value="">Selecione</option><option value="Sim">Sim</option><option value="Não">Não</option></Select></Field>
       {([["cep", "CEP"], ["endereco", "Endereço"], ["numero", "Número"], ["complemento", "Complemento"], ["bairro", "Bairro"], ["cidade", "Cidade"], ["uf", "UF"], ["iptu", "IPTU"]] as const).map(([key, label]) => <Field key={key} label={label} required={key !== "complemento"}><Input placeholder={key === "cep" ? "00000-000" : undefined} value={text(address[key])} onChange={(event) => setAddress(key, key === "cep" ? maskCep(event.target.value) : key === "iptu" ? maskIptu(event.target.value) : key === "uf" ? event.target.value.toUpperCase() : event.target.value)} disabled={text(address.escritorioVirtual) === "Sim"} inputMode={key === "cep" || key === "iptu" ? "numeric" : undefined} maxLength={key === "cep" ? 9 : key === "uf" ? 2 : key === "iptu" ? 15 : undefined} /></Field>)}
     </div></section>
-    <section><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-lg font-semibold">Quadro societário</h3><p className="mt-1 text-sm text-slate">Use os mesmos campos do formulário enviado ao cliente.</p></div><Button type="button" onClick={() => setDraft((current) => ({ ...current, quadroSocietario: [...toProcessRecords(current.quadroSocietario), { tipoPessoa: "CPF" }] }))}>Adicionar sócio</Button></div><div className="mt-3 space-y-4">
+    <section><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-lg font-semibold">Quadro societário</h3><p className="mt-1 text-sm text-slate">Use os mesmos campos do formulário enviado ao cliente.</p></div><Button type="button" onClick={() => setDraft((current) => ({ ...current, quadroSocietario: [...toProcessRecords(current.quadroSocietario), { tipoPessoa: "CPF", socioId: createSocioId() }] }))}>Adicionar sócio</Button></div><div className="mt-3 space-y-4">
       {socios.map((socio, index) => { const isCompany = text(socio.tipoPessoa) === "CNPJ"; return <div key={index} className={`rounded-2xl border border-ink/10 p-4 ${isCompany ? "bg-emerald/5" : "bg-white/80"}`}><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-semibold">Sócio {index + 1}</p>{index > 0 && <Button type="button" className="bg-clay" onClick={() => setDraft((current) => ({ ...current, quadroSocietario: toProcessRecords(current.quadroSocietario).filter((_, itemIndex) => itemIndex !== index) }))}>Remover sócio</Button>}</div><div className="mt-4 grid gap-4 md:grid-cols-2">
         <Field label="Tipo de sócio" required><button type="button" role="switch" aria-checked={isCompany} aria-label="Tipo de sócio" className="relative flex h-11 w-full items-center rounded-full border border-ink/10 bg-ink/5 p-1" onClick={() => updateSocioType(index, isCompany ? "CPF" : "CNPJ")}><span className={`relative z-10 flex-1 text-center text-[11px] font-semibold uppercase ${!isCompany ? "text-ink" : "text-slate"}`}>CPF</span><span className={`relative z-10 flex-1 text-center text-[11px] font-semibold uppercase ${isCompany ? "text-ink" : "text-slate"}`}>CNPJ</span><span className={`absolute left-1 top-1 h-9 w-[calc(50%-0.25rem)] rounded-full bg-white shadow-sm transition-transform ${isCompany ? "translate-x-full" : "translate-x-0"}`} /></button></Field>
         <Field label={isCompany ? "Razão social" : "Nome completo"} required><Input value={text(socio[isCompany ? "socioRazaoSocial" : "socioNome"])} onChange={(event) => setSocio(index, isCompany ? "socioRazaoSocial" : "socioNome", event.target.value)} /></Field>
@@ -136,5 +187,9 @@ export function OperatorClientDataEditor({ initialData, saving, onSave, onCancel
       </div></div>; })}
     </div></section>
     <div className="flex flex-wrap justify-end gap-3 border-t border-ink/10 pt-4"><Button type="button" variant="ghost" onClick={onCancel} disabled={saving}>Cancelar</Button><Button type="button" variant="accent" onClick={() => void submit()} disabled={saving}>{saving ? "Salvando..." : "Salvar alterações"}</Button></div>
+    <section className="space-y-5"><div><h3 className="text-lg font-semibold">Documentos do cliente</h3><p className="mt-1 text-sm text-slate">Os mesmos uploads disponíveis no link do cliente também podem ser enviados pelo operador.</p></div>
+      {socios.map((socio, index) => <div key={text(socio.socioId) || index} className="rounded-2xl border border-ink/10 bg-white/80 p-4"><p className="text-sm font-semibold">Documentos do sócio {index + 1}</p><div className="mt-3 grid gap-4 md:grid-cols-2">{documentTypes.map((item) => { const key = documentKey(item.key, text(socio.socioId)); const document = findDocument(item.key, text(socio.socioId)); return <div key={key} className="rounded-2xl border border-ink/10 bg-white/70 p-4"><p className="text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs text-slate">{item.description}</p>{document?.status && <p className="mt-2 text-xs text-slate">Status: {document.status}</p>}<Input className="mt-3" type="file" multiple accept=".pdf,.jpg,.jpeg,.png" disabled={uploadingKey === key} onChange={(event) => void uploadFiles(item.key, text(socio.socioId), event.target.files ? Array.from(event.target.files) : [])} />{uploadErrors[key] && <p role="alert" className="mt-2 text-xs text-clay">{uploadErrors[key]}</p>}{uploadingKey === key && <p className="mt-2 text-xs text-slate">Enviando...</p>}</div>; })}</div></div>)}
+      {text(address.escritorioVirtual) !== "Sim" && <div className="rounded-2xl border border-ink/10 bg-white/80 p-4"><p className="text-sm font-semibold">Foto da fachada</p><p className="mt-1 text-xs text-slate">Obrigatória para endereço físico, como no formulário do cliente.</p>{findDocument("FOTO_FACHADA")?.status && <p className="mt-2 text-xs text-slate">Status: {findDocument("FOTO_FACHADA")?.status}</p>}<Input className="mt-3" type="file" multiple accept=".jpg,.jpeg,.png,.pdf" disabled={uploadingKey === "FOTO_FACHADA"} onChange={(event) => void uploadFiles("FOTO_FACHADA", undefined, event.target.files ? Array.from(event.target.files) : [])} />{uploadErrors.FOTO_FACHADA && <p role="alert" className="mt-2 text-xs text-clay">{uploadErrors.FOTO_FACHADA}</p>}{uploadingKey === "FOTO_FACHADA" && <p className="mt-2 text-xs text-slate">Enviando...</p>}</div>}
+    </section>
   </div>;
 }

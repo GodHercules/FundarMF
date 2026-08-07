@@ -130,6 +130,25 @@ describe("OperatorProcess", () => {
     });
   });
 
+  it("mantém os uploads do link do cliente disponíveis dentro da edição do operador", async () => {
+    const { default: EmployeeProcess } = await import("@/app/operator/process/[id]/page");
+    const user = userEvent.setup();
+    render(<EmployeeProcess />);
+    await user.click(await screen.findByRole("button", { name: /editar dados do cliente/i }));
+
+    const fileInputs = Array.from(document.querySelectorAll('input[type="file"]')) as HTMLInputElement[];
+    expect(fileInputs.length).toBeGreaterThanOrEqual(3);
+    fetchMock.mockResolvedValue({ ok: true, text: async () => "" });
+    await user.upload(fileInputs[0], new File(["documento"], "identificacao.pdf", { type: "application/pdf" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/apix/documents/process-123/items/IDENTIFICACAO_SOCIOS/upload"),
+        expect.objectContaining({ method: "POST", credentials: "include" })
+      );
+    });
+  });
+
   it("abre visualizador de documento PDF sem erro", async () => {
     const { default: EmployeeProcess } = await import("@/app/operator/process/[id]/page");
     const user = userEvent.setup();
