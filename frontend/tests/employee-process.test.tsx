@@ -101,6 +101,35 @@ describe("OperatorProcess", () => {
     expect(screen.getAllByText(/empresa teste/i).length).toBeGreaterThan(0);
   });
 
+  it("edita os dados dentro do ambiente do operador e salva pela API autenticada", async () => {
+    const { default: EmployeeProcess } = await import("@/app/operator/process/[id]/page");
+    const user = userEvent.setup();
+    const stepData = processPayload.steps[0].data as any;
+    stepData.endereco.cidade = "Salvador";
+    stepData.endereco.uf = "BA";
+    stepData.endereco.escritorioVirtual = "N\u00e3o";
+    stepData.quadroSocietario[0].socioEstadoCivil = "Solteiro(a)";
+    stepData.quadroSocietario[0].socioProfissao = "Administrador";
+    render(<EmployeeProcess />);
+
+    await user.click(await screen.findByRole("button", { name: /editar dados do cliente/i }));
+    expect(await screen.findByRole("heading", { name: /editar dados do cliente/i })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Empresa Teste")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: /tipo de sócio/i })).toBeInTheDocument();
+
+    const companyName = screen.getByDisplayValue("Empresa Teste");
+    await user.clear(companyName);
+    await user.type(companyName, "Empresa Atualizada");
+    await user.click(screen.getByRole("button", { name: /salvar alterações/i }));
+
+    await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledWith(
+        "/processes/process-123/steps",
+        expect.objectContaining({ method: "PUT", body: expect.stringContaining("Empresa Atualizada") })
+      );
+    });
+  });
+
   it("abre visualizador de documento PDF sem erro", async () => {
     const { default: EmployeeProcess } = await import("@/app/operator/process/[id]/page");
     const user = userEvent.setup();
