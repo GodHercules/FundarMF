@@ -1111,11 +1111,19 @@ export default function OperatorProcess() {
       )}
 
       {editingClient && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-ink/40 px-4 py-6" role="dialog" aria-modal="true" aria-labelledby="edit-client-title">
-          <div className="mx-auto w-full max-w-6xl rounded-2xl bg-white p-6 shadow-soft">
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto bg-ink/40 px-4 py-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-client-title"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setEditingClient(false);
+          }}
+        >
+          <div className="mx-auto w-full max-w-6xl rounded-2xl bg-white p-6 shadow-soft" onMouseDown={(event) => event.stopPropagation()}>
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-ink/10 pb-4">
               <div><h2 id="edit-client-title" className="text-xl font-semibold">Editar dados do cliente</h2><p className="text-sm text-slate">Alterações persistidas no processo e registradas na auditoria.</p></div>
-              <span className="badge bg-brass/15 text-ink">Validação interna</span>
+              <div className="flex items-center gap-3"><span className="badge bg-brass/15 text-ink">Validação interna</span><button type="button" aria-label="Fechar edição dos dados do cliente" className="rounded-full p-2 text-slate transition hover:bg-ink/10 hover:text-ink" onClick={() => setEditingClient(false)}><FiX className="h-5 w-5" /></button></div>
             </div>
             <OperatorClientDataEditor
               initialData={getStepData(process, "ETAPA_2")}
