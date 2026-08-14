@@ -46,7 +46,7 @@ const MAX_UPLOAD_FILE_MB = 8;
 const MAX_UPLOAD_TOTAL_MB = 60;
 
 const text = (value: unknown) => (value === null || value === undefined ? "" : String(value));
-const cloneRecord = (value: ProcessRecord) => Object.fromEntries(Object.entries(value).map(([key, item]) => [key, text(item)]));
+const cloneRecord = (value: ProcessRecord): ProcessRecord => Object.fromEntries(Object.entries(value).map(([key, item]) => [key, text(item)])) as ProcessRecord;
 const createSocioId = () => `socio-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const documentKey = (itemKey: string, socioId?: string) => socioId ? `${itemKey}:${socioId}` : itemKey;
 
@@ -72,7 +72,7 @@ export function OperatorClientDataEditor({ initialData, processId, documents, on
       endereco: Object.fromEntries(
         ["cep", "endereco", "numero", "complemento", "bairro", "cidade", "uf", "iptu", "escritorioVirtual"].map((key) => [key, text(address[key])])
       ),
-      quadroSocietario: socios.length ? socios : [{ tipoPessoa: "CPF" }]
+      quadroSocietario: socios.length ? socios : [{ tipoPessoa: "CPF", socioId: createSocioId() }]
     });
     setError(null);
   }, [initialData]);
@@ -107,7 +107,10 @@ export function OperatorClientDataEditor({ initialData, processId, documents, on
   }, []);
 
   const address = (draft.endereco ?? {}) as Record<string, unknown>;
-  const socios = toProcessRecords(draft.quadroSocietario);
+  const socios: ProcessRecord[] = toProcessRecords(draft.quadroSocietario).map((socio, index): ProcessRecord => ({
+    ...socio,
+    socioId: text(socio.socioId) || `operator-${processId}-socio-${index + 1}`
+  }));
   const setTop = (key: string, value: string) => setDraft((current) => ({ ...current, [key]: value }));
   const setAddress = (key: string, value: string) => setDraft((current) => ({ ...current, endereco: { ...(current.endereco ?? {}), [key]: value } }));
   const setSocio = (index: number, key: string, value: string) => setDraft((current) => ({
@@ -187,7 +190,7 @@ export function OperatorClientDataEditor({ initialData, processId, documents, on
         : ["socioNome", "socioCpf", "socioEmail", "socioTelefone", "socioPercentual", "socioAdministrador", "socioEstadoCivil", "socioProfissao"];
       if (required.some((key) => !text(socio[key]).trim()) || (text(socio.socioEstadoCivil) === "Casado(a)" && !text(socio.socioRegimeCasamento).trim()) || (text(socio.adminEstadoCivil) === "Casado(a)" && !text(socio.adminRegimeCasamento).trim())) return setError("Preencha os campos obrigatórios de cada sócio.");
     }
-    await onSave(draft);
+    await onSave({ ...draft, quadroSocietario: socios });
   }
 
   return <div className="flex flex-col space-y-6">

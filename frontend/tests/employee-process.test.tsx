@@ -144,7 +144,7 @@ describe("OperatorProcess", () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining("/apix/documents/process-123/items/IDENTIFICACAO_SOCIOS/upload"),
+        expect.stringMatching(/\/apix\/documents\/process-123\/items\/IDENTIFICACAO_SOCIOS\/upload\?socioId=/),
         expect.objectContaining({ method: "POST", credentials: "include" })
       );
     });
