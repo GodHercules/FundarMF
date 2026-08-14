@@ -238,6 +238,11 @@ export default function OperatorProcess() {
         method: "PUT",
         body: JSON.stringify({ stepKey: "ETAPA_2", data })
       });
+      setFieldDecisions(
+        Object.fromEntries(
+          ["razaoSocial1", "razaoSocial2", "razaoSocial3", "municipio", "emailCnpj", "telefoneCnpj", "endereco", "quadroSocietario"].map((key) => [key, "approved"])
+        ) as Record<string, "approved">
+      );
       notifySuccess("Dados do cliente atualizados.");
       setEditingClient(false);
       await load();

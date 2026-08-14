@@ -128,6 +128,7 @@ describe("OperatorProcess", () => {
         expect.objectContaining({ method: "PUT", body: expect.stringContaining("Empresa Atualizada") })
       );
     });
+    expect(await screen.findByText(/8\/8 aprovados/i)).toBeInTheDocument();
   });
 
   it("mantém os uploads do link do cliente disponíveis dentro da edição do operador", async () => {

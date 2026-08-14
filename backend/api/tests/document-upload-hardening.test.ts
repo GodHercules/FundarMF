@@ -141,6 +141,23 @@ function makeHarness(options: { totalBytes?: number; transactionDelayMs?: number
 }
 
 describe("Document upload hardening", () => {
+  it("allows operators to upload socio documents and approves internal uploads automatically", async () => {
+    const { service, state } = makeHarness();
+
+    await expect(
+      service.uploadFiles(
+        "process-1",
+        DocumentItemKey.IDENTIFICACAO_SOCIOS,
+        "socio-1",
+        [makeFile()],
+        { role: "OPERADOR", userId: "operator-1" }
+      )
+    ).resolves.toEqual({ ok: true, version: 0 });
+
+    expect(state.items[0].status).toBe(DocumentItemStatus.APROVADO);
+    expect(state.files[0].uploadedByRole).toBe("OPERADOR");
+  });
+
   it("rejects a file whose declared MIME type does not match its signature", async () => {
     const { service, storage, state } = makeHarness();
 

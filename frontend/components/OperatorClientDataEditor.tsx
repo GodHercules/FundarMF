@@ -8,7 +8,7 @@ import { PhoneInput } from "@/components/PhoneInput";
 import { Select } from "@/components/Select";
 import { DOCS_API_BASE } from "@/lib/api";
 import { maskCep, maskCnpj, maskCpf, maskIptu, maskPercent } from "@/lib/masks";
-import { ProcessDocument, ProcessRecord, ProcessStepData, toProcessRecords } from "@/lib/process-types";
+import { MunicipalityData, ProcessDocument, ProcessRecord, ProcessStepData, toProcessRecords } from "@/lib/process-types";
 
 type Props = {
   initialData: ProcessStepData;
@@ -55,6 +55,8 @@ export function OperatorClientDataEditor({ initialData, processId, documents, on
   const [error, setError] = useState<string | null>(null);
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+  const [municipalities, setMunicipalities] = useState<string[]>([]);
+  const [municipalityNote, setMunicipalityNote] = useState<string | null>(null);
 
   useEffect(() => {
     const address = initialData.endereco && typeof initialData.endereco === "object" ? initialData.endereco : {};
@@ -74,6 +76,35 @@ export function OperatorClientDataEditor({ initialData, processId, documents, on
     });
     setError(null);
   }, [initialData]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadMunicipalities() {
+      setMunicipalityNote("Carregando municípios...");
+      try {
+        const response = await fetch("https://servicodados.ibge.gov.br/api/v1/localidades/municipios");
+        if (!response.ok) throw new Error("Falha ao carregar municípios.");
+        const data = await response.json();
+        const list = (data ?? [])
+          .map((municipio: MunicipalityData) => {
+            const uf = municipio?.microrregiao?.mesorregiao?.UF?.sigla ?? municipio?.UF?.sigla ?? "";
+            return uf ? `${municipio.nome} - ${uf}` : municipio.nome;
+          })
+          .filter(Boolean)
+          .sort((a: string, b: string) => a.localeCompare(b, "pt-BR"));
+        if (active) {
+          setMunicipalities(list);
+          setMunicipalityNote("Digite para filtrar e selecione a opção desejada.");
+        }
+      } catch {
+        if (active) setMunicipalityNote("Não foi possível carregar a lista completa. Você pode digitar manualmente.");
+      }
+    }
+    void loadMunicipalities();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const address = (draft.endereco ?? {}) as Record<string, unknown>;
   const socios = toProcessRecords(draft.quadroSocietario);
@@ -165,7 +196,7 @@ export function OperatorClientDataEditor({ initialData, processId, documents, on
       <Field label="Razão social 1" required hint="Sugestão principal, sem pontuação desnecessária."><Input placeholder="Ex: Fundar MF Serviços Ltda" value={text(draft.razaoSocial1)} onChange={(event) => setTop("razaoSocial1", event.target.value)} /></Field>
       <Field label="Razão social 2" hint="Opção alternativa caso a principal já exista."><Input placeholder="Ex: Fundar MF Holdings Ltda" value={text(draft.razaoSocial2)} onChange={(event) => setTop("razaoSocial2", event.target.value)} /></Field>
       <Field label="Razão social 3" hint="Terceira opção de contingência."><Input placeholder="Ex: Fundar MF Soluções Empresariais" value={text(draft.razaoSocial3)} onChange={(event) => setTop("razaoSocial3", event.target.value)} /></Field>
-      <Field label="Município" required hint="Digite o município informado pelo cliente."><Input placeholder="Digite o município" value={text(draft.municipio)} onChange={(event) => setTop("municipio", event.target.value)} /></Field>
+      <Field label="Município" required hint={municipalityNote ?? "Digite para filtrar e selecione."}><Input list="operator-municipios-list" placeholder="Digite o município" value={text(draft.municipio)} onChange={(event) => setTop("municipio", event.target.value)} /><datalist id="operator-municipios-list">{municipalities.map((municipio) => <option key={municipio} value={municipio} />)}</datalist></Field>
       <Field label="E-mail do CNPJ" required hint="E-mail que receberá notificações oficiais."><Input type="email" placeholder="contato@empresa.com.br" value={text(draft.emailCnpj)} onChange={(event) => setTop("emailCnpj", event.target.value)} /></Field>
       <Field label="Telefone do CNPJ" required hint="Com DDD e WhatsApp se possível."><PhoneInput value={text(draft.telefoneCnpj)} onChange={(value) => setTop("telefoneCnpj", value)} /></Field>
     </section>

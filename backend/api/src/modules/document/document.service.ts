@@ -120,15 +120,13 @@ export class DocumentService {
       throw new BadRequestException("Foto de fachada não deve estar vinculada a sócio.");
     }
 
+    if (SOCIO_ITEM_KEYS.includes(itemKey) && !socioId) {
+      throw new BadRequestException("Selecione o sócio para enviar o documento.");
+    }
+
     if (actor.role === "OPERADOR" || actor.role === "MASTER") {
       if (actor.role === "OPERADOR" && processRecord.ownerId !== actor.userId) {
         throw new ForbiddenException();
-      }
-      if (itemKey !== DocumentItemKey.FOTO_FACHADA) {
-        throw new BadRequestException("Apenas foto de fachada pode ser anexada internamente.");
-      }
-      if (!isVirtual) {
-        throw new BadRequestException("Foto de fachada é anexada pelo cliente quando o endereço não é virtual.");
       }
     } else if (actor.role === "CLIENTE") {
       if (!isClientOwner(actor, processRecord.clientEmail, processRecord.clientPhone)) {
@@ -136,9 +134,6 @@ export class DocumentService {
       }
       if (itemKey === DocumentItemKey.FOTO_FACHADA && isVirtual) {
         throw new BadRequestException("Foto de fachada ser anexada pelo operador.");
-      }
-      if (SOCIO_ITEM_KEYS.includes(itemKey) && !socioId) {
-        throw new BadRequestException("Selecione o sócio para enviar o documento.");
       }
     } else {
       throw new ForbiddenException();
@@ -213,7 +208,7 @@ export class DocumentService {
       await tx.documentItem.update({
         where: { id: currentItem.id },
         data: {
-          status: DocumentItemStatus.AGUARDANDO_VALIDACAO,
+          status: actor.role === "OPERADOR" || actor.role === "MASTER" ? DocumentItemStatus.APROVADO : DocumentItemStatus.AGUARDANDO_VALIDACAO,
           version: nextVersion,
           reason: null
         }
