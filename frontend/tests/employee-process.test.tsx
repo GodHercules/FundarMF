@@ -171,6 +171,23 @@ describe("OperatorProcess", () => {
     expect(await screen.findByText("identificacao-reload.pdf")).toBeInTheDocument();
   });
 
+  it("preserva endereço virtual escolhido no modal enquanto atualiza os documentos", async () => {
+    const { default: EmployeeProcess } = await import("@/app/operator/process/[id]/page");
+    const user = userEvent.setup();
+    render(<EmployeeProcess />);
+    await user.click(await screen.findByRole("button", { name: /editar dados do cliente/i }));
+
+    const virtualAddress = screen.getByRole("combobox", { name: /Endereço é virtual/i });
+    await user.selectOptions(virtualAddress, "Sim");
+    expect(virtualAddress).toHaveValue("Sim");
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fetchMock.mockResolvedValue({ ok: true, text: async () => "" });
+    await user.upload(fileInput, new File(["documento"], "endereco-virtual.pdf", { type: "application/pdf" }));
+
+    await waitFor(() => expect(virtualAddress).toHaveValue("Sim"));
+  });
+
   it("fecha a edição pelo X e ao clicar no fundo do modal", async () => {
     const { default: EmployeeProcess } = await import("@/app/operator/process/[id]/page");
     const user = userEvent.setup();

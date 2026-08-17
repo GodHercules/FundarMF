@@ -100,6 +100,11 @@ export default function OperatorProcess() {
     setChatMessages(chatData?.messages ?? []);
   }
 
+  async function refreshDocuments() {
+    const documentsData = await api<ProcessDocument[]>(`/documents/${processId}/items`);
+    setProcess((current) => current ? { ...current, documents: documentsData } : current);
+  }
+
   useEffect(() => {
     if (processId) load();
   }, [processId]);
@@ -1134,7 +1139,7 @@ export default function OperatorProcess() {
               initialData={getStepData(process, "ETAPA_2")}
               processId={processId}
               documents={process.documents ?? []}
-              onDocumentsChanged={load}
+              onDocumentsChanged={refreshDocuments}
               saving={savingClient}
               onSave={saveClientData}
               onCancel={() => setEditingClient(false)}
