@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/Button";
 import { Field } from "@/components/Field";
 import { Input } from "@/components/Input";
@@ -56,12 +56,28 @@ export function OperatorClientDataEditor({ initialData, processId, documents, on
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [selectedFileNames, setSelectedFileNames] = useState<Record<string, string[]>>({});
+  const generatedSocioIds = useRef<Record<string, string>>({});
   const [municipalities, setMunicipalities] = useState<string[]>([]);
   const [municipalityNote, setMunicipalityNote] = useState<string | null>(null);
 
+  function stableSocioId(socio: ProcessRecord, index: number) {
+    const persistedId = text(socio.socioId).trim();
+    if (persistedId) return persistedId;
+
+    const identity = [
+      text(socio.socioCpf),
+      text(socio.socioCnpj),
+      text(socio.socioNome),
+      text(socio.socioRazaoSocial)
+    ].map((value) => value.trim().toLowerCase()).join("|");
+    const key = `${identity}|index:${index}`;
+    if (!generatedSocioIds.current[key]) generatedSocioIds.current[key] = createSocioId();
+    return generatedSocioIds.current[key];
+  }
+
   useEffect(() => {
     const address = initialData.endereco && typeof initialData.endereco === "object" ? initialData.endereco : {};
-    const socios = toProcessRecords(initialData.quadroSocietario).map((socio) => ({ ...cloneRecord(socio), socioId: text(socio.socioId) || createSocioId() }));
+    const socios = toProcessRecords(initialData.quadroSocietario).map((socio, index) => ({ ...cloneRecord(socio), socioId: stableSocioId(socio, index) }));
     setDraft({
       ...initialData,
       razaoSocial1: text(initialData.razaoSocial1),
