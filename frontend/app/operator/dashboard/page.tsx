@@ -211,6 +211,9 @@ export default function OperatorDashboard() {
           <Link href="/operator/processos-finalizados" className="ml-4 text-sm font-semibold text-brass">
             Processos Finalizados
           </Link>
+          <Link href="/operator/clientes-sem-processo" className="ml-4 text-sm font-semibold text-brass">
+            Clientes sem processo FundarMF
+          </Link>
         </div>
       </header>
 

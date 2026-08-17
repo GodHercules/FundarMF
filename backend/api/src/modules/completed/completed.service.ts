@@ -113,6 +113,25 @@ export class CompletedService {
     return this.prisma.legacyClient.findMany({ where: { tenantKey: actor.tenantKey ?? "default", ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { documentNumber: { contains: normalizeDocument(search) } }] } : {}) }, orderBy: { name: "asc" }, take: 50 });
   }
 
+  async getLegacyClient(id: string, actor: Actor) {
+    this.ensureStaff(actor);
+    const client = await this.prisma.legacyClient.findFirst({
+      where: { id, tenantKey: actor.tenantKey ?? "default" },
+      include: {
+        contracts: {
+          orderBy: { updatedAt: "desc" },
+          include: {
+            versions: { orderBy: { version: "desc" }, take: 1 },
+            files: { select: { id: true, kind: true, fileName: true, mimeType: true, sizeBytes: true, createdAt: true } },
+            exports: { select: { id: true, format: true, version: true, fileName: true, createdAt: true } }
+          }
+        }
+      }
+    });
+    if (!client) throw new NotFoundException("Cliente sem processo não encontrado.");
+    return client;
+  }
+
   async createLegacyClient(body: Record<string, unknown>, actor: Actor) {
     this.ensureStaff(actor); const documentNumber = String(body.documentNumber ?? "").trim(); const normalized = normalizeDocument(documentNumber);
     if (!normalized || ![11, 14].includes(normalized.length)) throw new BadRequestException("CPF ou CNPJ inválido.");

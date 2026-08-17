@@ -20,6 +20,9 @@ export class CompletedController {
   @Get("legacy-clients")
   legacyClients(@Req() req: Request, @Query("search") search?: string) { return this.service.listLegacyClients(req.actor!, search); }
 
+  @Get("legacy-clients/:id")
+  legacyClient(@Param("id") id: string, @Req() req: Request) { return this.service.getLegacyClient(id, req.actor!); }
+
   @Get(":id")
   get(@Param("id") id: string, @Req() req: Request) { return this.service.get(id, req.actor!); }
 
