@@ -20,7 +20,9 @@ const execFileAsync = promisify(execFile);
 const EDITOR_SCHEMA = "1";
 const allowedMime = new Set(["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
 
-type EditorDoc = { type: "doc"; content: Array<{ type: "paragraph" | "heading"; attrs?: { level?: number }; content?: Array<{ type: "text"; text: string }> }> };
+type EditorMark = { type: "bold" | "italic" | "underline" | "strike" | "code" | "link"; attrs?: { href?: string } };
+type EditorInline = { type: "text"; text: string; marks?: EditorMark[] };
+type EditorDoc = { type: "doc"; content: Array<{ type: "paragraph" | "heading" | "blockquote" | "bulletList" | "orderedList"; attrs?: { level?: number; textAlign?: string }; content?: EditorInline[] }> };
 
 function hash(data: Buffer | string) { return createHash("sha256").update(data).digest("hex"); }
 function normalizeDocument(value: unknown) { return String(value ?? "").replace(/\D/g, ""); }
@@ -48,8 +50,16 @@ function validateEditor(content: unknown): asserts content is EditorDoc {
   const doc = content as EditorDoc;
   if (!doc || doc.type !== "doc" || !Array.isArray(doc.content) || doc.content.length > 5000) throw new BadRequestException("Conteúdo estruturado inválido.");
   for (const block of doc.content) {
-    if (!["paragraph", "heading"].includes(block.type) || !Array.isArray(block.content)) throw new BadRequestException("Bloco de editor inválido.");
-    for (const mark of block.content) if (!mark || typeof mark.text !== "string" || mark.text.length > 10000) throw new BadRequestException("Texto de editor inválido.");
+    if (!["paragraph", "heading", "blockquote", "bulletList", "orderedList"].includes(block.type) || !Array.isArray(block.content)) throw new BadRequestException("Bloco de editor inválido.");
+    if (block.attrs?.level !== undefined && (![1, 2, 3, 4, 5, 6].includes(block.attrs.level))) throw new BadRequestException("Nível de título inválido.");
+    if (block.attrs?.textAlign !== undefined && !["left", "center", "right", "justify"].includes(block.attrs.textAlign)) throw new BadRequestException("Alinhamento inválido.");
+    for (const mark of block.content) {
+      if (!mark || typeof mark.text !== "string" || mark.text.length > 10000) throw new BadRequestException("Texto de editor inválido.");
+      for (const decoration of mark.marks ?? []) {
+        if (!["bold", "italic", "underline", "strike", "code", "link"].includes(decoration.type)) throw new BadRequestException("Formatação inválida.");
+        if (decoration.type === "link" && (!decoration.attrs?.href || decoration.attrs.href.length > 2048)) throw new BadRequestException("Link inválido.");
+      }
+    }
   }
 }
 function hasSignature(file: Express.Multer.File) {
