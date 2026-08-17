@@ -148,6 +148,7 @@ describe("OperatorProcess", () => {
         expect.objectContaining({ method: "POST", credentials: "include" })
       );
     });
+    expect(await screen.findByText("identificacao.pdf")).toBeInTheDocument();
   });
 
   it("fecha a edição pelo X e ao clicar no fundo do modal", async () => {

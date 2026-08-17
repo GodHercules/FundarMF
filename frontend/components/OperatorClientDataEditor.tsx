@@ -55,6 +55,7 @@ export function OperatorClientDataEditor({ initialData, processId, documents, on
   const [error, setError] = useState<string | null>(null);
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+  const [selectedFileNames, setSelectedFileNames] = useState<Record<string, string[]>>({});
   const [municipalities, setMunicipalities] = useState<string[]>([]);
   const [municipalityNote, setMunicipalityNote] = useState<string | null>(null);
 
@@ -143,6 +144,7 @@ export function OperatorClientDataEditor({ initialData, processId, documents, on
   async function uploadFiles(itemKey: string, socioId: string | undefined, files: File[]) {
     if (!files.length) return;
     const key = documentKey(itemKey, socioId);
+    setSelectedFileNames((current) => ({ ...current, [key]: files.map((file) => file.name) }));
     const oversized = files.find((file) => file.size > MAX_UPLOAD_FILE_MB * 1024 * 1024);
     const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
     if (oversized) {
@@ -175,6 +177,20 @@ export function OperatorClientDataEditor({ initialData, processId, documents, on
 
   function findDocument(itemKey: string, socioId?: string) {
     return documents.find((document) => document.itemKey === itemKey && (document.socioId ?? undefined) === socioId);
+  }
+
+  function renderUploadControl(itemKey: string, socioId: string | undefined, document: ProcessDocument | undefined) {
+    const key = documentKey(itemKey, socioId);
+    const inputId = `document-upload-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+    const fileNames = selectedFileNames[key] ?? document?.files?.map((file) => file.fileName) ?? [];
+
+    return <div className="mt-3 space-y-2">
+      <label htmlFor={inputId} className="inline-flex cursor-pointer items-center rounded-lg bg-brass/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink transition hover:bg-brass/20 focus-within:ring-2 focus-within:ring-brass/40">
+        Escolher ficheiros
+      </label>
+      <Input id={inputId} className="sr-only" type="file" multiple accept=".pdf,.jpg,.jpeg,.png" disabled={uploadingKey === key} onChange={(event) => void uploadFiles(itemKey, socioId, event.target.files ? Array.from(event.target.files) : [])} />
+      {fileNames.length > 0 ? <p className="text-xs text-slate" aria-live="polite">{fileNames.join(", ")}</p> : <p className="text-xs text-slate" aria-live="polite">Nenhum ficheiro selecionado</p>}
+    </div>;
   }
 
   async function submit() {
@@ -222,8 +238,8 @@ export function OperatorClientDataEditor({ initialData, processId, documents, on
     </div></section>
     <div className="order-3 flex flex-wrap justify-end gap-3 border-t border-ink/10 pt-4"><Button type="button" variant="ghost" onClick={onCancel} disabled={saving || Boolean(uploadingKey)}>Cancelar</Button><Button type="button" variant="accent" onClick={() => void submit()} disabled={saving || Boolean(uploadingKey)}>{saving ? "Salvando..." : "Salvar alterações"}</Button></div>
     <section className="space-y-5"><div><h3 className="text-lg font-semibold">Documentos do cliente</h3><p className="mt-1 text-sm text-slate">Os mesmos uploads disponíveis no link do cliente também podem ser enviados pelo operador.</p></div>
-      {socios.map((socio, index) => <div key={text(socio.socioId) || index} className="rounded-2xl border border-ink/10 bg-white/80 p-4"><p className="text-sm font-semibold">Documentos do sócio {index + 1}</p><div className="mt-3 grid gap-4 md:grid-cols-2">{documentTypes.map((item) => { const key = documentKey(item.key, text(socio.socioId)); const document = findDocument(item.key, text(socio.socioId)); return <div key={key} className="rounded-2xl border border-ink/10 bg-white/70 p-4"><p className="text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs text-slate">{item.description}</p>{document?.status && <p className="mt-2 text-xs text-slate">Status: {document.status}</p>}<Input className="mt-3" type="file" multiple accept=".pdf,.jpg,.jpeg,.png" disabled={uploadingKey === key} onChange={(event) => void uploadFiles(item.key, text(socio.socioId), event.target.files ? Array.from(event.target.files) : [])} />{uploadErrors[key] && <p role="alert" className="mt-2 text-xs text-clay">{uploadErrors[key]}</p>}{uploadingKey === key && <p className="mt-2 text-xs text-slate">Enviando...</p>}</div>; })}</div></div>)}
-      {text(address.escritorioVirtual) !== "Sim" && <div className="rounded-2xl border border-ink/10 bg-white/80 p-4"><p className="text-sm font-semibold">Foto da fachada</p><p className="mt-1 text-xs text-slate">Obrigatória para endereço físico, como no formulário do cliente.</p>{findDocument("FOTO_FACHADA")?.status && <p className="mt-2 text-xs text-slate">Status: {findDocument("FOTO_FACHADA")?.status}</p>}<Input className="mt-3" type="file" multiple accept=".jpg,.jpeg,.png,.pdf" disabled={uploadingKey === "FOTO_FACHADA"} onChange={(event) => void uploadFiles("FOTO_FACHADA", undefined, event.target.files ? Array.from(event.target.files) : [])} />{uploadErrors.FOTO_FACHADA && <p role="alert" className="mt-2 text-xs text-clay">{uploadErrors.FOTO_FACHADA}</p>}{uploadingKey === "FOTO_FACHADA" && <p className="mt-2 text-xs text-slate">Enviando...</p>}</div>}
+      {socios.map((socio, index) => <div key={text(socio.socioId) || index} className="rounded-2xl border border-ink/10 bg-white/80 p-4"><p className="text-sm font-semibold">Documentos do sócio {index + 1}</p><div className="mt-3 grid gap-4 md:grid-cols-2">{documentTypes.map((item) => { const key = documentKey(item.key, text(socio.socioId)); const document = findDocument(item.key, text(socio.socioId)); return <div key={key} className="rounded-2xl border border-ink/10 bg-white/70 p-4"><p className="text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs text-slate">{item.description}</p>{document?.status && <p className="mt-2 text-xs text-slate">Status: {document.status}</p>}{renderUploadControl(item.key, text(socio.socioId), document)}{uploadErrors[key] && <p role="alert" className="mt-2 text-xs text-clay">{uploadErrors[key]}</p>}{uploadingKey === key && <p className="mt-2 text-xs text-slate">Enviando...</p>}</div>; })}</div></div>)}
+      {text(address.escritorioVirtual) !== "Sim" && <div className="rounded-2xl border border-ink/10 bg-white/80 p-4"><p className="text-sm font-semibold">Foto da fachada</p><p className="mt-1 text-xs text-slate">Obrigatória para endereço físico, como no formulário do cliente.</p>{findDocument("FOTO_FACHADA")?.status && <p className="mt-2 text-xs text-slate">Status: {findDocument("FOTO_FACHADA")?.status}</p>}{renderUploadControl("FOTO_FACHADA", undefined, findDocument("FOTO_FACHADA"))}{uploadErrors.FOTO_FACHADA && <p role="alert" className="mt-2 text-xs text-clay">{uploadErrors.FOTO_FACHADA}</p>}{uploadingKey === "FOTO_FACHADA" && <p className="mt-2 text-xs text-slate">Enviando...</p>}</div>}
     </section>
   </div>;
 }
