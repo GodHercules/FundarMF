@@ -177,6 +177,7 @@ export function OperatorKanbanBoard({ onStageChange }: OperatorKanbanBoardProps)
       AGUARDANDO_DOCUMENTOS: [],
       ANALISE_JUCEB: [],
       EXIGENCIA_JUCEB: [],
+      FINALIZADO: [],
 
     };
 
