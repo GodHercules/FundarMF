@@ -10,7 +10,7 @@ import { AlteracaoKanbanBoard } from "@/components/AlteracaoKanbanBoard";
 import { getAlteracaoContratualOption, AlteracaoContratualOptionId } from "@/lib/alteracao-contratual";
 
 type ProcessDetails = { id: string; clientName?: string | null; status: string };
-type AlteracaoRequest = { alterationType: string; stage: "SOLICITACAO_RECEBIDA" | "ANALISE_JURIDICA" | "AJUSTES_DOCUMENTAIS" | "PROTOCOLO" | "FINALIZADO" };
+type AlteracaoRequest = { alterationType: string; stage: "DOC_INICIAL_APROVADA" | "VIABILIDADE" | "DBE_RECEITA_FEDERAL" | "PREPARACAO_DOCUMENTOS" | "AGUARDANDO_DOCUMENTOS" | "ANALISE_JUCEB" | "EXIGENCIA_JUCEB" | "FINALIZADO" };
 
 export default function ClientAlteracaoContratualKanban() {
   const params = useParams();

@@ -5,7 +5,7 @@ import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { ALTERACAO_KANBAN_STAGE_LABELS, ALTERACAO_KANBAN_STAGES, AlteracaoContratualOptionId, AlteracaoKanbanStage, getAlteracaoContratualOption } from "@/lib/alteracao-contratual";
 
-export function AlteracaoKanbanBoard({ processId, companyName, alterationType, stage = "SOLICITACAO_RECEBIDA" }: { processId: string; companyName: string; alterationType: AlteracaoContratualOptionId; stage?: AlteracaoKanbanStage }) {
+export function AlteracaoKanbanBoard({ processId, companyName, alterationType, stage = "DOC_INICIAL_APROVADA" }: { processId: string; companyName: string; alterationType: AlteracaoContratualOptionId; stage?: AlteracaoKanbanStage }) {
   const option = getAlteracaoContratualOption(alterationType);
   const activeIndex = ALTERACAO_KANBAN_STAGES.indexOf(stage);
 

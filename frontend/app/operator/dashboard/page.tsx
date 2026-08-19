@@ -208,6 +208,9 @@ export default function OperatorDashboard() {
           <Link href="/operator/kanban" className="text-sm font-semibold text-brass">
             Abrir quadro Kanban
           </Link>
+          <Link href="/operator/alteracoes-contratuais" className="ml-4 text-sm font-semibold text-brass">
+            Alterações Contratuais
+          </Link>
           <Link href="/operator/processos-finalizados" className="ml-4 text-sm font-semibold text-brass">
             Processos Finalizados
           </Link>

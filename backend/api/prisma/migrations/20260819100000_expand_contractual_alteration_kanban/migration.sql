@@ -1,0 +1,13 @@
+ALTER TYPE "AlteracaoContratualStage" ADD VALUE IF NOT EXISTS 'VIABILIDADE';
+ALTER TYPE "AlteracaoContratualStage" ADD VALUE IF NOT EXISTS 'DOC_INICIAL_APROVADA';
+ALTER TYPE "AlteracaoContratualStage" ADD VALUE IF NOT EXISTS 'DBE_RECEITA_FEDERAL';
+ALTER TYPE "AlteracaoContratualStage" ADD VALUE IF NOT EXISTS 'PREPARACAO_DOCUMENTOS';
+ALTER TYPE "AlteracaoContratualStage" ADD VALUE IF NOT EXISTS 'AGUARDANDO_DOCUMENTOS';
+ALTER TYPE "AlteracaoContratualStage" ADD VALUE IF NOT EXISTS 'ANALISE_JUCEB';
+ALTER TYPE "AlteracaoContratualStage" ADD VALUE IF NOT EXISTS 'EXIGENCIA_JUCEB';
+ALTER TABLE "AlteracaoContratual" ADD COLUMN IF NOT EXISTS "alterationTypes" JSONB;
+UPDATE "AlteracaoContratual" SET "alterationTypes" = jsonb_build_array("alterationType") WHERE "alterationTypes" IS NULL;
+UPDATE "AlteracaoContratual" SET "stage" = 'VIABILIDADE' WHERE "stage" = 'SOLICITACAO_RECEBIDA';
+ALTER TABLE "AlteracaoContratual" ALTER COLUMN "stage" SET DEFAULT 'DOC_INICIAL_APROVADA';
+DROP INDEX IF EXISTS "AlteracaoContratual_processId_alterationType_key";
+CREATE INDEX IF NOT EXISTS "AlteracaoContratual_processId_alterationType_updatedAt_idx" ON "AlteracaoContratual"("processId", "alterationType", "updatedAt");

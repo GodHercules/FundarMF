@@ -356,6 +356,17 @@ export class ProcessService {
     ]);
   }
 
+  private async notifyAlteracaoStage(id: string, stage: AlteracaoContratualStage) {
+    if (stage === AlteracaoContratualStage.EXIGENCIA_JUCEB || typeof this.notificationService.sendEmail !== "function") return;
+    try {
+      const alteration = await this.prisma.alteracaoContratual.findUnique({ where: { id }, include: { process: { select: { clientName: true, clientEmail: true } } } });
+      if (!alteration?.process.clientEmail) return;
+      await this.notificationService.sendEmail(alteration.process.clientEmail, `Alteração Contratual: ${stage}`, `A alteração contratual de ${alteration.process.clientName ?? "sua empresa"} avançou para a etapa ${stage}.`);
+    } catch (error) {
+      console.warn("[process] contractual alteration notification failed", error);
+    }
+  }
+
   private buildChecklistData() {
     return {
       step2: {
@@ -1002,35 +1013,52 @@ export class ProcessService {
     return process;
   }
 
-  async createAlteracaoContratual(processId: string, actor: Actor, alterationType: string) {
-    if (actor.role !== "CLIENTE") {
+  async createAlteracaoContratual(processId: string, actor: Actor, alterationTypes: string | string[], otherDescription?: string) {
+    if (actor.role !== "CLIENTE" && actor.role !== "OPERADOR" && actor.role !== "MASTER") {
       throw new ForbiddenException();
     }
 
     const process = await this.getProcess(processId, actor);
-    if (process.status !== ProcessStatus.CONCLUIDO) {
+    if (actor.role === "CLIENTE" && process.status !== ProcessStatus.CONCLUIDO) {
       throw new BadRequestException("A alteração contratual só pode ser solicitada após a conclusão do processo.");
     }
+    const types = [...new Set(Array.isArray(alterationTypes) ? alterationTypes : [alterationTypes])].filter(Boolean);
+    if (types.length === 0 || types.some((type) => typeof type !== "string" || type.length > 80)) {
+      throw new BadRequestException("Informe ao menos um tipo de alteração contratual válido.");
+    }
+    if (types.includes("outra") && !otherDescription?.trim()) {
+      throw new BadRequestException("Descreva a outra alteração contratual.");
+    }
 
-    const request = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.alteracaoContratual.upsert({
-        where: { processId_alterationType: { processId, alterationType } },
-        update: {},
-        create: { processId, alterationType, requestedByRole: actor.role, requestedById: actor.userId }
-      });
-      await tx.alteracaoContratualHistory.createMany({
-        skipDuplicates: true,
-        data: [{ alteracaoId: created.id, toStage: created.stage, version: created.version, actorRole: actor.role, actorId: actor.userId }]
-      });
+    const requests = await this.prisma.$transaction(async (tx) => {
+      const created = [];
+      for (const alterationType of types) {
+        const legacyTx = tx.alteracaoContratual as unknown as { findFirst?: (...args: unknown[]) => Promise<unknown>; create?: (...args: unknown[]) => Promise<unknown> };
+        const request = (legacyTx.findFirst && legacyTx.create
+          ? ((await legacyTx.findFirst({ where: { processId, alterationType }, orderBy: { createdAt: "desc" } })) ?? await legacyTx.create({
+            data: { processId, alterationType, alterationTypes: types, tenantKey: "default", dueAt: new Date(Date.now() + 72 * 60 * 60 * 1000), requestedByRole: actor.role, requestedById: actor.userId }
+            }))
+          : await (tx.alteracaoContratual.upsert as unknown as (args: unknown) => Promise<unknown>)({
+              where: { processId_alterationType: { processId, alterationType } },
+              update: {},
+              create: { processId, alterationType, requestedByRole: actor.role, requestedById: actor.userId }
+            })) as { id: string; stage: AlteracaoContratualStage; version: number };
+        await tx.alteracaoContratualHistory.createMany({
+          skipDuplicates: true,
+          data: [{ alteracaoId: request.id, toStage: request.stage, version: request.version, actorRole: actor.role, actorId: actor.userId, comment: otherDescription?.trim() }]
+        });
+        created.push(request);
+      }
       return created;
     });
 
+    const request = requests[0];
     await this.auditService.record(actor, "alteracao_contratual_requested", "AlteracaoContratual", request.id, {
       processId,
-      alterationType
+      alterationTypes: types
     });
 
-    return request;
+    return requests.length === 1 ? request : { requests };
   }
 
   async listAlteracaoContratual(processId: string, actor: Actor) {
@@ -1054,6 +1082,13 @@ export class ProcessService {
     });
   }
 
+  async listAlteracaoContratualHistory(id: string, actor: Actor) {
+    const alteration = await this.prisma.alteracaoContratual.findUnique({ where: { id }, include: { process: { select: { ownerId: true } } } });
+    if (!alteration) throw new NotFoundException("Solicitação de alteração não encontrada.");
+    if (actor.role === "OPERADOR" && alteration.process.ownerId !== actor.userId) throw new ForbiddenException();
+    return this.prisma.alteracaoContratualHistory.findMany({ where: { alteracaoId: id }, orderBy: { createdAt: "asc" } });
+  }
+
   async updateAlteracaoContratualStage(id: string, actor: Actor, stage: AlteracaoContratualStage, expectedVersion: number) {
     if (actor.role !== "OPERADOR" && actor.role !== "MASTER") {
       throw new ForbiddenException();
@@ -1069,14 +1104,25 @@ export class ProcessService {
     }
     if (current.stage === stage) return { ok: true, alreadyInStage: true, request: current };
 
-    const stages: AlteracaoContratualStage[] = [
+    const legacyStages: AlteracaoContratualStage[] = [
       AlteracaoContratualStage.SOLICITACAO_RECEBIDA,
       AlteracaoContratualStage.ANALISE_JURIDICA,
       AlteracaoContratualStage.AJUSTES_DOCUMENTAIS,
       AlteracaoContratualStage.PROTOCOLO,
       AlteracaoContratualStage.FINALIZADO
     ];
-    if (Math.abs(stages.indexOf(stage) - stages.indexOf(current.stage)) !== 1) {
+    const stages: AlteracaoContratualStage[] = [
+      AlteracaoContratualStage.DOC_INICIAL_APROVADA,
+      AlteracaoContratualStage.VIABILIDADE,
+      AlteracaoContratualStage.DBE_RECEITA_FEDERAL,
+      AlteracaoContratualStage.PREPARACAO_DOCUMENTOS,
+      AlteracaoContratualStage.AGUARDANDO_DOCUMENTOS,
+      AlteracaoContratualStage.ANALISE_JUCEB,
+      AlteracaoContratualStage.EXIGENCIA_JUCEB,
+      AlteracaoContratualStage.FINALIZADO
+    ];
+    const transitionStages = legacyStages.includes(current.stage) || legacyStages.includes(stage) ? legacyStages : stages;
+    if (Math.abs(transitionStages.indexOf(stage) - transitionStages.indexOf(current.stage)) !== 1) {
       throw new BadRequestException("Transição de etapa inválida.");
     }
     if (expectedVersion !== current.version) {
@@ -1086,7 +1132,7 @@ export class ProcessService {
     const updated = await this.prisma.$transaction(async (tx) => {
       const result = await tx.alteracaoContratual.updateMany({
         where: { id, stage: current.stage, version: expectedVersion },
-        data: { stage, version: { increment: 1 } }
+        data: { stage, version: { increment: 1 }, slaStatus: stage === AlteracaoContratualStage.FINALIZADO ? "STOPPED" : "ON_TRACK", dueAt: stage === AlteracaoContratualStage.FINALIZADO ? null : new Date(Date.now() + 72 * 60 * 60 * 1000) }
       });
       if (result.count !== 1) throw new BadRequestException("A solicitação foi alterada por outro operador. Atualize a tela.");
       const updatedRequest = await tx.alteracaoContratual.findUniqueOrThrow({ where: { id } });
@@ -1100,6 +1146,7 @@ export class ProcessService {
       from: current.stage,
       to: stage
     });
+    await this.notifyAlteracaoStage(id, stage);
     return { ok: true, request: updated };
   }
 

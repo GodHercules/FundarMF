@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
 import { Request } from "express";
 
 import { AuthGuard } from "../../common/auth/auth.guard";
@@ -80,6 +80,20 @@ export class ProcessController {
     return this.processService.listAllAlteracaoContratual(req.actor!);
   }
 
+  @Post("alteracoes-contratuais")
+  @Roles("OPERADOR", "MASTER")
+  async createAlteracaoForOperator(@Body() dto: CreateAlteracaoContratualDto, @Req() req: Request) {
+    if (!dto.alterationType && !dto.alterationTypes) {
+      throw new BadRequestException("Informe ao menos um tipo de alteração contratual.");
+    }
+    return this.processService.createAlteracaoContratual(
+      (dto as CreateAlteracaoContratualDto & { processId?: string }).processId ?? "",
+      req.actor!,
+      dto.alterationTypes ?? dto.alterationType!,
+      dto.otherDescription
+    );
+  }
+
   @Get(":id")
   async get(@Param("id") id: string, @Req() req: Request) {
     return this.processService.getProcess(id, req.actor!);
@@ -87,12 +101,18 @@ export class ProcessController {
 
   @Post(":id/alteracoes-contratuais")
   async createAlteracao(@Param("id") id: string, @Body() dto: CreateAlteracaoContratualDto, @Req() req: Request) {
-    return this.processService.createAlteracaoContratual(id, req.actor!, dto.alterationType);
+    return this.processService.createAlteracaoContratual(id, req.actor!, dto.alterationTypes ?? dto.alterationType!, dto.otherDescription);
   }
 
   @Get(":id/alteracoes-contratuais")
   async listAlteracoes(@Param("id") id: string, @Req() req: Request) {
     return this.processService.listAlteracaoContratual(id, req.actor!);
+  }
+
+  @Get("alteracoes-contratuais/:alteracaoId/history")
+  @Roles("OPERADOR", "MASTER")
+  async listAlteracaoHistory(@Param("alteracaoId") alteracaoId: string, @Req() req: Request) {
+    return this.processService.listAlteracaoContratualHistory(alteracaoId, req.actor!);
   }
 
   @Patch("alteracoes-contratuais/:alteracaoId/stage")

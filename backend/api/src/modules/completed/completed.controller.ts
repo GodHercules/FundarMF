@@ -37,11 +37,11 @@ export class CompletedController {
   legacyUpload(@Param("clientId") clientId: string, @UploadedFile() file: Express.Multer.File, @Body() body: { title?: string; type?: string }, @Req() req: Request) { return this.service.uploadLegacyContract(clientId, file, body, req.actor!); }
 
   @Post(":id/contracts/blank")
-  blank(@Param("id") id: string, @Body() body: { title: string; type?: string }, @Req() req: Request) { return this.service.createBlank(id, body, req.actor!); }
+  blank(@Param("id") id: string, @Body() body: { title: string; type?: string; alteracaoId?: string }, @Req() req: Request) { return this.service.createBlank(id, body, req.actor!); }
 
   @Post(":id/contracts/upload")
   @UseInterceptors(FileInterceptor("file", { storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } }))
-  upload(@Param("id") id: string, @UploadedFile() file: Express.Multer.File, @Body() body: { title?: string; type?: string }, @Req() req: Request) {
+  upload(@Param("id") id: string, @UploadedFile() file: Express.Multer.File, @Body() body: { title?: string; type?: string; alteracaoId?: string }, @Req() req: Request) {
     return this.service.uploadContract(id, file, body, req.actor!);
   }
 

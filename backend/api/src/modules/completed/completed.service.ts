@@ -152,16 +152,20 @@ export class CompletedService {
     await this.audit.record(actor, "legacy_client_created", "LegacyClient", client.id, { source: "CLIENTE_LEGADO", tenantKey }); return client;
   }
 
-  async createBlank(processId: string, body: { title: string; type?: string }, actor: Actor) { const process = await this.ensureProcess(processId, actor); return this.createContract({ processId: process.id, title: body.title, type: body.type, origin: "BLANK", actor }); }
+  async createBlank(processId: string, body: { title: string; type?: string; alteracaoId?: string }, actor: Actor) { const process = await this.ensureProcess(processId, actor); return this.createContract({ processId: process.id, alteracaoId: body.alteracaoId, title: body.title, type: body.type, origin: "BLANK", actor }); }
   async createLegacyBlank(clientId: string, body: { title: string; type?: string }, actor: Actor) { this.ensureStaff(actor); const client = await this.prisma.legacyClient.findFirst({ where: { id: clientId, tenantKey: actor.tenantKey ?? "default" } }); if (!client) throw new NotFoundException("Cliente legado não encontrado."); return this.createContract({ legacyClientId: client.id, title: body.title, type: body.type, origin: "CLIENTE_LEGADO", actor }); }
 
-  private async createContract(input: { processId?: string; legacyClientId?: string; title: string; type?: string; origin: string; actor: Actor; content?: EditorDoc; original?: Express.Multer.File; conversion?: { usedOcr: boolean; metadata?: Record<string, unknown> } }) {
+  private async createContract(input: { processId?: string; alteracaoId?: string; legacyClientId?: string; title: string; type?: string; origin: string; actor: Actor; content?: EditorDoc; original?: Express.Multer.File; conversion?: { usedOcr: boolean; metadata?: Record<string, unknown> } }) {
     if (!input.processId && !input.legacyClientId) throw new BadRequestException("Contrato deve estar vinculado a um processo ou cliente.");
     if (!input.title?.trim()) throw new BadRequestException("Título obrigatório."); const content = input.content ?? editorFromText(""); validateEditor(content);
+    if (input.alteracaoId) {
+      const alteration = await this.prisma.alteracaoContratual.findFirst({ where: { id: input.alteracaoId, processId: input.processId } });
+      if (!alteration) throw new NotFoundException("Alteração contratual não encontrada para este processo.");
+    }
     return this.prisma.$transaction(async (tx) => {
       const contract = await tx.contract.create({ data: { processId: input.processId, legacyClientId: input.legacyClientId, title: input.title.trim(), type: input.type, origin: input.origin, editorSchemaVersion: EDITOR_SCHEMA, conversionStatus: "CONCLUIDO", usedOcr: input.conversion?.usedOcr ?? false, conversionMetadata: input.conversion?.metadata as Prisma.InputJsonValue | undefined, createdById: input.actor.userId, versions: { create: { version: 1, status: "RASCUNHO", source: input.origin, content: content as Prisma.InputJsonValue, sha256: hash(JSON.stringify(content)), createdById: input.actor.userId } }, files: input.original ? { create: { kind: "ORIGINAL", fileName: safeName(input.original.originalname), mimeType: input.original.mimetype, sizeBytes: input.original.size, sha256: hash(input.original.buffer), data: input.original.buffer, createdById: input.actor.userId } } : undefined, conversions: { create: { status: "CONCLUIDO", usedOcr: input.conversion?.usedOcr ?? false, metadata: input.conversion?.metadata as Prisma.InputJsonValue | undefined, startedAt: new Date(), finishedAt: new Date() } } }, include: { versions: true, files: { select: { id: true, kind: true, fileName: true, mimeType: true, sizeBytes: true } } } });
       return contract;
-    }).then(async (contract) => { await this.audit.record(input.actor, input.original ? "contract_uploaded" : "contract_created", "Contract", contract.id, { origin: input.origin, editable: true }); return contract; });
+    }).then(async (contract) => { if (input.alteracaoId) await this.prisma.contract.update({ where: { id: contract.id }, data: { alteracaoId: input.alteracaoId } }); await this.audit.record(input.actor, input.original ? "contract_uploaded" : "contract_created", "Contract", contract.id, { origin: input.origin, editable: true, alteracaoId: input.alteracaoId }); return contract; });
   }
 
   private async convertFile(file: Express.Multer.File) {
@@ -182,9 +186,9 @@ export class CompletedService {
     return { content, conversion, metadata };
   }
 
-  async uploadContract(processId: string, file: Express.Multer.File, body: { title?: string; type?: string }, actor: Actor) {
+  async uploadContract(processId: string, file: Express.Multer.File, body: { title?: string; type?: string; alteracaoId?: string }, actor: Actor) {
     await this.ensureProcess(processId, actor); const converted = await this.convertFile(file);
-    const contract = await this.createContract({ processId, title: body.title ?? file.originalname.replace(/\.(pdf|docx)$/i, ""), type: body.type, origin: converted.conversion === "OCR" ? "UPLOAD_PDF_OCR" : "UPLOAD", actor, content: converted.content, original: file, conversion: { usedOcr: converted.conversion === "OCR", metadata: converted.metadata } });
+    const contract = await this.createContract({ processId, alteracaoId: body.alteracaoId, title: body.title ?? file.originalname.replace(/\.(pdf|docx)$/i, ""), type: body.type, origin: converted.conversion === "OCR" ? "UPLOAD_PDF_OCR" : "UPLOAD", actor, content: converted.content, original: file, conversion: { usedOcr: converted.conversion === "OCR", metadata: converted.metadata } });
     await this.audit.record(actor, converted.conversion === "OCR" ? "contract_ocr_used" : "contract_converted", "Contract", contract.id, { sourceMime: file.mimetype, conversion: converted.conversion }); return contract;
   }
 

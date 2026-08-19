@@ -42,11 +42,19 @@ enum KanbanStage {
 }
 
 enum AlteracaoContratualStage {
+  VIABILIDADE
+  DOC_INICIAL_APROVADA
+  DBE_RECEITA_FEDERAL
+  PREPARACAO_DOCUMENTOS
+  AGUARDANDO_DOCUMENTOS
+  ANALISE_JUCEB
+  EXIGENCIA_JUCEB
+  FINALIZADO
+  // Legacy values remain readable for rows created by the first preview.
   SOLICITACAO_RECEBIDA
   ANALISE_JURIDICA
   AJUSTES_DOCUMENTAIS
   PROTOCOLO
-  FINALIZADO
 }
 
 enum StepSide {
@@ -200,6 +208,7 @@ model ProcessFinalization {
 model Contract {
   id             String   @id @default(uuid())
   processId      String?
+  alteracaoId    String?
   legacyClientId String?
   tenantKey      String   @default("default")
   title          String
@@ -217,12 +226,14 @@ model Contract {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   process        Process? @relation(fields: [processId], references: [id], onDelete: Cascade)
+  alteracao      AlteracaoContratual? @relation(fields: [alteracaoId], references: [id], onDelete: SetNull)
   legacyClient   LegacyClient? @relation(fields: [legacyClientId], references: [id])
   versions       ContractVersion[]
   files          ContractFile[]
   exports        ContractExport[]
   conversions    ContractConversion[]
   @@index([processId, updatedAt])
+  @@index([alteracaoId, updatedAt])
   @@index([legacyClientId, updatedAt])
   @@index([tenantKey, updatedAt])
 }
@@ -296,18 +307,23 @@ model ContractExport {
 model AlteracaoContratual {
   id              String                   @id @default(uuid())
   processId       String
+  tenantKey       String                   @default("default")
   alterationType  String
-  stage           AlteracaoContratualStage @default(SOLICITACAO_RECEBIDA)
+  alterationTypes Json?
+  stage           AlteracaoContratualStage @default(DOC_INICIAL_APROVADA)
   version         Int                      @default(1)
   requestedByRole AuditActorRole
   requestedById   String?
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
+  dueAt           DateTime?
+  slaStatus       String                   @default("ON_TRACK")
 
   process Process                      @relation(fields: [processId], references: [id])
   history AlteracaoContratualHistory[]
+  contracts Contract[]
 
-  @@unique([processId, alterationType])
+  @@index([processId, alterationType, updatedAt])
   @@index([stage, updatedAt])
   @@index([processId, updatedAt])
 }
@@ -315,6 +331,7 @@ model AlteracaoContratual {
 model AlteracaoContratualHistory {
   id          String                    @id @default(uuid())
   alteracaoId String
+  tenantKey   String                    @default("default")
   fromStage   AlteracaoContratualStage?
   toStage     AlteracaoContratualStage
   version     Int
