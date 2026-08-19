@@ -1,0 +1,2 @@
+UPDATE "AlteracaoContratual" SET "stage" = 'VIABILIDADE' WHERE "stage" = 'SOLICITACAO_RECEBIDA';
+ALTER TABLE "AlteracaoContratual" ALTER COLUMN "stage" SET DEFAULT 'DOC_INICIAL_APROVADA';
