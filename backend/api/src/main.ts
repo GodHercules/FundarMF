@@ -78,7 +78,10 @@ async function bootstrap() {
   app.use(requestContextMiddleware);
   app.use(helmet());
   app.use(cookieParser());
-  const allowedOrigins = new Set((process.env.FRONTEND_URL ?? "http://localhost:3000").split(",").map((origin) => origin.trim()));
+  const allowedOrigins = new Set([
+    ...(process.env.FRONTEND_URL ?? "http://localhost:3000").split(",").map((origin) => origin.trim()),
+    "https://fundar-mf.vercel.app"
+  ]);
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
       const origin = req.header("origin");
