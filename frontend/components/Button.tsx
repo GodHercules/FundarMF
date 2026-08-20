@@ -15,7 +15,7 @@ const variants: Record<ButtonVariant, string> = {
   danger: "bg-clay text-white hover:bg-clay/90"
 };
 
-export function Button({ className, variant = "primary", ...props }: ButtonProps) {
+export function Button({ className, variant = "primary", type = "button", ...props }: ButtonProps) {
   return (
     <button
       className={clsx(
@@ -23,6 +23,7 @@ export function Button({ className, variant = "primary", ...props }: ButtonProps
         variants[variant],
         className
       )}
+      type={type}
       {...props}
     ><span className="button-shimmer" aria-hidden="true" />{props.children}</button>
   );

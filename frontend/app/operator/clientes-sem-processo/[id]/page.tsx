@@ -8,6 +8,7 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Input } from "@/components/Input";
 import { Logo } from "@/components/Logo";
+import { WorkspaceNav } from "@/components/WorkspaceNav";
 import { api } from "@/lib/api";
 import { EditorDoc, RichTextEditor } from "@/components/RichTextEditor";
 
@@ -79,7 +80,7 @@ export default function LegacyClientContractsPage() {
 
   if (!client) return <main className="app-container py-12"><Link href="/operator/clientes-sem-processo" className="text-sm font-semibold text-slate">Voltar</Link><Card className="mt-6 p-6">{message ?? "Carregando..."}</Card></main>;
 
-  return <main className="app-container flex min-h-screen flex-col gap-6 py-12">
+  return <main className="app-container flex min-h-screen flex-col gap-6 py-12"><WorkspaceNav role="operator" />
     <Link href="/operator/clientes-sem-processo" className="text-sm font-semibold text-slate">Voltar para clientes sem processo</Link>
     <header><Logo withText /><span className="badge bg-brass/15 text-ink">Contratos independentes</span><h1 className="mt-2 text-3xl font-semibold">{client.name}</h1><p className="mt-2 text-slate">{client.tradeName ?? client.documentNumber} · {client.email ?? client.phone ?? "Sem contato informado"}</p></header>
     <Card className="p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">Contratos e alterações contratuais</h2><p className="mt-1 text-sm text-slate">Este cadastro não depende de processo FundarMF.</p></div><div className="flex flex-wrap gap-2"><select aria-label="Tipo do novo documento" className="rounded-xl border border-ink/15 bg-white px-3 py-2 text-sm" value={type} onChange={(event) => setType(event.target.value)}><option value="ALTERACAO_CONTRATUAL">Alteração contratual</option><option value="CONTRATO_SOCIAL">Contrato social</option><option value="OUTRO">Outro documento</option></select><Button variant="accent" onClick={() => void createBlank()}>Novo documento</Button><label className="inline-flex cursor-pointer items-center rounded-xl border border-ink/20 px-4 py-2 text-sm font-semibold text-ink">{uploading ? "Convertendo..." : "Enviar PDF/DOCX"}<Input className="sr-only" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => void upload(event)} disabled={uploading} /></label></div></div>{message && <p role="status" className="mt-4 text-sm text-slate">{message}</p>}<div className="mt-5 grid gap-3">{client.contracts.length === 0 ? <p className="text-sm text-slate">Nenhum documento cadastrado.</p> : client.contracts.map((contract) => <button key={contract.id} type="button" className="rounded-xl border border-ink/10 p-4 text-left hover:bg-cream" onClick={() => open(contract)}><span className="font-semibold">{contract.title}</span><span className="ml-3 text-xs text-slate">{contract.type ?? "Documento"} · {contract.status} · v{contract.currentVersion}</span></button>)}</div></Card>

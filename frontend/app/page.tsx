@@ -42,27 +42,57 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="app-container flex min-h-screen flex-col gap-8 py-12">
-      <div className="flex flex-col gap-3">
-        <Logo withText />
-        <span className="badge bg-ink/10 text-ink">Acesso interno</span>
-        <h1 className="text-3xl font-semibold">Login</h1>
-        <p className="text-slate">Entre com seu e-mail e senha para acessar o painel.</p>
-      </div>
-      <Card className="w-full max-w-xl space-y-4 p-6">
-        <div>
-          <label htmlFor="login-email" className="text-sm font-semibold text-slate">E-mail</label>
-          <Input id="login-email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" />
+    <main className="login-screen">
+      <section className="login-aside" aria-label="Sobre o FundarMF">
+        <div className="login-brand">
+          <Logo size={68} />
+          <div>
+            <p className="login-brand-kicker">FundarMF</p>
+            <p className="login-brand-name">Portal contábil</p>
+          </div>
         </div>
-        <div>
-          <label htmlFor="login-password" className="text-sm font-semibold text-slate">Senha</label>
-          <PasswordField id="login-password" value={password} onChange={setPassword} placeholder="Digite sua senha" showStrength={false} />
+        <div className="login-aside-copy">
+          <span className="login-eyebrow">Workflow para abertura de empresa</span>
+          <h1>Clareza para cada etapa do processo.</h1>
+          <p>Organize validações, documentos e decisões em um único lugar — do primeiro contato à conclusão.</p>
         </div>
-        <Button onClick={handleLogin} className="w-full" disabled={loading}>
-          {loading ? "Entrando..." : "Entrar"}
-        </Button>
-        {message && <p role="alert" className="text-sm text-clay">{message}</p>}
-      </Card>
+        <div className="login-process-mark" aria-hidden="true">
+          <span className="login-process-line" />
+          <div><strong>01</strong><span>Dados recebidos</span></div>
+          <div><strong>02</strong><span>Validação assistida</span></div>
+          <div><strong>03</strong><span>Empresa concluída</span></div>
+        </div>
+        <p className="login-aside-footer">Acesso restrito à equipe FundarMF</p>
+      </section>
+
+      <section className="login-content" aria-labelledby="login-title">
+        <div className="login-mobile-brand"><Logo size={52} /><span>FundarMF</span></div>
+        <div className="login-form-wrap">
+          <span className="login-eyebrow login-eyebrow-light">Acesso interno</span>
+          <h2 id="login-title">Entrar no painel</h2>
+          <p className="login-intro">Use suas credenciais para continuar a operação.</p>
+          <Card className="login-card w-full p-6 sm:p-8">
+            <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void handleLogin(); }}>
+            <div className="login-field">
+              <label htmlFor="login-email">E-mail</label>
+              <Input id="login-email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" />
+            </div>
+            <div className="login-field">
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="login-password">Senha</label>
+                <span className="login-field-hint">Acesso protegido</span>
+              </div>
+              <PasswordField id="login-password" value={password} onChange={setPassword} placeholder="Digite sua senha" showStrength={false} />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Entrando..." : "Entrar"}
+            </Button>
+            {message && <p role="alert" className="text-sm text-clay">{message}</p>}
+            </form>
+          </Card>
+          <p className="login-help">Problemas para acessar? Fale com o administrador do seu ambiente.</p>
+        </div>
+      </section>
     </main>
   );
 }

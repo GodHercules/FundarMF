@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
+import { WorkspaceNav } from "@/components/WorkspaceNav";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 
@@ -43,6 +44,7 @@ export default function OperatorStart() {
 
   return (
     <main className="app-container flex min-h-screen flex-col gap-8 py-12">
+      <WorkspaceNav role="operator" />
       <Link href="/" className="text-sm font-semibold text-slate">
         {"<- Sair"}
       </Link>

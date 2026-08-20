@@ -10,6 +10,7 @@ import { Button } from "@/components/Button";
 import { StatusBadge } from "@/components/Stepper";
 import { Input } from "@/components/Input";
 import { Logo } from "@/components/Logo";
+import { WorkspaceNav } from "@/components/WorkspaceNav";
 import { Select } from "@/components/Select";
 import { Field } from "@/components/Field";
 import { notifyError, notifySuccess } from "@/lib/notify";
@@ -453,6 +454,7 @@ export default function OperatorProcess() {
 
   return (
     <main className="app-container flex min-h-screen flex-col gap-8 py-10">
+      <WorkspaceNav role="operator" />
       <Link href="/operator/dashboard" className="text-sm font-semibold text-slate">
          Voltar
       </Link>

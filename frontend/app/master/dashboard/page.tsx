@@ -13,6 +13,7 @@ import { PasswordField } from "@/components/PasswordField";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { logClientPerf } from "@/lib/perf";
 import { FiAlertTriangle, FiTrash2, FiUserX, FiX } from "react-icons/fi";
+import { WorkspaceNav } from "@/components/WorkspaceNav";
 
 type DashboardProcess = {
   id: string;
@@ -215,6 +216,7 @@ export default function MasterDashboard() {
 
   return (
     <main className="app-container flex min-h-screen flex-col gap-8 py-12">
+      <WorkspaceNav role="master" />
       <Link href="/" className="text-sm font-semibold text-slate">
         {"<- Sair"}
       </Link>

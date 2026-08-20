@@ -8,6 +8,7 @@ import { DOCS_API_BASE, api } from "@/lib/api";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Logo } from "@/components/Logo";
+import { WorkspaceNav } from "@/components/WorkspaceNav";
 import { StatusBadge } from "@/components/Stepper";
 import { notifyError } from "@/lib/notify";
 import { FiCheckCircle, FiFileText, FiXCircle } from "react-icons/fi";
@@ -122,6 +123,7 @@ export default function OperatorProcessReview() {
 
   return (
     <main className="app-container flex min-h-screen flex-col gap-6 py-10">
+      <WorkspaceNav role="operator" />
       <Link href={`/operator/process/${processId}`} className="text-sm font-semibold text-slate">
         Voltar para o processo
       </Link>

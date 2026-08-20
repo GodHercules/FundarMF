@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { OperatorKanbanBoard } from "@/components/OperatorKanbanBoard";
+import { WorkspaceNav } from "@/components/WorkspaceNav";
 
 export default function OperatorKanbanPage() {
   return (
     <main className="app-container flex min-h-screen flex-col gap-8 py-12">
+      <WorkspaceNav role="operator" />
       <Link href="/operator/dashboard" className="text-sm font-semibold text-slate">
         Voltar para dashboard
       </Link>

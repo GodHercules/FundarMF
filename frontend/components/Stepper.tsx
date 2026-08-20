@@ -20,14 +20,18 @@ const stepLabels: Record<string, string> = {
 
 export function Stepper({ steps, current }: { steps: string[]; current: string }) {
   return (
-    <div className="flex flex-col gap-4">
-      {steps.map((step) => (
-        <div key={step} className="flex items-center gap-3">
-          <span className={clsx("step-dot", step === current ? "bg-brass" : "bg-slate/30")} />
-          <span className="text-sm font-semibold text-slate">{stepLabels[step] ?? step}</span>
-        </div>
-      ))}
-    </div>
+    <ol className="flex flex-col gap-4" aria-label="Etapas do processo">
+      {steps.map((step, index) => {
+        const currentIndex = steps.indexOf(current);
+        const done = currentIndex >= 0 && index < currentIndex;
+        return (
+          <li key={step} className="flex items-center gap-3" aria-current={step === current ? "step" : undefined}>
+            <span className={clsx("step-dot", done ? "bg-emerald" : step === current ? "bg-brass" : "bg-slate/30")} aria-hidden="true" />
+            <span className={clsx("text-sm font-semibold", step === current ? "text-ink" : "text-slate")}>{stepLabels[step] ?? step}</span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

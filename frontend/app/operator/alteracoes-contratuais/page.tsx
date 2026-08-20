@@ -5,6 +5,7 @@ import { OperatorAlteracaoKanbanBoard } from "@/components/OperatorAlteracaoKanb
 import { ALTERACAO_CONTRATUAL_OPTIONS } from "@/lib/alteracao-contratual";
 import { api } from "@/lib/api";
 import { useState } from "react";
+import { WorkspaceNav } from "@/components/WorkspaceNav";
 
 export default function OperatorAlteracoesContratuaisPage() {
   const [processId, setProcessId] = useState("");
@@ -29,7 +30,7 @@ export default function OperatorAlteracoesContratuaisPage() {
     finally { setSaving(false); }
   }
 
-  return <main className="app-container flex min-h-screen flex-col gap-8 py-12">
+  return <main className="app-container flex min-h-screen flex-col gap-8 py-12"><WorkspaceNav role="operator" />
     <Link href="/operator/dashboard" className="text-sm font-semibold text-slate">Voltar para dashboard</Link>
     <header className="flex flex-col gap-2"><Logo withText /><span className="badge bg-brass/15 text-ink">Kanban operacional</span><h1 className="text-3xl font-semibold">Alterações Contratuais</h1><p className="text-slate">Crie uma alteração para um processo existente ou para qualquer cliente cadastrado avulso.</p></header>
     <section className="rounded-2xl border border-ink/10 bg-white/70 p-4">

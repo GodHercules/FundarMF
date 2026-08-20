@@ -10,6 +10,7 @@ import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
 import { PhoneInput } from "@/components/PhoneInput";
 import { OperatorKanbanBoard } from "@/components/OperatorKanbanBoard";
+import { WorkspaceNav } from "@/components/WorkspaceNav";
 import { KANBAN_STAGE_LABELS, KanbanStage } from "@/lib/kanban";
 import { notifySuccess } from "@/lib/notify";
 
@@ -196,6 +197,7 @@ export default function OperatorDashboard() {
 
   return (
     <main className="app-container flex min-h-screen flex-col gap-8 py-12">
+      <WorkspaceNav role="operator" />
       <Link href="/" className="text-sm font-semibold text-slate">
         {"<- Sair"}
       </Link>

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragEndEvent,
+  KeyboardSensor,
   PointerSensor,
   TouchSensor,
   useDroppable,
@@ -14,6 +15,7 @@ import {
 import {
   SortableContext,
   useSortable,
+  sortableKeyboardCoordinates,
   verticalListSortingStrategy
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -95,7 +97,7 @@ function SortableProcessCard({ process, disabled }: { process: ProcessCard; disa
           <Link href={`/operator/process/${process.id}`} className="text-xs font-semibold text-brass">
             Abrir caso
           </Link>
-          {disabled && <p className="text-[11px] text-slate">Movendo...</p>}
+          {disabled && <p role="status" className="text-[11px] text-slate">Movendo...</p>}
         </div>
       </Card>
     </div>
@@ -142,7 +144,8 @@ export function OperatorKanbanBoard({ onStageChange }: OperatorKanbanBoardProps)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 1 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } })
+    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   async function loadProcesses() {
@@ -255,7 +258,7 @@ export function OperatorKanbanBoard({ onStageChange }: OperatorKanbanBoardProps)
       sensors={sensors}
       onDragEnd={(event) => void handleDragEnd(event)}
     >
-      <section className="overflow-x-auto pb-2">
+      <section className="overflow-x-auto pb-2" aria-label="Quadro de processos por etapa">
         <div className="flex min-w-max gap-4">
           {KANBAN_STAGES.map((stage) => (
             <KanbanColumn key={stage} stage={stage} processes={grouped[stage]} busyId={busyProcessId} />

@@ -9,6 +9,7 @@ import { Input } from "@/components/Input";
 import { PhoneInput } from "@/components/PhoneInput";
 import { Card } from "@/components/Card";
 import { Logo } from "@/components/Logo";
+import { WorkspaceNav } from "@/components/WorkspaceNav";
 import { notifySuccess } from "@/lib/notify";
 
 export default function OperatorRequestLink() {
@@ -84,6 +85,7 @@ export default function OperatorRequestLink() {
 
   return (
     <main className="app-container flex min-h-screen flex-col gap-8 py-12">
+      <WorkspaceNav role="operator" />
       <Link href="/operator/start" className="text-sm font-semibold text-slate">
         Voltar
       </Link>
