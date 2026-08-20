@@ -83,7 +83,9 @@ export class NotificationService {
 
   async sendEmail(to: string, subject: string, body: string, htmlOverride?: string) {
     try {
-      const inline = (process.env.NOTIFY_INLINE ?? "false") === "true";
+      // Direct provider delivery is the safe default. Queue delivery remains
+      // available for deployments that explicitly opt into it.
+      const inline = (process.env.NOTIFY_INLINE ?? "true") === "true";
       const rendered = htmlOverride ? { html: htmlOverride, text: body } : renderBaseEmail({ title: subject, body });
       const { html, text } = rendered;
       const from = process.env.EMAIL_FROM ?? "no-reply@fundarmf.local";
@@ -141,7 +143,7 @@ export class NotificationService {
     draft: { subject: string; text: string; html: string; from?: string; replyTo?: string }
   ) {
     try {
-      const inline = (process.env.NOTIFY_INLINE ?? "false") === "true";
+      const inline = (process.env.NOTIFY_INLINE ?? "true") === "true";
       const from = draft.from ?? (process.env.EMAIL_FROM ?? "no-reply@fundarmf.local");
       const replyTo = draft.replyTo ?? (process.env.EMAIL_REPLY_TO?.trim() || undefined);
       const correlationId = getRequestContext()?.correlationId;

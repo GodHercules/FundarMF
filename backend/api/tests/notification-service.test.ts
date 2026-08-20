@@ -3,6 +3,7 @@ import { NotificationService } from "../src/modules/notification/notification.se
 
 describe("NotificationService", () => {
   it("enqueues email with rendered html", async () => {
+    process.env.NOTIFY_INLINE = "false";
     const queue = {
       enqueueEmail: vi.fn().mockResolvedValue("job-id"),
       enqueueWhatsApp: vi.fn()
@@ -20,6 +21,25 @@ describe("NotificationService", () => {
     expect(payload.html).toContain("MF Contabilidade");
     expect(payload.html).not.toContain("{{logoUrl}}");
     expect(payload.html).not.toContain("{{fundarLogoUrl}}");
+    delete process.env.NOTIFY_INLINE;
+  });
+
+  it("sends email directly when inline delivery is enabled", async () => {
+    process.env.NOTIFY_INLINE = "true";
+    const queue = { enqueueEmail: vi.fn() };
+    const emailProvider = { sendEmail: vi.fn().mockResolvedValue(undefined) };
+    const service = new NotificationService(queue as any, emailProvider as any);
+
+    await service.sendEmail("user@example.com", "Assunto", "Mensagem");
+
+    expect(emailProvider.sendEmail).toHaveBeenCalledWith(
+      "user@example.com",
+      "Assunto",
+      expect.stringContaining("Mensagem"),
+      expect.stringContaining("<html")
+    );
+    expect(queue.enqueueEmail).not.toHaveBeenCalled();
+    delete process.env.NOTIFY_INLINE;
   });
 
   it("enqueues whatsapp", async () => {
