@@ -1183,12 +1183,11 @@ export class ProcessService {
     }
     if (current.stage === stage) return { ok: true, alreadyInStage: true, request: current };
 
-    const legacyStages: AlteracaoContratualStage[] = [
+    const legacyOnlyStages: AlteracaoContratualStage[] = [
       AlteracaoContratualStage.SOLICITACAO_RECEBIDA,
       AlteracaoContratualStage.ANALISE_JURIDICA,
       AlteracaoContratualStage.AJUSTES_DOCUMENTAIS,
-      AlteracaoContratualStage.PROTOCOLO,
-      AlteracaoContratualStage.FINALIZADO
+      AlteracaoContratualStage.PROTOCOLO
     ];
     const stages: AlteracaoContratualStage[] = [
       AlteracaoContratualStage.DOC_INICIAL_APROVADA,
@@ -1200,7 +1199,9 @@ export class ProcessService {
       AlteracaoContratualStage.EXIGENCIA_JUCEB,
       AlteracaoContratualStage.FINALIZADO
     ];
-    const transitionStages = legacyStages.includes(current.stage) || legacyStages.includes(stage) ? legacyStages : stages;
+    const transitionStages = legacyOnlyStages.includes(current.stage) || legacyOnlyStages.includes(stage)
+      ? [...legacyOnlyStages, AlteracaoContratualStage.FINALIZADO]
+      : stages;
     if (Math.abs(transitionStages.indexOf(stage) - transitionStages.indexOf(current.stage)) !== 1) {
       throw new BadRequestException("Transição de etapa inválida.");
     }

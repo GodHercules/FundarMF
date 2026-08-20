@@ -227,6 +227,29 @@ describe("ProcessService contractual alterations", () => {
     expect(tx.alteracaoContratual.updateMany).not.toHaveBeenCalled();
   });
 
+  it("allows a modern alteration to move from exigencia to finalizado", async () => {
+    const { service, tx } = createService({
+      request: {
+        id: "alteration-1",
+        processId: "process-1",
+        alterationType: "ALTERACAO_ENDERECO",
+        stage: AlteracaoContratualStage.EXIGENCIA_JUCEB,
+        version: 1,
+        process: { ownerId: "operator-1" }
+      }
+    });
+
+    await expect(
+      service.updateAlteracaoContratualStage(
+        "alteration-1",
+        { role: "OPERADOR", userId: "operator-1" },
+        AlteracaoContratualStage.FINALIZADO,
+        1
+      )
+    ).resolves.toMatchObject({ ok: true, request: expect.any(Object) });
+    expect(tx.alteracaoContratual.updateMany).toHaveBeenCalledTimes(1);
+  });
+
   it("requires an operator or master to change the stage", async () => {
     const { service } = createService();
 
