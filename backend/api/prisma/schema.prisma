@@ -188,6 +188,7 @@ model LegacyClient {
   updatedAt        DateTime @updatedAt
   processes        Process[]
   contracts        Contract[]
+  alteracoesContratuais AlteracaoContratual[]
 
   @@index([name])
   @@index([createdAt])
@@ -306,7 +307,8 @@ model ContractExport {
 
 model AlteracaoContratual {
   id              String                   @id @default(uuid())
-  processId       String
+  processId       String?
+  legacyClientId  String?
   tenantKey       String                   @default("default")
   alterationType  String
   alterationTypes Json?
@@ -319,13 +321,15 @@ model AlteracaoContratual {
   dueAt           DateTime?
   slaStatus       String                   @default("ON_TRACK")
 
-  process Process                      @relation(fields: [processId], references: [id])
+  process Process?                     @relation(fields: [processId], references: [id])
+  legacyClient LegacyClient?           @relation(fields: [legacyClientId], references: [id], onDelete: SetNull)
   history AlteracaoContratualHistory[]
   contracts Contract[]
 
   @@index([processId, alterationType, updatedAt])
   @@index([stage, updatedAt])
   @@index([processId, updatedAt])
+  @@index([legacyClientId, alterationType, updatedAt])
 }
 
 model AlteracaoContratualHistory {

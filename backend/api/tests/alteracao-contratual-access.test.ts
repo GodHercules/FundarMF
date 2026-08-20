@@ -70,7 +70,63 @@ function createService(options?: { process?: unknown; request?: AlterationReques
   return { service, prisma, tx, auditService };
 }
 
+function createStandaloneService() {
+  const request = {
+    id: "alteration-standalone",
+    legacyClientId: "legacy-client-1",
+    alterationType: "ALTERACAO_ENDERECO",
+    stage: AlteracaoContratualStage.DOC_INICIAL_APROVADA,
+    version: 1
+  };
+  const tx = {
+    legacyClient: {
+      upsert: vi.fn().mockResolvedValue({ id: "legacy-client-1", name: "Empresa Avulsa" })
+    },
+    alteracaoContratual: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue(request)
+    },
+    alteracaoContratualHistory: { createMany: vi.fn().mockResolvedValue({ count: 1 }) }
+  };
+  const prisma = { $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)) };
+  const auditService = { record: vi.fn().mockResolvedValue(undefined) };
+  const service = new ProcessService(
+    prisma as unknown as PrismaService,
+    {} as unknown as SlaService,
+    auditService as unknown as AuditService,
+    {} as unknown as NotificationService,
+    {} as unknown as AuthService,
+    {} as unknown as IdempotencyService
+  );
+  return { service, tx, auditService };
+}
+
 describe("ProcessService contractual alterations", () => {
+  it("creates an alteration for a standalone client and stores notification data", async () => {
+    const { service, tx, auditService } = createStandaloneService();
+
+    const result = await service.createAlteracaoContratual(undefined, { role: "OPERADOR", userId: "operator-1" }, "ALTERACAO_ENDERECO", undefined, {
+      name: "Empresa Avulsa",
+      email: "cliente@example.com",
+      documentNumber: "12.345.678/0001-90"
+    });
+
+    expect(result.id).toBe("alteration-standalone");
+    expect(tx.legacyClient.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { tenantKey_normalizedDocument: { tenantKey: "default", normalizedDocument: "12345678000190" } },
+      create: expect.objectContaining({ name: "Empresa Avulsa", email: "cliente@example.com" })
+    }));
+    expect(tx.alteracaoContratual.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ legacyClientId: "legacy-client-1" })
+    }));
+    expect(auditService.record).toHaveBeenCalledWith(expect.anything(), "alteracao_contratual_requested", "AlteracaoContratual", "alteration-standalone", expect.objectContaining({ documentNumber: "12345678000190" }));
+  });
+
+  it("requires the standalone client's name, email and CNPJ", async () => {
+    const { service } = createStandaloneService();
+    await expect(service.createAlteracaoContratual(undefined, { role: "MASTER" }, "ALTERACAO_ENDERECO")).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it("creates an alteration and its initial history for the owning client", async () => {
     const { service, prisma, tx, auditService } = createService();
 

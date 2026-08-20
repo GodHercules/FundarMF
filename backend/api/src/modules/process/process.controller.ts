@@ -87,10 +87,16 @@ export class ProcessController {
       throw new BadRequestException("Informe ao menos um tipo de alteração contratual.");
     }
     return this.processService.createAlteracaoContratual(
-      (dto as CreateAlteracaoContratualDto & { processId?: string }).processId ?? "",
+      dto.processId,
       req.actor!,
       dto.alterationTypes ?? dto.alterationType!,
-      dto.otherDescription
+      dto.otherDescription,
+      {
+        legacyClientId: dto.legacyClientId,
+        name: dto.clientName,
+        email: dto.clientEmail,
+        documentNumber: dto.documentNumber
+      }
     );
   }
 

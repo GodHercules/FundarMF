@@ -60,6 +60,10 @@ function sanitizeClientStep2(data: Record<string, unknown>) {
   }
   return result;
 }
+
+function normalizeDocument(value: unknown) {
+  return String(value ?? "").replace(/\D/g, "");
+}
 const KANBAN_STAGE_EMAILS: Record<KanbanStage, (clientName: string) => string> = {
   VIABILIDADE: (clientName) =>
     `Olá, ${clientName}. Seu processo acaba de ser iniciado e encontra-se em análise na Junta Comercial / Sedur - Viabilidade Regin.`,
@@ -359,9 +363,17 @@ export class ProcessService {
   private async notifyAlteracaoStage(id: string, stage: AlteracaoContratualStage) {
     if (stage === AlteracaoContratualStage.EXIGENCIA_JUCEB || typeof this.notificationService.sendEmail !== "function") return;
     try {
-      const alteration = await this.prisma.alteracaoContratual.findUnique({ where: { id }, include: { process: { select: { clientName: true, clientEmail: true } } } });
-      if (!alteration?.process.clientEmail) return;
-      await this.notificationService.sendEmail(alteration.process.clientEmail, `Alteração Contratual: ${stage}`, `A alteração contratual de ${alteration.process.clientName ?? "sua empresa"} avançou para a etapa ${stage}.`);
+      const alteration = await this.prisma.alteracaoContratual.findUnique({
+        where: { id },
+        include: {
+          process: { select: { clientName: true, clientEmail: true } },
+          legacyClient: { select: { name: true, email: true } }
+        }
+      });
+      const email = alteration?.process?.clientEmail ?? alteration?.legacyClient?.email;
+      if (!email) return;
+      const name = alteration?.process?.clientName ?? alteration?.legacyClient?.name ?? "sua empresa";
+      await this.notificationService.sendEmail(email, `Alteração Contratual: ${stage}`, `A alteração contratual de ${name} avançou para a etapa ${stage}.`);
     } catch (error) {
       console.warn("[process] contractual alteration notification failed", error);
     }
@@ -1013,15 +1025,17 @@ export class ProcessService {
     return process;
   }
 
-  async createAlteracaoContratual(processId: string, actor: Actor, alterationTypes: string | string[], otherDescription?: string) {
+  async createAlteracaoContratual(
+    processId: string | undefined,
+    actor: Actor,
+    alterationTypes: string | string[],
+    otherDescription?: string,
+    standaloneClient?: { legacyClientId?: string; name?: string; email?: string; documentNumber?: string }
+  ) {
     if (actor.role !== "CLIENTE" && actor.role !== "OPERADOR" && actor.role !== "MASTER") {
       throw new ForbiddenException();
     }
 
-    const process = await this.getProcess(processId, actor);
-    if (actor.role === "CLIENTE" && process.status !== ProcessStatus.CONCLUIDO) {
-      throw new BadRequestException("A alteração contratual só pode ser solicitada após a conclusão do processo.");
-    }
     const types = [...new Set(Array.isArray(alterationTypes) ? alterationTypes : [alterationTypes])].filter(Boolean);
     if (types.length === 0 || types.some((type) => typeof type !== "string" || type.length > 80)) {
       throw new BadRequestException("Informe ao menos um tipo de alteração contratual válido.");
@@ -1030,13 +1044,74 @@ export class ProcessService {
       throw new BadRequestException("Descreva a outra alteração contratual.");
     }
 
+    if (!processId) {
+      if (actor.role === "CLIENTE") throw new ForbiddenException();
+      const tenantKey = actor.tenantKey ?? "default";
+      const documentNumber = normalizeDocument(standaloneClient?.documentNumber);
+      if (!standaloneClient?.legacyClientId && (!standaloneClient?.name?.trim() || !standaloneClient?.email?.trim() || !documentNumber)) {
+        throw new BadRequestException("Informe nome ou razão social, e-mail de notificação e CNPJ do cliente.");
+      }
+      if (!standaloneClient?.legacyClientId && documentNumber.length !== 14) {
+        throw new BadRequestException("Informe um CNPJ válido com 14 dígitos.");
+      }
+
+      const requests = await this.prisma.$transaction(async (tx) => {
+        const client = standaloneClient.legacyClientId
+          ? await tx.legacyClient.findFirst({ where: { id: standaloneClient.legacyClientId, tenantKey } })
+          : await tx.legacyClient.upsert({
+            where: { tenantKey_normalizedDocument: { tenantKey, normalizedDocument: documentNumber } },
+            update: { name: standaloneClient.name!.trim(), documentNumber, email: standaloneClient.email!.trim() },
+            create: {
+              kind: "PJ",
+              name: standaloneClient.name!.trim(),
+              documentNumber,
+              normalizedDocument: documentNumber,
+              tenantKey,
+              email: standaloneClient.email!.trim(),
+              createdById: actor.userId
+            }
+          });
+        if (!client) throw new NotFoundException("Cliente não encontrado.");
+
+        const created = [];
+        for (const alterationType of types) {
+          const existing = await tx.alteracaoContratual.findFirst({ where: { legacyClientId: client.id, alterationType }, orderBy: { createdAt: "desc" } });
+          const request = existing ?? await tx.alteracaoContratual.create({
+            data: {
+              legacyClientId: client.id,
+              alterationType,
+              alterationTypes: types,
+              tenantKey,
+              dueAt: new Date(Date.now() + 72 * 60 * 60 * 1000),
+              requestedByRole: actor.role,
+              requestedById: actor.userId
+            }
+          });
+          await tx.alteracaoContratualHistory.createMany({
+            skipDuplicates: true,
+            data: [{ alteracaoId: request.id, toStage: request.stage, version: request.version, actorRole: actor.role, actorId: actor.userId, comment: otherDescription?.trim() }]
+          });
+          created.push(request);
+        }
+        return created;
+      });
+      const request = requests[0];
+      await this.auditService.record(actor, "alteracao_contratual_requested", "AlteracaoContratual", request.id, { legacyClientId: standaloneClient.legacyClientId, clientName: standaloneClient.name, documentNumber, alterationTypes: types });
+      return requests.length === 1 ? request : { requests };
+    }
+
+    const process = await this.getProcess(processId, actor);
+    if (actor.role === "CLIENTE" && process.status !== ProcessStatus.CONCLUIDO) {
+      throw new BadRequestException("A alteração contratual só pode ser solicitada após a conclusão do processo.");
+    }
+
     const requests = await this.prisma.$transaction(async (tx) => {
       const created = [];
       for (const alterationType of types) {
         const legacyTx = tx.alteracaoContratual as unknown as { findFirst?: (...args: unknown[]) => Promise<unknown>; create?: (...args: unknown[]) => Promise<unknown> };
         const request = (legacyTx.findFirst && legacyTx.create
           ? ((await legacyTx.findFirst({ where: { processId, alterationType }, orderBy: { createdAt: "desc" } })) ?? await legacyTx.create({
-            data: { processId, alterationType, alterationTypes: types, tenantKey: "default", dueAt: new Date(Date.now() + 72 * 60 * 60 * 1000), requestedByRole: actor.role, requestedById: actor.userId }
+            data: { processId, alterationType, alterationTypes: types, tenantKey: process.tenantKey, dueAt: new Date(Date.now() + 72 * 60 * 60 * 1000), requestedByRole: actor.role, requestedById: actor.userId }
             }))
           : await (tx.alteracaoContratual.upsert as unknown as (args: unknown) => Promise<unknown>)({
               where: { processId_alterationType: { processId, alterationType } },
@@ -1075,17 +1150,20 @@ export class ProcessService {
     }
 
     return this.prisma.alteracaoContratual.findMany({
-      where: actor.role === "OPERADOR" ? { process: { ownerId: actor.userId } } : undefined,
+      where: actor.role === "OPERADOR" ? { OR: [{ process: { ownerId: actor.userId } }, { legacyClient: { createdById: actor.userId } }] } : undefined,
       orderBy: { updatedAt: "desc" },
       take: 200,
-      include: { process: { select: { id: true, clientName: true, clientEmail: true, ownerId: true } } }
+      include: {
+        process: { select: { id: true, clientName: true, clientEmail: true, ownerId: true } },
+        legacyClient: { select: { id: true, name: true, email: true, documentNumber: true, createdById: true } }
+      }
     });
   }
 
   async listAlteracaoContratualHistory(id: string, actor: Actor) {
-    const alteration = await this.prisma.alteracaoContratual.findUnique({ where: { id }, include: { process: { select: { ownerId: true } } } });
+    const alteration = await this.prisma.alteracaoContratual.findUnique({ where: { id }, include: { process: { select: { ownerId: true } }, legacyClient: { select: { createdById: true } } } });
     if (!alteration) throw new NotFoundException("Solicitação de alteração não encontrada.");
-    if (actor.role === "OPERADOR" && alteration.process.ownerId !== actor.userId) throw new ForbiddenException();
+    if (actor.role === "OPERADOR" && alteration.process?.ownerId !== actor.userId && alteration.legacyClient?.createdById !== actor.userId) throw new ForbiddenException();
     return this.prisma.alteracaoContratualHistory.findMany({ where: { alteracaoId: id }, orderBy: { createdAt: "asc" } });
   }
 
@@ -1096,10 +1174,10 @@ export class ProcessService {
 
     const current = await this.prisma.alteracaoContratual.findUnique({
       where: { id },
-      include: { process: { select: { ownerId: true } } }
+      include: { process: { select: { ownerId: true } }, legacyClient: { select: { createdById: true } } }
     });
     if (!current) throw new NotFoundException("Solicitação de alteração não encontrada.");
-    if (actor.role === "OPERADOR" && current.process.ownerId !== actor.userId) {
+    if (actor.role === "OPERADOR" && current.process?.ownerId !== actor.userId && current.legacyClient?.createdById !== actor.userId) {
       throw new ForbiddenException();
     }
     if (current.stage === stage) return { ok: true, alreadyInStage: true, request: current };

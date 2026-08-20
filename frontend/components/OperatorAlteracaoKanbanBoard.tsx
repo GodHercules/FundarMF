@@ -7,7 +7,7 @@ import { Card } from "@/components/Card";
 import { api } from "@/lib/api";
 import { ALTERACAO_KANBAN_STAGE_LABELS, ALTERACAO_KANBAN_STAGES, AlteracaoKanbanStage } from "@/lib/alteracao-contratual";
 
-type AlteracaoCard = { id: string; processId: string; alterationType: string; stage: AlteracaoKanbanStage; version: number; process?: { id: string; clientName?: string | null; ownerId?: string | null } };
+type AlteracaoCard = { id: string; processId?: string | null; legacyClientId?: string | null; alterationType: string; stage: AlteracaoKanbanStage; version: number; process?: { id: string; clientName?: string | null; ownerId?: string | null } | null; legacyClient?: { id: string; name?: string | null; documentNumber?: string | null } | null };
 
 function Column({ stage, items }: { stage: AlteracaoKanbanStage; items: AlteracaoCard[] }) {
   const droppable = useDroppable({ id: `alteracao-column:${stage}` });
@@ -19,8 +19,10 @@ function Column({ stage, items }: { stage: AlteracaoKanbanStage; items: Alteraca
 
 function DraggableAlteracaoCard({ item }: { item: AlteracaoCard }) {
   const draggable = useDraggable({ id: `alteracao:${item.id}` });
+  const name = item.process?.clientName ?? item.legacyClient?.name ?? "Empresa sem nome";
+  const href = item.processId ? `/operator/process/${item.processId}` : item.legacyClientId ? `/operator/clientes-sem-processo/${item.legacyClientId}` : null;
   return <div ref={draggable.setNodeRef} style={{ transform: draggable.transform ? `translate3d(${draggable.transform.x}px, ${draggable.transform.y}px, 0)` : undefined }} {...draggable.attributes} {...draggable.listeners} className="cursor-grab rounded-xl border border-ink/10 bg-white p-4 shadow-sm active:cursor-grabbing">
-    <p className="text-sm font-semibold text-ink">{item.process?.clientName ?? "Empresa sem nome"}</p><p className="mt-1 text-xs text-slate">Alteração: {item.alterationType}</p><p className="mt-1 font-mono text-[11px] text-slate">{item.processId}</p><Link href={`/operator/process/${item.processId}`} className="mt-3 inline-block text-xs font-semibold text-brass">Abrir processo</Link>
+    <p className="text-sm font-semibold text-ink">{name}</p><p className="mt-1 text-xs text-slate">Alteração: {item.alterationType}</p><p className="mt-1 font-mono text-[11px] text-slate">{item.legacyClient?.documentNumber ?? item.processId ?? item.legacyClientId}</p>{href && <Link href={href} className="mt-3 inline-block text-xs font-semibold text-brass">Abrir cadastro</Link>}
   </div>;
 }
 
