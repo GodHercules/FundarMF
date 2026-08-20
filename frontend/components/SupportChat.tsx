@@ -31,7 +31,7 @@ export function SupportChat() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-ink text-white shadow-soft hover:opacity-90"
+        className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-ink text-white shadow-soft hover:-translate-y-0.5 hover:opacity-90"
         aria-label="Abrir chat de suporte"
       >
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
@@ -43,10 +43,10 @@ export function SupportChat() {
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center lg:justify-end">
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-soft lg:mr-2">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-soft lg:mr-2" role="dialog" aria-modal="true" aria-labelledby="support-chat-title">
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="text-sm font-semibold text-ink">Chat de suporte</h4>
+                <h4 id="support-chat-title" className="text-sm font-semibold text-ink">Chat de suporte</h4>
                 <p className="mt-1 text-xs text-slate">Fale com nosso time durante todo o processo.</p>
               </div>
               <button

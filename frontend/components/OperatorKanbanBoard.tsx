@@ -81,7 +81,7 @@ function SortableProcessCard({ process, disabled }: { process: ProcessCard; disa
   return (
     <div ref={setNodeRef} style={style}>
       <Card
-        className="cursor-grab border border-ink/10 bg-white/90 p-4 transition hover:-translate-y-0.5 active:cursor-grabbing"
+        className="cursor-grab border border-ink/10 bg-white/95 p-4 transition hover:-translate-y-0.5 hover:border-brass/40 active:cursor-grabbing"
         {...attributes}
         {...listeners}
       >
@@ -114,7 +114,7 @@ function KanbanColumn({
   const droppable = useDroppable({ id: columnDragId(stage) });
 
   return (
-    <div ref={droppable.setNodeRef} className="w-[300px] shrink-0 rounded-2xl border border-ink/10 bg-white/60 p-3">
+    <div ref={droppable.setNodeRef} className="w-[min(300px,calc(100vw-2rem))] shrink-0 rounded-2xl border border-ink/10 bg-slate/5 p-3">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-ink">{KANBAN_STAGE_LABELS[stage]}</h2>
         <span className="badge bg-ink text-white">{processes.length}</span>

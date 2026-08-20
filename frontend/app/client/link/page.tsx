@@ -129,25 +129,25 @@ function ClientLinkInner() {
         <Logo withText />
         <span className="badge bg-brass/15 text-ink">Validação segura</span>
         <h1 className="text-3xl font-semibold">Confirmar acesso</h1>
-        <p className="text-slate">Insira o token e o OTP enviado pelo escritorio.</p>
+        <p className="text-slate">Insira o token e o OTP enviado pelo escritório.</p>
       </div>
       <Card className="p-6 space-y-4">
         <div>
-          <label className="text-sm font-semibold text-slate">Token</label>
-          <Input value={token} onChange={(event) => setToken(event.target.value)} placeholder="token do link" />
+          <label htmlFor="client-link-token" className="text-sm font-semibold text-slate">Token</label>
+          <Input id="client-link-token" value={token} onChange={(event) => setToken(event.target.value)} placeholder="token do link" />
         </div>
         <div>
-          <label className="text-sm font-semibold text-slate">OTP</label>
-          <Input value={otp} onChange={(event) => setOtp(event.target.value)} placeholder="123456" />
+          <label htmlFor="client-link-otp" className="text-sm font-semibold text-slate">OTP</label>
+          <Input id="client-link-otp" value={otp} onChange={(event) => setOtp(event.target.value)} placeholder="123456" />
         </div>
         <Button onClick={handleVerify} className="w-full">
           Entrar
         </Button>
-        {otpStatus && <p className="text-sm text-slate">{otpStatus}</p>}
+        {otpStatus && <p role="status" className="text-sm text-slate">{otpStatus}</p>}
         <Button onClick={handleResendOtp} className="w-full bg-ink" disabled={!token || sendingOtp}>
           {sendingOtp ? "Enviando OTP..." : "Enviar novo OTP"}
         </Button>
-        {message && <p className="text-sm text-slate">{message}</p>}
+        {message && <p role="alert" className="text-sm text-clay">{message}</p>}
       </Card>
       <SupportChat />
     </main>

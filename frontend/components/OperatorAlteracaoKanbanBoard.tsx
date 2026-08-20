@@ -11,7 +11,7 @@ type AlteracaoCard = { id: string; processId?: string | null; legacyClientId?: s
 
 function Column({ stage, items }: { stage: AlteracaoKanbanStage; items: AlteracaoCard[] }) {
   const droppable = useDroppable({ id: `alteracao-column:${stage}` });
-  return <div ref={droppable.setNodeRef} className="w-[300px] shrink-0 rounded-2xl border border-ink/10 bg-white/60 p-3">
+  return <div ref={droppable.setNodeRef} className="w-[min(300px,calc(100vw-2rem))] shrink-0 rounded-2xl border border-ink/10 bg-slate/5 p-3">
     <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-ink">{ALTERACAO_KANBAN_STAGE_LABELS[stage]}</h2><span className="badge bg-ink text-white">{items.length}</span></div>
     <div className="min-h-24 space-y-3">{items.map((item) => <DraggableAlteracaoCard key={item.id} item={item} />)}{items.length === 0 && <p className="rounded-xl border border-dashed border-ink/20 p-4 text-xs text-slate">Arraste cards para esta coluna.</p>}</div>
   </div>;
@@ -21,7 +21,7 @@ function DraggableAlteracaoCard({ item }: { item: AlteracaoCard }) {
   const draggable = useDraggable({ id: `alteracao:${item.id}` });
   const name = item.process?.clientName ?? item.legacyClient?.name ?? "Empresa sem nome";
   const href = item.processId ? `/operator/process/${item.processId}` : item.legacyClientId ? `/operator/clientes-sem-processo/${item.legacyClientId}` : null;
-  return <div ref={draggable.setNodeRef} style={{ transform: draggable.transform ? `translate3d(${draggable.transform.x}px, ${draggable.transform.y}px, 0)` : undefined }} {...draggable.attributes} {...draggable.listeners} className="cursor-grab rounded-xl border border-ink/10 bg-white p-4 shadow-sm active:cursor-grabbing">
+  return <div ref={draggable.setNodeRef} style={{ transform: draggable.transform ? `translate3d(${draggable.transform.x}px, ${draggable.transform.y}px, 0)` : undefined }} {...draggable.attributes} {...draggable.listeners} className="cursor-grab rounded-xl border border-ink/10 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brass/40 active:cursor-grabbing">
     <p className="text-sm font-semibold text-ink">{name}</p><p className="mt-1 text-xs text-slate">Alteração: {item.alterationType}</p><p className="mt-1 font-mono text-[11px] text-slate">{item.legacyClient?.documentNumber ?? item.processId ?? item.legacyClientId}</p>{href && <Link href={href} className="mt-3 inline-block text-xs font-semibold text-brass">Abrir cadastro</Link>}
   </div>;
 }

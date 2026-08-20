@@ -12,7 +12,7 @@ export function Logo({ size = 56, withText = false, className }: LogoProps) {
   return (
     <div className={clsx("flex items-center gap-3", className)}>
       <div
-        className="flex items-center justify-center rounded-3xl bg-gradient-to-br from-white via-blue-50 to-ledger shadow-soft ring-1 ring-brass/20"
+        className="flex items-center justify-center rounded-2xl bg-white/90 shadow-sm ring-1 ring-ink/10"
         style={{ width: box, height: box }}
       >
         <Image
@@ -20,7 +20,7 @@ export function Logo({ size = 56, withText = false, className }: LogoProps) {
           alt="FundarMF"
           width={size}
           height={size}
-          className="h-auto w-auto max-w-[85%] object-contain drop-shadow-sm"
+          className="h-auto w-auto max-w-[82%] object-contain"
           priority
         />
       </div>

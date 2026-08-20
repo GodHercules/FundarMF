@@ -49,7 +49,7 @@ export default function LoginPage() {
         <h1 className="text-3xl font-semibold">Login</h1>
         <p className="text-slate">Entre com seu e-mail e senha para acessar o painel.</p>
       </div>
-      <Card className="p-6 space-y-4">
+      <Card className="w-full max-w-xl space-y-4 p-6">
         <div>
           <label htmlFor="login-email" className="text-sm font-semibold text-slate">E-mail</label>
           <Input id="login-email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" />
@@ -61,7 +61,7 @@ export default function LoginPage() {
         <Button onClick={handleLogin} className="w-full" disabled={loading}>
           {loading ? "Entrando..." : "Entrar"}
         </Button>
-        {message && <p className="text-sm text-slate">{message}</p>}
+        {message && <p role="alert" className="text-sm text-clay">{message}</p>}
       </Card>
     </main>
   );

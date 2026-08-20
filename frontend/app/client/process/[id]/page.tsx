@@ -300,7 +300,7 @@ export default function ClientProcess() {
           Obrigado por enviar as informações e documentos. Estamos iniciando o seu processo. Aguarde o contato do nosso time
           por e-mail ou WhatsApp.
         </p>
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-ink/10 border-t-brass" />
+        <div className="fm-spinner" role="status" aria-label="Enviando dados" />
         <p className="text-xs text-slate">Não feche esta página até finalizar.</p>
         <SupportChat />
       </main>

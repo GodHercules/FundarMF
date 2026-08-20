@@ -2,5 +2,5 @@ import { HTMLAttributes } from "react";
 import clsx from "clsx";
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={clsx("card", className)} {...props} />;
+  return <div className={clsx("card relative transition-colors duration-200", className)} {...props} />;
 }

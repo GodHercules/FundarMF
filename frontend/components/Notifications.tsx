@@ -33,10 +33,11 @@ export function Notifications() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="pointer-events-none fixed left-1/2 top-6 z-50 flex w-[min(620px,92vw)] -translate-x-1/2 flex-col gap-3">
+    <div className="pointer-events-none fixed left-1/2 top-6 z-50 flex w-[min(620px,calc(100vw-2rem))] -translate-x-1/2 flex-col gap-3" aria-live="polite" aria-atomic="true">
       {toasts.map((toast) => (
         <div
           key={toast.id}
+          role={toast.type === "error" ? "alert" : "status"}
           className={clsx(
             "pointer-events-auto rounded-2xl border px-5 py-4 text-sm font-semibold shadow-soft backdrop-blur",
             styles[toast.type]

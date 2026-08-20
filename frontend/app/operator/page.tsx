@@ -42,19 +42,19 @@ export default function OperatorLogin() {
         <h1 className="text-3xl font-semibold">Área do operador</h1>
         <p className="text-slate">Acesso interno para validação, SLA e atendimento ao cliente.</p>
       </div>
-      <Card className="p-6 space-y-4">
+      <Card className="w-full max-w-xl space-y-4 p-6">
         <div>
-          <label className="text-sm font-semibold text-slate">E-mail</label>
-          <Input value={email} onChange={(event) => setEmail(event.target.value)} />
+          <label htmlFor="operator-login-email" className="text-sm font-semibold text-slate">E-mail</label>
+          <Input id="operator-login-email" value={email} onChange={(event) => setEmail(event.target.value)} />
         </div>
         <div>
-          <label className="text-sm font-semibold text-slate">Senha</label>
-          <PasswordField value={password} onChange={setPassword} placeholder="Digite sua senha" showStrength={false} />
+          <label htmlFor="operator-login-password" className="text-sm font-semibold text-slate">Senha</label>
+          <PasswordField id="operator-login-password" value={password} onChange={setPassword} placeholder="Digite sua senha" showStrength={false} />
         </div>
         <Button onClick={handleLogin} className="w-full">
           Entrar no painel
         </Button>
-        {message && <p className="text-sm text-slate">{message}</p>}
+        {message && <p role="alert" className="text-sm text-clay">{message}</p>}
       </Card>
     </main>
   );

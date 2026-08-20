@@ -4,40 +4,108 @@
 
 :root {
   color-scheme: light;
+  --fm-ink: #0b1b32;
+  --fm-ink-soft: #29405c;
+  --fm-paper: #fbfaf7;
+  --fm-canvas: #f1f4f7;
+  --fm-line: rgba(11, 27, 50, 0.13);
+  --fm-line-strong: rgba(11, 27, 50, 0.22);
+  --fm-blue: #1769e8;
+  --fm-blue-dark: #0b4cae;
+  --fm-gold: #c8953f;
+  --fm-success: #138a68;
+  --fm-danger: #c95852;
 }
+
+* { box-sizing: border-box; }
+
+::selection { background: rgba(23, 105, 232, 0.18); color: var(--fm-ink); }
 
 body {
   font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
-  letter-spacing: -0.01em;
-  background: #f4efe8;
+  letter-spacing: -0.012em;
+  background: var(--fm-canvas);
+  color: var(--fm-ink);
 }
 
 h1, h2, h3, h4 {
   font-family: var(--font-display), ui-serif, serif;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+a, button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+
+a { transition: color 160ms ease, opacity 160ms ease; }
+a:hover { opacity: 0.82; }
+
+:focus-visible {
+  outline: 3px solid rgba(23, 105, 232, 0.35);
+  outline-offset: 3px;
 }
 
 .app-shell {
   min-height: 100vh;
   background:
-    radial-gradient(circle at 15% 20%, rgba(47, 107, 255, 0.08), transparent 45%),
-    radial-gradient(circle at 85% 15%, rgba(209, 163, 74, 0.12), transparent 40%),
-    linear-gradient(135deg, #faf7f2 0%, #f4efe8 55%, #edf0f4 100%);
+    radial-gradient(circle at 4% 2%, rgba(23, 105, 232, 0.08), transparent 34%),
+    radial-gradient(circle at 96% 0%, rgba(200, 149, 63, 0.09), transparent 28%),
+    linear-gradient(145deg, #fcfbf8 0%, #f3f5f7 58%, #e9eef4 100%);
+  border-top: 4px solid var(--fm-ink);
 }
 
 .ledger-bg {
   background-image:
-    linear-gradient(transparent 23px, rgba(14, 26, 43, 0.05) 24px),
-    linear-gradient(90deg, transparent 23px, rgba(14, 26, 43, 0.05) 24px);
-  background-size: 24px 24px;
+    linear-gradient(transparent 31px, rgba(11, 27, 50, 0.035) 32px),
+    linear-gradient(90deg, transparent 31px, rgba(11, 27, 50, 0.035) 32px);
+  background-size: 32px 32px;
 }
 
 .card {
-  @apply bg-white/85 backdrop-blur rounded-2xl shadow-soft border border-ink/10;
+  @apply rounded-2xl border bg-white/90 shadow-sm;
+  border-color: var(--fm-line);
+  box-shadow: 0 14px 34px rgba(11, 27, 50, 0.07);
+  backdrop-filter: blur(12px);
 }
 
+.card:hover {
+  border-color: var(--fm-line-strong);
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 0% 0%, rgba(23, 105, 232, 0.06), transparent 34%);
+}
+
+.button-shimmer {
+  position: absolute;
+  inset: 0 auto 0 -45%;
+  width: 28%;
+  transform: skewX(-18deg);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent);
+  transition: left 550ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+
+.group:hover .button-shimmer { left: 120%; }
+
+.fm-spinner {
+  display: inline-block;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 3px solid rgba(11, 27, 50, 0.12);
+  border-top-color: var(--fm-blue);
+  border-right-color: var(--fm-gold);
+  border-radius: 999px;
+  animation: fm-spin 800ms linear infinite;
+}
+
+@keyframes fm-spin { to { transform: rotate(360deg); } }
+
 .badge {
-  @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em];
+  @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em];
 }
 
 .step-dot {
@@ -45,5 +113,24 @@ h1, h2, h3, h4 {
 }
 
 .app-container {
-  @apply mx-auto w-full px-4 sm:px-6 lg:px-10 2xl:px-16 3xl:px-24;
+  @apply mx-auto w-full max-w-[1920px] px-4 sm:px-6 lg:px-10 2xl:px-16 3xl:px-24;
+}
+
+/* Shared affordances used by legacy utility markup across the routes. */
+.input {
+  @apply w-full rounded-xl border bg-white/90 px-4 py-2.5 text-sm text-ink shadow-sm;
+  border-color: var(--fm-line);
+}
+
+.input::placeholder { color: rgba(75, 95, 120, 0.62); }
+.input:focus { border-color: var(--fm-blue); outline: none; box-shadow: 0 0 0 4px rgba(23, 105, 232, 0.12); }
+
+@media (max-width: 639px) {
+  .app-container { padding-left: 1rem; padding-right: 1rem; }
+  h1 { font-size: clamp(1.75rem, 8vw, 2.25rem); line-height: 1.08; }
+  .card { border-radius: 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }

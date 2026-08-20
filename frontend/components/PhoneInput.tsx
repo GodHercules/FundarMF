@@ -116,7 +116,7 @@ export function PhoneInput({ value, onChange, label, required, disabled, classNa
         <div ref={containerRef} className="relative">
           <button
             type="button"
-            className="flex w-full items-center justify-between gap-2 rounded-xl border border-ink/15 bg-white/90 px-4 py-2.5 text-sm text-ink shadow-sm focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass/30 focus-visible:ring-2 focus-visible:ring-brass/40 disabled:cursor-not-allowed disabled:border-ink/10 disabled:bg-slate/5 disabled:text-slate/70"
+            className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-ink/15 bg-white/90 px-4 py-2.5 text-sm text-ink shadow-sm focus:border-brass focus:outline-none focus:ring-4 focus:ring-brass/15 focus-visible:ring-2 focus-visible:ring-brass/40 disabled:cursor-not-allowed disabled:border-ink/10 disabled:bg-slate/5 disabled:text-slate/70"
             onClick={() => setOpen((prev) => !prev)}
             disabled={disabled}
             aria-expanded={open}
