@@ -312,7 +312,7 @@ model AlteracaoContratual {
   tenantKey       String                   @default("default")
   alterationType  String
   alterationTypes Json?
-  stage           AlteracaoContratualStage @default(DOC_INICIAL_APROVADA)
+  stage           AlteracaoContratualStage @default(VIABILIDADE)
   version         Int                      @default(1)
   requestedByRole AuditActorRole
   requestedById   String?

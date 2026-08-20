@@ -1,0 +1,1 @@
+ALTER TABLE "AlteracaoContratual" ALTER COLUMN "stage" SET DEFAULT 'VIABILIDADE';

@@ -144,6 +144,7 @@ describe("ProcessService contractual alterations", () => {
       create: {
         processId: "process-1",
         alterationType: "ALTERACAO_ENDERECO",
+        stage: "VIABILIDADE",
         requestedByRole: "CLIENTE",
         requestedById: "client-1"
       }

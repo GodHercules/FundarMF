@@ -1082,6 +1082,7 @@ export class ProcessService {
               alterationType,
               alterationTypes: types,
               tenantKey,
+              stage: AlteracaoContratualStage.VIABILIDADE,
               dueAt: new Date(Date.now() + 72 * 60 * 60 * 1000),
               requestedByRole: actor.role,
               requestedById: actor.userId
@@ -1111,12 +1112,12 @@ export class ProcessService {
         const legacyTx = tx.alteracaoContratual as unknown as { findFirst?: (...args: unknown[]) => Promise<unknown>; create?: (...args: unknown[]) => Promise<unknown> };
         const request = (legacyTx.findFirst && legacyTx.create
           ? ((await legacyTx.findFirst({ where: { processId, alterationType }, orderBy: { createdAt: "desc" } })) ?? await legacyTx.create({
-            data: { processId, alterationType, alterationTypes: types, tenantKey: process.tenantKey, dueAt: new Date(Date.now() + 72 * 60 * 60 * 1000), requestedByRole: actor.role, requestedById: actor.userId }
+            data: { processId, alterationType, alterationTypes: types, tenantKey: process.tenantKey, stage: AlteracaoContratualStage.VIABILIDADE, dueAt: new Date(Date.now() + 72 * 60 * 60 * 1000), requestedByRole: actor.role, requestedById: actor.userId }
             }))
           : await (tx.alteracaoContratual.upsert as unknown as (args: unknown) => Promise<unknown>)({
               where: { processId_alterationType: { processId, alterationType } },
               update: {},
-              create: { processId, alterationType, requestedByRole: actor.role, requestedById: actor.userId }
+              create: { processId, alterationType, stage: AlteracaoContratualStage.VIABILIDADE, requestedByRole: actor.role, requestedById: actor.userId }
             })) as { id: string; stage: AlteracaoContratualStage; version: number };
         await tx.alteracaoContratualHistory.createMany({
           skipDuplicates: true,
