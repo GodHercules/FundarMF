@@ -361,19 +361,43 @@ export class ProcessService {
   }
 
   private async notifyAlteracaoStage(id: string, stage: AlteracaoContratualStage) {
-    if (stage === AlteracaoContratualStage.EXIGENCIA_JUCEB || typeof this.notificationService.sendEmail !== "function") return;
     try {
       const alteration = await this.prisma.alteracaoContratual.findUnique({
         where: { id },
         include: {
-          process: { select: { clientName: true, clientEmail: true } },
-          legacyClient: { select: { name: true, email: true } }
+          process: { select: { id: true, clientName: true, clientEmail: true } },
+          legacyClient: { select: { id: true, name: true, email: true, documentNumber: true } }
         }
       });
-      const email = alteration?.process?.clientEmail ?? alteration?.legacyClient?.email;
-      if (!email) return;
-      const name = alteration?.process?.clientName ?? alteration?.legacyClient?.name ?? "sua empresa";
-      await this.notificationService.sendEmail(email, `Alteração Contratual: ${stage}`, `A alteração contratual de ${name} avançou para a etapa ${stage}.`);
+      if (!alteration) return;
+      const email = alteration.process?.clientEmail ?? alteration.legacyClient?.email ?? undefined;
+      const name = alteration.process?.clientName ?? alteration.legacyClient?.name ?? "sua empresa";
+      const subject = `Alteração Contratual: ${stage}`;
+      const body = `A alteração contratual de ${name} avançou para a etapa ${stage}.`;
+
+      if (email && typeof this.notificationService.sendEmail === "function") {
+        await this.notificationService.sendEmail(email, subject, body);
+      }
+      if (typeof this.notificationService.sendWebhook === "function") {
+        await this.notificationService.sendWebhook({
+          audience: "client",
+          reason: "alteracao_contratual_stage_changed",
+          channel: "system",
+          to: email,
+          subject,
+          body,
+          process: {
+            id: alteration.process?.id ?? null,
+            alterationId: alteration.id,
+            alterationType: alteration.alterationType,
+            stage,
+            clientName: name,
+            clientEmail: email ?? null,
+            legacyClientId: alteration.legacyClient?.id ?? null,
+            documentNumber: alteration.legacyClient?.documentNumber ?? null
+          }
+        });
+      }
     } catch (error) {
       console.warn("[process] contractual alteration notification failed", error);
     }
@@ -1215,7 +1239,13 @@ export class ProcessService {
         data: { stage, version: { increment: 1 }, slaStatus: stage === AlteracaoContratualStage.FINALIZADO ? "STOPPED" : "ON_TRACK", dueAt: stage === AlteracaoContratualStage.FINALIZADO ? null : new Date(Date.now() + 72 * 60 * 60 * 1000) }
       });
       if (result.count !== 1) throw new BadRequestException("A solicitação foi alterada por outro operador. Atualize a tela.");
-      const updatedRequest = await tx.alteracaoContratual.findUniqueOrThrow({ where: { id } });
+      const updatedRequest = await tx.alteracaoContratual.findUniqueOrThrow({
+        where: { id },
+        include: {
+          process: { select: { id: true, clientName: true, clientEmail: true, ownerId: true } },
+          legacyClient: { select: { id: true, name: true, email: true, documentNumber: true, createdById: true } }
+        }
+      });
       await tx.alteracaoContratualHistory.create({
         data: { alteracaoId: id, fromStage: current.stage, toStage: stage, version: updatedRequest.version, actorRole: actor.role, actorId: actor.userId }
       });

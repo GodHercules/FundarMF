@@ -59,15 +59,16 @@ function createService(options?: { process?: unknown; request?: AlterationReques
     $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx))
   };
   const auditService = { record: vi.fn().mockResolvedValue(undefined) };
+  const notificationService = { sendEmail: vi.fn().mockResolvedValue(undefined), sendWebhook: vi.fn().mockResolvedValue(undefined) };
   const service = new ProcessService(
     prisma as unknown as PrismaService,
     {} as unknown as SlaService,
     auditService as unknown as AuditService,
-    {} as unknown as NotificationService,
+    notificationService as unknown as NotificationService,
     {} as unknown as AuthService,
     {} as unknown as IdempotencyService
   );
-  return { service, prisma, tx, auditService };
+  return { service, prisma, tx, auditService, notificationService };
 }
 
 function createStandaloneService() {
@@ -90,11 +91,12 @@ function createStandaloneService() {
   };
   const prisma = { $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)) };
   const auditService = { record: vi.fn().mockResolvedValue(undefined) };
+  const notificationService = { sendEmail: vi.fn().mockResolvedValue(undefined), sendWebhook: vi.fn().mockResolvedValue(undefined) };
   const service = new ProcessService(
     prisma as unknown as PrismaService,
     {} as unknown as SlaService,
     auditService as unknown as AuditService,
-    {} as unknown as NotificationService,
+    notificationService as unknown as NotificationService,
     {} as unknown as AuthService,
     {} as unknown as IdempotencyService
   );
