@@ -12,7 +12,7 @@ export class ResendEmailProvider implements EmailProvider {
       throw new Error("RESEND_API_KEY is required to use ResendEmailProvider");
     }
     this.resend = new Resend(apiKey);
-    this.from = process.env.EMAIL_FROM ?? "no-reply@fundarmf.local";
+    this.from = process.env.EMAIL_FROM ?? "contato@fundarmf.com.br";
   }
 
   async sendEmail(to: string, subject: string, body: string, html?: string) {

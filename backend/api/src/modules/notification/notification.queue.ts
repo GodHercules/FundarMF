@@ -98,7 +98,7 @@ export class NotificationQueue implements OnModuleInit, OnModuleDestroy {
           correlationId,
           to: payload.to,
           subject: payload.subject,
-          mode: process.env.NOTIFY_MODE ?? "mock"
+          mode: process.env.NOTIFY_MODE ?? "real"
         })
       );
       return await this.boss.send(NOTIFY_EMAIL_JOB, { ...payload, correlationId }, {
@@ -127,7 +127,7 @@ export class NotificationQueue implements OnModuleInit, OnModuleDestroy {
         JSON.stringify({
           correlationId,
           to: payload.to,
-          mode: process.env.NOTIFY_MODE ?? "mock"
+          mode: process.env.NOTIFY_MODE ?? "real"
         })
       );
       return await this.boss.send(NOTIFY_WHATSAPP_JOB, { ...payload, correlationId }, {

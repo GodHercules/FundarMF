@@ -22,14 +22,16 @@ import { SmtpEmailProvider, TwilioWhatsAppProvider } from "./smtp.provider";
     {
       provide: EMAIL_PROVIDER,
       useFactory: (prisma: PrismaService) => {
-        const notifyMode = (process.env.NOTIFY_MODE ?? "mock").toLowerCase();
+        // Real SMTP delivery is the production-safe default. Mock delivery
+        // remains available only when NOTIFY_MODE=mock is explicitly set.
+        const notifyMode = (process.env.NOTIFY_MODE ?? "real").toLowerCase();
         if (process.env.NODE_ENV === "production" && (notifyMode === "mock" || notifyMode === "terminal")) {
           throw new Error("NOTIFY_MODE mock/terminal is not allowed in production.");
         }
         if (notifyMode === "terminal") return new TerminalEmailProvider();
         if (notifyMode === "mock") return new MockEmailProvider(prisma);
 
-        const mode = (process.env.EMAIL_PROVIDER ?? "").toLowerCase();
+        const mode = (process.env.EMAIL_PROVIDER ?? "smtp").toLowerCase();
         if (mode === "resend" || process.env.RESEND_API_KEY) {
           return new ResendEmailProvider();
         }
@@ -46,7 +48,7 @@ import { SmtpEmailProvider, TwilioWhatsAppProvider } from "./smtp.provider";
     {
       provide: WHATSAPP_PROVIDER,
       useFactory: (prisma: PrismaService) => {
-        const notifyMode = (process.env.NOTIFY_MODE ?? "mock").toLowerCase();
+        const notifyMode = (process.env.NOTIFY_MODE ?? "real").toLowerCase();
         if (process.env.NODE_ENV === "production" && (notifyMode === "mock" || notifyMode === "terminal")) {
           throw new Error("NOTIFY_MODE mock/terminal is not allowed in production.");
         }

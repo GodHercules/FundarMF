@@ -88,7 +88,7 @@ export class NotificationService {
       const inline = (process.env.NOTIFY_INLINE ?? "true") === "true";
       const rendered = htmlOverride ? { html: htmlOverride, text: body } : renderBaseEmail({ title: subject, body });
       const { html, text } = rendered;
-      const from = process.env.EMAIL_FROM ?? "no-reply@fundarmf.local";
+      const from = process.env.EMAIL_FROM ?? "contato@fundarmf.com.br";
       const replyTo = process.env.EMAIL_REPLY_TO?.trim() || undefined;
       const correlationId = getRequestContext()?.correlationId;
       if (inline) {
@@ -144,7 +144,7 @@ export class NotificationService {
   ) {
     try {
       const inline = (process.env.NOTIFY_INLINE ?? "true") === "true";
-      const from = draft.from ?? (process.env.EMAIL_FROM ?? "no-reply@fundarmf.local");
+      const from = draft.from ?? (process.env.EMAIL_FROM ?? "contato@fundarmf.com.br");
       const replyTo = draft.replyTo ?? (process.env.EMAIL_REPLY_TO?.trim() || undefined);
       const correlationId = getRequestContext()?.correlationId;
 

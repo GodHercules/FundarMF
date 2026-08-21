@@ -43,7 +43,7 @@ const toBoolean = (value: string | undefined, fallback: boolean) => {
   return ["1", "true", "yes", "on"].includes(value.toLowerCase());
 };
 
-const getNotifyMode = () => (process.env.NOTIFY_MODE ?? "mock").toLowerCase();
+const getNotifyMode = () => (process.env.NOTIFY_MODE ?? "real").toLowerCase();
 
 @Injectable()
 export class NotificationWorkerService implements OnModuleInit {

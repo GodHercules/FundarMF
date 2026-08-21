@@ -10,17 +10,13 @@ export class SmtpEmailProvider implements EmailProvider {
   private readonly from: string;
 
   constructor() {
-    const host = process.env.SMTP_HOST;
+    const host = process.env.SMTP_HOST ?? "smtp.gmail.com";
     const port = Number(process.env.SMTP_PORT ?? 587);
     const secure = (process.env.SMTP_SECURE ?? "false") === "true";
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASS;
 
-    this.from = process.env.EMAIL_FROM ?? "no-reply@fundarmf.local";
-
-    if (!host) {
-      throw new Error("SMTP_HOST is required to use SmtpEmailProvider");
-    }
+    this.from = process.env.EMAIL_FROM ?? "contato@fundarmf.com.br";
 
     this.transporter = nodemailer.createTransport({
       host,
