@@ -4,7 +4,6 @@ import { AuthService } from "../src/modules/auth/auth.service";
 describe("AuthService customer link", () => {
   it("deduplicates near-simultaneous link requests", async () => {
     process.env.LINK_REQUEST_DEDUP_SECONDS = "30";
-    process.env.N8N_WEBHOOK_AUTH_ENABLED = "false";
     process.env.FRONTEND_URL = "http://localhost:3000";
 
     const prisma = {
@@ -28,14 +27,11 @@ describe("AuthService customer link", () => {
     const result = await service.requestCustomerLink("client@x.com", undefined, "Cliente", { email: "op@x.com", role: "OPERADOR" });
     expect(result).toEqual({ otpRequired: true, deduped: true });
     expect(prisma.customerLinkToken.create).not.toHaveBeenCalled();
-    expect(notificationService.sendEmail).not.toHaveBeenCalled();
-    expect(notificationService.sendWhatsApp).not.toHaveBeenCalled();
     expect(notificationService.sendWebhook).not.toHaveBeenCalled();
   });
 
-  it("does not send webhook for auth events by default", async () => {
+  it("always sends the customer link and OTP through n8n", async () => {
     process.env.LINK_REQUEST_DEDUP_SECONDS = "0";
-    process.env.N8N_WEBHOOK_AUTH_ENABLED = "false";
     process.env.N8N_WEBHOOK_AUTH_EVENTS_ENABLED = "false";
     process.env.FRONTEND_URL = "http://localhost:3000";
 
@@ -47,8 +43,6 @@ describe("AuthService customer link", () => {
     };
     const sessionService = {} as any;
     const notificationService = {
-      sendEmail: vi.fn().mockResolvedValue({ ok: true }),
-      sendWhatsApp: vi.fn().mockResolvedValue({ ok: true }),
       sendWebhook: vi.fn().mockResolvedValue({ ok: true })
     };
     const auditService = { record: vi.fn() };
@@ -56,8 +50,8 @@ describe("AuthService customer link", () => {
 
     const result = await service.requestCustomerLink("client@x.com", undefined);
     expect(result).toEqual({ otpRequired: true });
-    expect(notificationService.sendEmail).toHaveBeenCalledTimes(1);
-    expect(notificationService.sendWebhook).toHaveBeenCalledTimes(0);
+    expect(notificationService.sendWebhook).toHaveBeenCalledTimes(1);
+    expect(notificationService.sendWebhook.mock.calls[0][0]).toMatchObject({ reason: "link_created" });
   });
 
   it("sends the customer link and OTP to n8n when auth events are enabled", async () => {
@@ -72,8 +66,6 @@ describe("AuthService customer link", () => {
       }
     };
     const notificationService = {
-      sendEmail: vi.fn().mockResolvedValue({ ok: true }),
-      sendWhatsApp: vi.fn().mockResolvedValue({ ok: true }),
       sendWebhook: vi.fn().mockResolvedValue({ ok: true })
     };
     const auditService = { record: vi.fn() };

@@ -23,14 +23,6 @@ export class AuthService {
     private readonly idempotencyService: IdempotencyService
   ) {}
 
-  private shouldSendAuthWebhook() {
-    // This is intentionally separate from N8N_WEBHOOK_AUTH_ENABLED, which controls
-    // whether the transport itself must include x-webhook-secret. The n8n workflow
-    // is the configured customer-mail delivery path, so it must receive link + OTP
-    // when explicitly enabled.
-    return (process.env.N8N_WEBHOOK_AUTH_EVENTS_ENABLED ?? "false").trim().toLowerCase() === "true";
-  }
-
   private linkDedupSeconds() {
     const raw = Number(process.env.LINK_REQUEST_DEDUP_SECONDS ?? 30);
     if (!Number.isFinite(raw) || raw <= 0) return 0;
@@ -191,7 +183,6 @@ export class AuthService {
 
     const linkUrl = `${process.env.FRONTEND_URL ?? "http://localhost:3000"}/client/link?token=${token}`;
 
-    const notifyTasks: Promise<unknown>[] = [];
     if (email) {
       const subject = "Seu acesso ao FundarMF";
       const emailText = this.buildCustomerAccessEmail(linkUrl, otp, name);
@@ -201,59 +192,34 @@ export class AuthService {
         ctaLabel: "Abrir acesso",
         ctaUrl: linkUrl
       });
-      notifyTasks.push(
-        this.notificationService.sendEmail(email, subject, emailText, emailRendered.html)
-      );
-      // Avoid double-delivery: in some setups n8n also sends the email/whatsapp when it receives the webhook.
-      // Enable this only if you want webhook mirroring for auth events.
-      if (this.shouldSendAuthWebhook()) {
-        void this.notificationService.sendWebhook({
-          audience: "client",
-          email,
-          whatsapp: normalizedWhatsapp,
-          link: linkUrl,
-          otp,
-          reason: "link_created",
-          requestedBy,
-          emails: {
-            client: {
-              target: "client",
-              to: email,
-              subject,
-              text: emailRendered.text,
-              html: emailRendered.html
-            }
+      await this.notificationService.sendWebhook({
+        audience: "client",
+        email,
+        whatsapp: normalizedWhatsapp,
+        link: linkUrl,
+        otp,
+        reason: "link_created",
+        requestedBy,
+        emails: {
+          client: {
+            target: "client",
+            to: email,
+            subject,
+            text: emailRendered.text,
+            html: emailRendered.html
           }
-        });
-      }
-    }
-    if (normalizedWhatsapp) {
-      notifyTasks.push(
-        this.notificationService.sendWhatsApp(
-          normalizedWhatsapp,
-          this.buildCustomerAccessWhatsApp(linkUrl, otp, name)
-        )
-      );
-    }
-    if (notifyTasks.length > 0) {
-      void Promise.all(notifyTasks).catch((err) => {
-        console.error("[auth] requestCustomerLink notify failed", err);
+        }
       });
-    }
-
-    if (!email) {
-      // If there's no email, still notify webhook with link + otp metadata.
-      if (this.shouldSendAuthWebhook()) {
-        void this.notificationService.sendWebhook({
-          audience: "client",
-          email,
-          whatsapp: normalizedWhatsapp,
-          link: linkUrl,
-          otp,
-          reason: "link_created",
-          requestedBy
-        });
-      }
+    } else {
+      await this.notificationService.sendWebhook({
+        audience: "client",
+        email,
+        whatsapp: normalizedWhatsapp,
+        link: linkUrl,
+        otp,
+        reason: "link_created",
+        requestedBy
+      });
     }
 
     await this.auditService.record(
@@ -325,18 +291,23 @@ export class AuthService {
       "Se você não solicitou este código, ignore este e-mail."
     ].join("\n");
 
-    void this.notificationService.sendEmail(updatedLink.email!, subject, emailText);
-
-    if (this.shouldSendAuthWebhook()) {
-      void this.notificationService.sendWebhook({
-        audience: "client",
-        email: updatedLink.email ?? undefined,
-        whatsapp: updatedLink.whatsapp ?? undefined,
-        otp,
-        reason: "otp_resent_by_operator",
-        requestedBy
-      });
-    }
+    await this.notificationService.sendWebhook({
+      audience: "client",
+      email: updatedLink.email ?? undefined,
+      whatsapp: updatedLink.whatsapp ?? undefined,
+      otp,
+      reason: "otp_resent_by_operator",
+      requestedBy,
+      emails: {
+        client: {
+          target: "client",
+          to: updatedLink.email!,
+          subject,
+          text: emailText,
+          html: renderBaseEmail({ title: subject, body: emailText }).html
+        }
+      }
+    });
 
     await this.auditService.record(
       { role: "SYSTEM" },
@@ -458,28 +429,24 @@ export class AuthService {
       ctaLabel: "Abrir acesso",
       ctaUrl: linkUrl
     });
-    void this.notificationService.sendEmail(updatedLink.email!, subject, emailText, emailRendered.html);
-
-    if (this.shouldSendAuthWebhook()) {
-      void this.notificationService.sendWebhook({
-        audience: "client",
-        email: updatedLink.email ?? undefined,
-        whatsapp: updatedLink.whatsapp ?? undefined,
-        link: linkUrl,
-        otp,
-        reason: "otp_resent",
-        requestedBy: { email: updatedLink.email ?? undefined, role: "CLIENTE" },
-        emails: {
-          client: {
-            target: "client",
-            to: updatedLink.email!,
-            subject,
-            text: emailRendered.text,
-            html: emailRendered.html
-          }
+    await this.notificationService.sendWebhook({
+      audience: "client",
+      email: updatedLink.email ?? undefined,
+      whatsapp: updatedLink.whatsapp ?? undefined,
+      link: linkUrl,
+      otp,
+      reason: "otp_resent",
+      requestedBy: { email: updatedLink.email ?? undefined, role: "CLIENTE" },
+      emails: {
+        client: {
+          target: "client",
+          to: updatedLink.email!,
+          subject,
+          text: emailRendered.text,
+          html: emailRendered.html
         }
-      });
-    }
+      }
+    });
 
     await this.auditService.record(
       { role: "SYSTEM" },

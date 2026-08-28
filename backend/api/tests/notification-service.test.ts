@@ -2,57 +2,42 @@ import { describe, expect, it, vi } from "vitest";
 import { NotificationService } from "../src/modules/notification/notification.service";
 
 describe("NotificationService", () => {
-  it("enqueues email with rendered html", async () => {
-    process.env.NOTIFY_INLINE = "false";
-    const queue = {
-      enqueueEmail: vi.fn().mockResolvedValue("job-id"),
-      enqueueWhatsApp: vi.fn()
-    };
-    const service = new NotificationService(queue as any, {} as any);
+  const prisma = { user: { findUnique: vi.fn().mockResolvedValue(null) } };
+
+  it("sends email through n8n webhook with rendered html", async () => {
+    const service = new NotificationService(prisma as any);
+    const sendWebhook = vi.spyOn(service, "sendWebhook").mockResolvedValue(undefined);
 
     await service.sendEmail("user@example.com", "Assunto", "Linha 1\nLinha 2");
 
-    expect(queue.enqueueEmail).toHaveBeenCalledTimes(1);
-    const payload = queue.enqueueEmail.mock.calls[0][0];
+    expect(sendWebhook).toHaveBeenCalledTimes(1);
+    const payload = sendWebhook.mock.calls[0][0];
     expect(payload.to).toBe("user@example.com");
     expect(payload.subject).toBe("Assunto");
-    expect(payload.text).toContain("Linha 1");
-    expect(payload.html).toContain("<html");
-    expect(payload.html).toContain("MF Contabilidade");
-    expect(payload.html).not.toContain("{{logoUrl}}");
-    expect(payload.html).not.toContain("{{fundarLogoUrl}}");
-    delete process.env.NOTIFY_INLINE;
+    expect(payload.emails.client.text).toContain("Linha 1");
+    expect(payload.emails.client.html).toContain("<html");
+    expect(payload.emails.client.html).toContain("MF Contabilidade");
+    expect(payload.emails.client.html).not.toContain("{{logoUrl}}");
+    expect(payload.emails.client.html).not.toContain("{{fundarLogoUrl}}");
   });
 
-  it("sends email directly when inline delivery is enabled", async () => {
-    process.env.NOTIFY_INLINE = "true";
-    const queue = { enqueueEmail: vi.fn() };
-    const emailProvider = { sendEmail: vi.fn().mockResolvedValue(undefined) };
-    const service = new NotificationService(queue as any, emailProvider as any);
+  it("does not use a direct email provider", async () => {
+    const service = new NotificationService(prisma as any);
+    const sendWebhook = vi.spyOn(service, "sendWebhook").mockResolvedValue(undefined);
 
     await service.sendEmail("user@example.com", "Assunto", "Mensagem");
 
-    expect(emailProvider.sendEmail).toHaveBeenCalledWith(
-      "user@example.com",
-      "Assunto",
-      expect.stringContaining("Mensagem"),
-      expect.stringContaining("<html")
-    );
-    expect(queue.enqueueEmail).not.toHaveBeenCalled();
-    delete process.env.NOTIFY_INLINE;
+    expect(sendWebhook).toHaveBeenCalledTimes(1);
   });
 
-  it("enqueues whatsapp", async () => {
-    const queue = {
-      enqueueEmail: vi.fn(),
-      enqueueWhatsApp: vi.fn().mockResolvedValue("job-id")
-    };
-    const service = new NotificationService(queue as any, {} as any);
+  it("sends whatsapp through n8n webhook", async () => {
+    const service = new NotificationService(prisma as any);
+    const sendWebhook = vi.spyOn(service, "sendWebhook").mockResolvedValue(undefined);
 
     await service.sendWhatsApp("+5511999999999", "Teste");
 
-    expect(queue.enqueueWhatsApp).toHaveBeenCalledTimes(1);
-    const payload = queue.enqueueWhatsApp.mock.calls[0][0];
+    expect(sendWebhook).toHaveBeenCalledTimes(1);
+    const payload = sendWebhook.mock.calls[0][0];
     expect(payload.to).toBe("+5511999999999");
     expect(payload.body).toBe("Teste");
   });

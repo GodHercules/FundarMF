@@ -19,6 +19,7 @@ export default function OperatorRequestLink() {
   const [whatsapp, setWhatsapp] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -47,6 +48,7 @@ export default function OperatorRequestLink() {
   }, [router]);
 
   async function handleSubmit() {
+    if (submitting) return;
     setMessage(null);
     if (!name.trim()) {
       setMessage("Informe o nome do cliente.");
@@ -56,9 +58,11 @@ export default function OperatorRequestLink() {
       setMessage("Informe e-mail ou telefone para enviar o link.");
       return;
     }
+    setSubmitting(true);
     try {
       const result = await api<{ id: string }>("/processes", {
         method: "POST",
+        headers: { "Idempotency-Key": crypto.randomUUID() },
         body: JSON.stringify({
           nome: name || undefined,
           email: email || undefined,
@@ -76,6 +80,8 @@ export default function OperatorRequestLink() {
       }
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : "Erro ao solicitar link.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -109,8 +115,8 @@ export default function OperatorRequestLink() {
             onChange={setWhatsapp}
           />
         </div>
-        <Button variant="accent" onClick={handleSubmit} className="mt-4 w-full">
-          Enviar link seguro
+        <Button variant="accent" onClick={handleSubmit} className="mt-4 w-full" disabled={submitting}>
+          {submitting ? "Enviando..." : "Enviar link seguro"}
         </Button>
         {message && <p className="mt-4 text-sm text-slate">{message}</p>}
       </Card>
