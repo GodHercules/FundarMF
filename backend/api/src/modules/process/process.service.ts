@@ -1,3 +1,4 @@
+import { ALTERACAO_CONTRATUAL_CATALOG } from "@fundarmf/shared";
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import {
   AlteracaoContratualStage,
@@ -375,8 +376,10 @@ export class ProcessService {
       if (!alteration) return;
       const email = alteration.process?.clientEmail ?? alteration.legacyClient?.email ?? undefined;
       const name = alteration.process?.clientName ?? alteration.legacyClient?.name ?? "sua empresa";
-      const subject = `Alteração Contratual: ${stage}`;
-      const body = `A alteração contratual de ${name} avançou para a etapa ${stage}.`;
+      const reason = ALTERACAO_CONTRATUAL_CATALOG.find(([id]) => id === alteration.alterationType)?.[1]
+        ?? alteration.alterationType.replace(/[-_]/g, " ");
+      const subject = `Alteração Contratual: ${reason} - ${stage}`;
+      const body = `A alteração contratual em ${reason} da empresa ${name}, avançou e se encontra na etapa ${stage}.`;
 
       if (email && typeof this.notificationService.sendEmail === "function") {
         await this.notificationService.sendEmail(email, subject, body);
