@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
 import { Request } from "express";
 
 import { AuthGuard } from "../../common/auth/auth.guard";
@@ -98,6 +98,12 @@ export class ProcessController {
         documentNumber: dto.documentNumber
       }
     );
+  }
+
+  @Delete("alteracoes-contratuais/:alteracaoId")
+  @Roles("OPERADOR", "MASTER")
+  async deleteAlteracao(@Param("alteracaoId") alteracaoId: string, @Req() req: Request) {
+    return this.processService.deleteAlteracaoContratual(alteracaoId, req.actor!);
   }
 
   @Get(":id")

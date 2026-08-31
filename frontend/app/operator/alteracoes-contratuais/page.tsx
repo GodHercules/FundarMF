@@ -15,6 +15,7 @@ export default function OperatorAlteracoesContratuaisPage() {
   const [type, setType] = useState("nome");
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [boardRefreshKey, setBoardRefreshKey] = useState(0);
   const standaloneComplete = clientName.trim() && clientEmail.trim() && documentNumber.trim();
   const canCreate = Boolean(processId.trim() || standaloneComplete);
 
@@ -25,6 +26,7 @@ export default function OperatorAlteracoesContratuaisPage() {
       const body = processId.trim() ? { processId: processId.trim(), alterationTypes: [type] } : { clientName: clientName.trim(), clientEmail: clientEmail.trim(), documentNumber: documentNumber.trim(), alterationTypes: [type] };
       await api("/processes/alteracoes-contratuais", { method: "POST", body: JSON.stringify(body) });
       setMessage("Alteração contratual criada na primeira etapa.");
+      setBoardRefreshKey((current) => current + 1);
       setProcessId(""); setClientName(""); setClientEmail(""); setDocumentNumber("");
     } catch (reason: unknown) { setMessage(reason instanceof Error ? reason.message : "Não foi possível criar a alteração."); }
     finally { setSaving(false); }
@@ -42,6 +44,6 @@ export default function OperatorAlteracoesContratuaisPage() {
       </div>
       <button type="button" className="mt-4 rounded-xl bg-ink px-4 py-2 font-semibold text-white disabled:opacity-50" onClick={() => void create()} disabled={!canCreate || saving}>{saving ? "Criando..." : "Criar alteração"}</button>
       {message && <p role="status" className="mt-3 text-sm text-slate">{message}</p>}
-    </section><OperatorAlteracaoKanbanBoard />
+    </section><OperatorAlteracaoKanbanBoard refreshKey={boardRefreshKey} />
   </main>;
 }

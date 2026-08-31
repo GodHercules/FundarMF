@@ -362,6 +362,9 @@ export class ProcessService {
 
   private async notifyAlteracaoStage(id: string, stage: AlteracaoContratualStage) {
     try {
+      // Keep notification dispatch best-effort when a reduced runtime/test double
+      // does not expose the contractual-alteration model.
+      if (!this.prisma.alteracaoContratual) return;
       const alteration = await this.prisma.alteracaoContratual.findUnique({
         where: { id },
         include: {
@@ -1122,6 +1125,7 @@ export class ProcessService {
       });
       const request = requests[0];
       await this.auditService.record(actor, "alteracao_contratual_requested", "AlteracaoContratual", request.id, { legacyClientId: standaloneClient.legacyClientId, clientName: standaloneClient.name, documentNumber, alterationTypes: types });
+      await this.notifyAlteracaoStage(request.id, request.stage);
       return requests.length === 1 ? request : { requests };
     }
 
@@ -1157,8 +1161,27 @@ export class ProcessService {
       processId,
       alterationTypes: types
     });
+    await this.notifyAlteracaoStage(request.id, request.stage);
 
     return requests.length === 1 ? request : { requests };
+  }
+
+  async deleteAlteracaoContratual(id: string, actor: Actor) {
+    if (actor.role !== "OPERADOR" && actor.role !== "MASTER") throw new ForbiddenException();
+    const alteration = await this.prisma.alteracaoContratual.findUnique({
+      where: { id },
+      include: { process: { select: { ownerId: true } }, legacyClient: { select: { createdById: true } } }
+    });
+    if (!alteration) throw new NotFoundException("Solicitação de alteração não encontrada.");
+    if (actor.role === "OPERADOR" && alteration.process?.ownerId !== actor.userId && alteration.legacyClient?.createdById !== actor.userId) {
+      throw new ForbiddenException();
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.alteracaoContratualHistory.deleteMany({ where: { alteracaoId: id } });
+      await tx.alteracaoContratual.delete({ where: { id } });
+    });
+    await this.auditService.record(actor, "alteracao_contratual_deleted", "AlteracaoContratual", id, {});
+    return { ok: true };
   }
 
   async listAlteracaoContratual(processId: string, actor: Actor) {
