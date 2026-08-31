@@ -379,7 +379,15 @@ export class ProcessService {
       const reason = ALTERACAO_CONTRATUAL_CATALOG.find(([id]) => id === alteration.alterationType)?.[1]
         ?? alteration.alterationType.replace(/[-_]/g, " ");
       const subject = `Alteração Contratual: ${reason} - ${stage}`;
-      const body = `A alteração contratual em ${reason} da empresa ${name}, avançou e se encontra na etapa ${stage}.`;
+      const body = [
+        "Acompanhamento da alteração contratual",
+        "",
+        `Motivo da alteração: ${reason}`,
+        `Empresa: ${name}`,
+        `Etapa atual: ${stage}`,
+        "",
+        "A alteração contratual avançou e se encontra na etapa informada acima."
+      ].join("\n");
 
       if (email && typeof this.notificationService.sendEmail === "function") {
         await this.notificationService.sendEmail(email, subject, body);
