@@ -252,6 +252,29 @@ describe("ProcessService contractual alterations", () => {
     expect(tx.alteracaoContratual.updateMany).toHaveBeenCalledTimes(1);
   });
 
+  it("allows a modern alteration to finalize without going through exigencia", async () => {
+    const { service, tx } = createService({
+      request: {
+        id: "alteration-1",
+        processId: "process-1",
+        alterationType: "ALTERACAO_ENDERECO",
+        stage: AlteracaoContratualStage.ANALISE_JUCEB,
+        version: 1,
+        process: { ownerId: "operator-1" }
+      }
+    });
+
+    await expect(
+      service.updateAlteracaoContratualStage(
+        "alteration-1",
+        { role: "OPERADOR", userId: "operator-1" },
+        AlteracaoContratualStage.FINALIZADO,
+        1
+      )
+    ).resolves.toMatchObject({ ok: true, request: expect.any(Object) });
+    expect(tx.alteracaoContratual.updateMany).toHaveBeenCalledTimes(1);
+  });
+
   it("requires an operator or master to change the stage", async () => {
     const { service } = createService();
 
@@ -263,5 +286,16 @@ describe("ProcessService contractual alterations", () => {
         1
       )
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("does not notify the client when the alteration enters exigencia juceb", async () => {
+    const { service, prisma, notificationService } = createService();
+
+    const notifyAlteracaoStage = Reflect.get(service, "notifyAlteracaoStage") as (id: string, stage: AlteracaoContratualStage) => Promise<void>;
+    await notifyAlteracaoStage.call(service, "alteration-1", AlteracaoContratualStage.EXIGENCIA_JUCEB);
+
+    expect(prisma.alteracaoContratual.findUnique).not.toHaveBeenCalled();
+    expect(notificationService.sendEmail).not.toHaveBeenCalled();
+    expect(notificationService.sendWebhook).not.toHaveBeenCalled();
   });
 });

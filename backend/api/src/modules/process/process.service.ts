@@ -363,6 +363,7 @@ export class ProcessService {
 
   private async notifyAlteracaoStage(id: string, stage: AlteracaoContratualStage) {
     try {
+      if (stage === AlteracaoContratualStage.EXIGENCIA_JUCEB) return;
       // Keep notification dispatch best-effort when a reduced runtime/test double
       // does not expose the contractual-alteration model.
       if (!this.prisma.alteracaoContratual) return;
@@ -1260,7 +1261,11 @@ export class ProcessService {
     const transitionStages = legacyOnlyStages.includes(current.stage) || legacyOnlyStages.includes(stage)
       ? [...legacyOnlyStages, AlteracaoContratualStage.FINALIZADO]
       : stages;
-    if (Math.abs(transitionStages.indexOf(stage) - transitionStages.indexOf(current.stage)) !== 1) {
+    const canFinalizeDirectly = !legacyOnlyStages.includes(current.stage)
+      && !legacyOnlyStages.includes(stage)
+      && stage === AlteracaoContratualStage.FINALIZADO
+      && current.stage !== AlteracaoContratualStage.FINALIZADO;
+    if (!canFinalizeDirectly && Math.abs(transitionStages.indexOf(stage) - transitionStages.indexOf(current.stage)) !== 1) {
       throw new BadRequestException("Transição de etapa inválida.");
     }
     if (expectedVersion !== current.version) {
