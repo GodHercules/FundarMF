@@ -80,6 +80,7 @@ export const ALTERACAO_CONTRATUAL_CATALOG = [
   ["reducao-capital", "Redução de capital social"],
   ["integralizacao-capital", "Integralização de capital"],
   ["forma-integralizacao", "Alteração da forma de integralização"],
+  ["capital-social", "Alteração de capital social"],
   ["natureza-juridica", "Alteração de natureza jurídica"],
   ["transformacao", "Transformação empresarial"],
   ["tipo-societario", "Alteração de tipo societário"],
@@ -104,6 +105,18 @@ export const ALTERACAO_CONTRATUAL_CATALOG = [
   ["baixa", "Encerramento ou baixa"],
   ["reativacao", "Reativação"],
   ["outra", "Outra alteração contratual"]
+] as const;
+
+/** Options shown when an operator opens a new contractual alteration. */
+export const ALTERACAO_CONTRATUAL_OPERATOR_CATALOG = [
+  ["razao-social", "Razão social"],
+  ["endereco-matriz", "Endereço da matriz"],
+  ["objeto-social", "Objetivo social (CNAE)"],
+  ["quadro-societario", "QSA- quadro societário"],
+  ["capital-social", "Capital social"],
+  ["natureza-juridica", "Natureza jurídica"],
+  ["clausulas-contratuais", "Cláusulas contratuais"],
+  ["outra", "Outras"]
 ] as const;
 
 export const NOTIFY_EMAIL_JOB = "notify:email";

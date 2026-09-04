@@ -4,6 +4,17 @@ const CATALOG = [
 
 export const ALTERACAO_CONTRATUAL_OPTIONS = CATALOG.filter(([id]) => id !== "nomeacao-administrador").map(([id, label]) => ({ id, label, description: `Organize a solicitação de ${label.toLowerCase()}.` })) as ReadonlyArray<{ id: string; label: string; description: string }>;
 
+export const ALTERACAO_CONTRATUAL_OPERATOR_OPTIONS = [
+  ["razao-social", "Razão social"],
+  ["endereco-matriz", "Endereço da matriz"],
+  ["objeto-social", "Objetivo social (CNAE)"],
+  ["quadro-societario", "QSA- quadro societário"],
+  ["capital-social", "Capital social"],
+  ["natureza-juridica", "Natureza jurídica"],
+  ["clausulas-contratuais", "Cláusulas contratuais"],
+  ["outra", "Outras"]
+] as const;
+
 export type AlteracaoContratualOptionId = (typeof ALTERACAO_CONTRATUAL_OPTIONS)[number]["id"];
 
 export const ALTERACAO_KANBAN_STAGES = [

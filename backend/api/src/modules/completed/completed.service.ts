@@ -25,7 +25,7 @@ type EditorInline = { type: "text"; text: string; marks?: EditorMark[] };
 type EditorDoc = { type: "doc"; content: Array<{ type: "paragraph" | "heading" | "blockquote" | "bulletList" | "orderedList"; attrs?: { level?: number; textAlign?: string }; content?: EditorInline[] }> };
 
 function hash(data: Buffer | string) { return createHash("sha256").update(data).digest("hex"); }
-function normalizeDocument(value: unknown) { return String(value ?? "").replace(/\D/g, ""); }
+function normalizeDocument(value: unknown) { return String(value ?? "").replace(/[^a-z0-9]/gi, "").toUpperCase(); }
 function safeName(value: string) { return value.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 100) || "documento"; }
 function editorFromText(text: string): EditorDoc {
   const paragraphs = text.replace(/\r/g, "").split(/\n{2,}/).map((part) => part.trim()).filter(Boolean);

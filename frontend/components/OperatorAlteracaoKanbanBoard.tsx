@@ -12,7 +12,7 @@ type AlteracaoCard = { id: string; processId?: string | null; legacyClientId?: s
 function Column({ stage, items, onDelete, busyId }: { stage: AlteracaoKanbanStage; items: AlteracaoCard[]; onDelete: (item: AlteracaoCard) => void; busyId: string | null }) {
   const droppable = useDroppable({ id: `alteracao-column:${stage}` });
   return <div ref={droppable.setNodeRef} className="w-[min(300px,calc(100vw-2rem))] shrink-0 rounded-2xl border border-ink/10 bg-slate/5 p-3">
-    <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-ink">{ALTERACAO_KANBAN_STAGE_LABELS[stage]}</h2><span className="badge bg-ink text-white">{items.length}</span></div>
+    <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-ink">{stage === "DOC_INICIAL_APROVADA" ? "Análise da Alteração" : ALTERACAO_KANBAN_STAGE_LABELS[stage]}</h2><span className="badge bg-ink text-white">{items.length}</span></div>
     <div className="min-h-24 space-y-3">{items.map((item) => <DraggableAlteracaoCard key={item.id} item={item} onDelete={onDelete} deleting={busyId === item.id} />)}{items.length === 0 && <p className="rounded-xl border border-dashed border-ink/20 p-4 text-xs text-slate">Arraste cards para esta coluna.</p>}</div>
   </div>;
 }

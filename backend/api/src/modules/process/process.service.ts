@@ -1,4 +1,4 @@
-import { ALTERACAO_CONTRATUAL_CATALOG } from "@fundarmf/shared";
+import { ALTERACAO_CONTRATUAL_CATALOG, ALTERACAO_CONTRATUAL_OPERATOR_CATALOG } from "@fundarmf/shared";
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import {
   AlteracaoContratualStage,
@@ -63,7 +63,7 @@ function sanitizeClientStep2(data: Record<string, unknown>) {
 }
 
 function normalizeDocument(value: unknown) {
-  return String(value ?? "").replace(/\D/g, "");
+  return String(value ?? "").replace(/[^a-z0-9]/gi, "").toUpperCase();
 }
 const KANBAN_STAGE_EMAILS: Record<KanbanStage, (clientName: string) => string> = {
   VIABILIDADE: (clientName) =>
@@ -377,18 +377,24 @@ export class ProcessService {
       if (!alteration) return;
       const email = alteration.process?.clientEmail ?? alteration.legacyClient?.email ?? undefined;
       const name = alteration.process?.clientName ?? alteration.legacyClient?.name ?? "sua empresa";
-      const reason = ALTERACAO_CONTRATUAL_CATALOG.find(([id]) => id === alteration.alterationType)?.[1]
+      const reason = ALTERACAO_CONTRATUAL_OPERATOR_CATALOG.find(([id]) => id === alteration.alterationType)?.[1]
+        ?? ALTERACAO_CONTRATUAL_CATALOG.find(([id]) => id === alteration.alterationType)?.[1]
         ?? alteration.alterationType.replace(/[-_]/g, " ");
-      const subject = `Alteração Contratual: ${reason} - ${stage}`;
-      const body = [
-        "Acompanhamento da alteração contratual",
-        "",
-        `Motivo da alteração: ${reason}`,
-        `Empresa: ${name}`,
-        `Etapa atual: ${stage}`,
-        "",
-        "A alteração contratual avançou e se encontra na etapa informada acima."
-      ].join("\n");
+      const isInitialAnalysis = stage === AlteracaoContratualStage.DOC_INICIAL_APROVADA;
+      const subject = isInitialAnalysis
+        ? "Sua solicitação de alteração contratual está em análise"
+        : `Alteração Contratual: ${reason} - ${stage}`;
+      const body = isInitialAnalysis
+        ? `${name}, sua solicitação de alteração contratual pelo motivo ${reason} está em análise. Estamos trabalhando para entender melhor a sua solicitação para que possamos prosseguir da melhor forma possível para atendê-la.`
+        : [
+          "Acompanhamento da alteração contratual",
+          "",
+          `Motivo da alteração: ${reason}`,
+          `Empresa: ${name}`,
+          `Etapa atual: ${stage}`,
+          "",
+          "A alteração contratual avançou e se encontra na etapa informada acima."
+        ].join("\n");
 
       if (email && typeof this.notificationService.sendEmail === "function") {
         await this.notificationService.sendEmail(email, subject, body);
@@ -1090,8 +1096,8 @@ export class ProcessService {
       if (!standaloneClient?.legacyClientId && (!standaloneClient?.name?.trim() || !standaloneClient?.email?.trim() || !documentNumber)) {
         throw new BadRequestException("Informe nome ou razão social, e-mail de notificação e CNPJ do cliente.");
       }
-      if (!standaloneClient?.legacyClientId && documentNumber.length !== 14) {
-        throw new BadRequestException("Informe um CNPJ válido com 14 dígitos.");
+      if (!standaloneClient?.legacyClientId && !/^[A-Z0-9]{12}\d{2}$/.test(documentNumber)) {
+        throw new BadRequestException("Informe um CNPJ válido com 14 posições e dois dígitos verificadores numéricos.");
       }
 
       const requests = await this.prisma.$transaction(async (tx) => {
@@ -1121,7 +1127,7 @@ export class ProcessService {
               alterationType,
               alterationTypes: types,
               tenantKey,
-              stage: AlteracaoContratualStage.VIABILIDADE,
+              stage: AlteracaoContratualStage.DOC_INICIAL_APROVADA,
               dueAt: new Date(Date.now() + 72 * 60 * 60 * 1000),
               requestedByRole: actor.role,
               requestedById: actor.userId
@@ -1152,12 +1158,12 @@ export class ProcessService {
         const legacyTx = tx.alteracaoContratual as unknown as { findFirst?: (...args: unknown[]) => Promise<unknown>; create?: (...args: unknown[]) => Promise<unknown> };
         const request = (legacyTx.findFirst && legacyTx.create
           ? ((await legacyTx.findFirst({ where: { processId, alterationType }, orderBy: { createdAt: "desc" } })) ?? await legacyTx.create({
-            data: { processId, alterationType, alterationTypes: types, tenantKey: process.tenantKey, stage: AlteracaoContratualStage.VIABILIDADE, dueAt: new Date(Date.now() + 72 * 60 * 60 * 1000), requestedByRole: actor.role, requestedById: actor.userId }
+            data: { processId, alterationType, alterationTypes: types, tenantKey: process.tenantKey, stage: AlteracaoContratualStage.DOC_INICIAL_APROVADA, dueAt: new Date(Date.now() + 72 * 60 * 60 * 1000), requestedByRole: actor.role, requestedById: actor.userId }
             }))
           : await (tx.alteracaoContratual.upsert as unknown as (args: unknown) => Promise<unknown>)({
               where: { processId_alterationType: { processId, alterationType } },
               update: {},
-              create: { processId, alterationType, stage: AlteracaoContratualStage.VIABILIDADE, requestedByRole: actor.role, requestedById: actor.userId }
+              create: { processId, alterationType, stage: AlteracaoContratualStage.DOC_INICIAL_APROVADA, requestedByRole: actor.role, requestedById: actor.userId }
             })) as { id: string; stage: AlteracaoContratualStage; version: number };
         await tx.alteracaoContratualHistory.createMany({
           skipDuplicates: true,

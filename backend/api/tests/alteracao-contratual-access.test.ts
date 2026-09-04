@@ -129,6 +129,30 @@ describe("ProcessService contractual alterations", () => {
     await expect(service.createAlteracaoContratual(undefined, { role: "MASTER" }, "ALTERACAO_ENDERECO")).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it("accepts and normalizes an alphanumeric CNPJ", async () => {
+    const { service, tx } = createStandaloneService();
+
+    await service.createAlteracaoContratual(undefined, { role: "OPERADOR", userId: "operator-1" }, "razao-social", undefined, {
+      name: "Empresa Alfa",
+      email: "alfa@example.com",
+      documentNumber: "12.ABC.345/DEFG-67"
+    });
+
+    expect(tx.legacyClient.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { tenantKey_normalizedDocument: { tenantKey: "default", normalizedDocument: "12ABC345DEFG67" } }
+    }));
+  });
+
+  it("rejects letters in the CNPJ verification digits", async () => {
+    const { service } = createStandaloneService();
+
+    await expect(service.createAlteracaoContratual(undefined, { role: "OPERADOR", userId: "operator-1" }, "razao-social", undefined, {
+      name: "Empresa Inválida",
+      email: "invalida@example.com",
+      documentNumber: "12.ABC.345/DEFG-6A"
+    })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it("creates an alteration and its initial history for the owning client", async () => {
     const { service, prisma, tx, auditService } = createService();
 
@@ -146,7 +170,7 @@ describe("ProcessService contractual alterations", () => {
       create: {
         processId: "process-1",
         alterationType: "ALTERACAO_ENDERECO",
-        stage: "VIABILIDADE",
+        stage: "DOC_INICIAL_APROVADA",
         requestedByRole: "CLIENTE",
         requestedById: "client-1"
       }
@@ -297,5 +321,24 @@ describe("ProcessService contractual alterations", () => {
     expect(prisma.alteracaoContratual.findUnique).not.toHaveBeenCalled();
     expect(notificationService.sendEmail).not.toHaveBeenCalled();
     expect(notificationService.sendWebhook).not.toHaveBeenCalled();
+  });
+
+  it("notifies the client that a new alteration is under analysis", async () => {
+    const { service, prisma, notificationService } = createService();
+    prisma.alteracaoContratual.findUnique.mockResolvedValue({
+      id: "alteration-1",
+      alterationType: "razao-social",
+      process: { clientName: "Empresa Alfa", clientEmail: "alfa@example.com" },
+      legacyClient: null
+    });
+
+    const notifyAlteracaoStage = Reflect.get(service, "notifyAlteracaoStage") as (id: string, stage: AlteracaoContratualStage) => Promise<void>;
+    await notifyAlteracaoStage.call(service, "alteration-1", AlteracaoContratualStage.DOC_INICIAL_APROVADA);
+
+    expect(notificationService.sendEmail).toHaveBeenCalledWith(
+      "alfa@example.com",
+      "Sua solicitação de alteração contratual está em análise",
+      expect.stringContaining("Empresa Alfa, sua solicitação de alteração contratual pelo motivo Razão social está em análise")
+    );
   });
 });
