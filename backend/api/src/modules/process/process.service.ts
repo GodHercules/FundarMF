@@ -388,9 +388,7 @@ export class ProcessService {
         ? [
           `Olá, prezado(a) ${name},`,
           "",
-          `Sua solicitação para alteração contratual pelo motivo ${reason} foi recebida com sucesso.`,
-          "",
-          "Nossa equipe está trabalhando para entender melhor a sua solicitação e prosseguir da melhor forma possível para atendê-la.",
+          "Sua solicitação para alteração contratual foi recebida com sucesso.",
           "",
           "Você receberá um novo e-mail sempre que houver qualquer movimentação ou atualização sobre o seu pedido, assim como recebeu esta mensagem.",
           "",
