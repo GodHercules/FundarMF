@@ -337,8 +337,8 @@ describe("ProcessService contractual alterations", () => {
 
     expect(notificationService.sendEmail).toHaveBeenCalledWith(
       "alfa@example.com",
-      "Sua solicitação de alteração contratual está em análise",
-      expect.stringContaining("Empresa Alfa, sua solicitação de alteração contratual pelo motivo Razão social está em análise")
+      "Sua Solicitação de alteração contratual foi recebida com sucesso",
+      expect.stringContaining("Olá, prezado(a) Empresa Alfa")
     );
   });
 });

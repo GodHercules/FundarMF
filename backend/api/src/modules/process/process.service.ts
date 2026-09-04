@@ -382,10 +382,20 @@ export class ProcessService {
         ?? alteration.alterationType.replace(/[-_]/g, " ");
       const isInitialAnalysis = stage === AlteracaoContratualStage.DOC_INICIAL_APROVADA;
       const subject = isInitialAnalysis
-        ? "Sua solicitação de alteração contratual está em análise"
+        ? "Sua Solicitação de alteração contratual foi recebida com sucesso"
         : `Alteração Contratual: ${reason} - ${stage}`;
       const body = isInitialAnalysis
-        ? `${name}, sua solicitação de alteração contratual pelo motivo ${reason} está em análise. Estamos trabalhando para entender melhor a sua solicitação para que possamos prosseguir da melhor forma possível para atendê-la.`
+        ? [
+          `Olá, prezado(a) ${name},`,
+          "",
+          `Sua solicitação para alteração contratual pelo motivo ${reason} foi recebida com sucesso.`,
+          "",
+          "Nossa equipe está trabalhando para entender melhor a sua solicitação e prosseguir da melhor forma possível para atendê-la.",
+          "",
+          "Você receberá um novo e-mail sempre que houver qualquer movimentação ou atualização sobre o seu pedido, assim como recebeu esta mensagem.",
+          "",
+          "Agradecemos pela confiança e por aguardar nosso retorno."
+        ].join("\n")
         : [
           "Acompanhamento da alteração contratual",
           "",

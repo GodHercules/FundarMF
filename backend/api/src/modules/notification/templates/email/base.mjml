@@ -10,8 +10,9 @@
     <mj-style>
       .card {
         background: #ffffff;
-        border-radius: 16px;
+        border-radius: 20px;
         border: 1px solid #e5eaf2;
+        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
       }
       .muted {
         color: #6b7280;
@@ -24,10 +25,19 @@
         letter-spacing: 0.08em;
         text-transform: uppercase;
       }
+      .status {
+        color: #087f5b;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
     </mj-style>
   </mj-head>
   <mj-body background-color="#f5f7fb">
-    <mj-section background-color="#ffffff" padding="22px 22px 20px" border-bottom="1px solid #e5eaf2">
+    <mj-section background-color="#0f2442" padding="7px 0 0">
+      <mj-column></mj-column>
+    </mj-section>
+    <mj-section background-color="#ffffff" padding="24px 22px 22px" border-bottom="1px solid #e5eaf2">
       <mj-column width="28%" vertical-align="middle">
         <mj-image src="{{fundarLogoUrl}}" alt="FundarMF" width="104px" align="left" padding="0" />
       </mj-column>
@@ -35,10 +45,11 @@
         <mj-image src="{{logoUrl}}" alt="MF Contabilidade" width="270px" align="right" padding="0" />
       </mj-column>
     </mj-section>
-    <mj-section padding="34px 16px 20px">
-      <mj-column css-class="card" padding="28px 30px 30px">
+    <mj-section padding="34px 16px 18px">
+      <mj-column css-class="card" padding="30px 32px 32px">
         <mj-text css-class="eyebrow" padding="0 0 8px">Portal do cliente</mj-text>
-        <mj-text font-size="24px" line-height="1.25" font-weight="700" color="#0f172a" padding="0 0 12px">
+        <mj-text css-class="status" padding="0 0 14px">Solicitação recebida</mj-text>
+        <mj-text font-size="26px" line-height="1.22" font-weight="700" color="#0f172a" padding="0 0 18px">
           {{title}}
         </mj-text>
         <mj-text padding="0">
