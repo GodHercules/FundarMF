@@ -1293,7 +1293,8 @@ export class ProcessService {
       && !legacyOnlyStages.includes(stage)
       && stage === AlteracaoContratualStage.FINALIZADO
       && current.stage !== AlteracaoContratualStage.FINALIZADO;
-    if (!canFinalizeDirectly && Math.abs(transitionStages.indexOf(stage) - transitionStages.indexOf(current.stage)) !== 1) {
+    const usesLegacyTransitionRules = legacyOnlyStages.includes(current.stage) || legacyOnlyStages.includes(stage);
+    if (usesLegacyTransitionRules && !canFinalizeDirectly && Math.abs(transitionStages.indexOf(stage) - transitionStages.indexOf(current.stage)) !== 1) {
       throw new BadRequestException("Transição de etapa inválida.");
     }
     if (expectedVersion !== current.version) {

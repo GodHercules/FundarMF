@@ -299,6 +299,29 @@ describe("ProcessService contractual alterations", () => {
     expect(tx.alteracaoContratual.updateMany).toHaveBeenCalledTimes(1);
   });
 
+  it("allows a modern alteration to jump directly to any later stage", async () => {
+    const { service, tx } = createService({
+      request: {
+        id: "alteration-1",
+        processId: "process-1",
+        alterationType: "ALTERACAO_ENDERECO",
+        stage: AlteracaoContratualStage.VIABILIDADE,
+        version: 1,
+        process: { ownerId: "operator-1" }
+      }
+    });
+
+    await expect(
+      service.updateAlteracaoContratualStage(
+        "alteration-1",
+        { role: "OPERADOR", userId: "operator-1" },
+        AlteracaoContratualStage.AGUARDANDO_DOCUMENTOS,
+        1
+      )
+    ).resolves.toMatchObject({ ok: true, request: expect.any(Object) });
+    expect(tx.alteracaoContratual.updateMany).toHaveBeenCalledTimes(1);
+  });
+
   it("requires an operator or master to change the stage", async () => {
     const { service } = createService();
 
