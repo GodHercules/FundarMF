@@ -367,4 +367,23 @@ describe("ProcessService contractual alterations", () => {
     expect(emailBody).not.toContain("Motivo da alteração");
     expect(emailBody).not.toContain("DBE_RECEITA_FEDERAL");
   });
+
+  it("uses the signature-specific message when an alteration reaches awaiting documents", async () => {
+    const { service, prisma, notificationService } = createService();
+    prisma.alteracaoContratual.findUnique.mockResolvedValue({
+      id: "alteration-1",
+      alterationType: "razao-social",
+      process: { clientName: "SemiDeus", clientEmail: "semideus@example.com" },
+      legacyClient: null
+    });
+
+    const notifyAlteracaoStage = Reflect.get(service, "notifyAlteracaoStage") as (id: string, stage: AlteracaoContratualStage) => Promise<void>;
+    await notifyAlteracaoStage.call(service, "alteration-1", AlteracaoContratualStage.AGUARDANDO_DOCUMENTOS);
+
+    expect(notificationService.sendEmail).toHaveBeenCalledWith(
+      "semideus@example.com",
+      "Alteração Contratual do(a) SemiDeus",
+      "Olá, SemiDeus. Os documentos foram enviados para proceder com as assinaturas, favor verificar o seu e-mail."
+    );
+  });
 });
