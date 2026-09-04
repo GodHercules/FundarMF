@@ -1,18 +1,10 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 
 export function PageMotion({ children }: { children: ReactNode }) {
-  const reducedMotion = useReducedMotion();
-
-  return (
-    <motion.div
-      initial={reducedMotion ? false : { opacity: 0, y: 8 }}
-      animate={reducedMotion ? undefined : { opacity: 1, y: 0 }}
-      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-    >
-      {children}
-    </motion.div>
-  );
+  // Keep the page visible even if a slow/older browser delays JavaScript.
+  // The previous motion component rendered the content transparent until
+  // its client-side animation completed, which could look like a blank page.
+  return <div className="page-motion">{children}</div>;
 }
