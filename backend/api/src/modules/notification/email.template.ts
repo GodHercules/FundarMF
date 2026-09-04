@@ -84,7 +84,20 @@ const toHtmlBody = (body: string) => {
   return body
     .split("\n")
     .map((line) => line.trim())
-    .map((line) => (line.length === 0 ? "<br/>" : `<p style="margin:0 0 8px;">${escapeHtml(line)}</p>`))
+    .map((line) => {
+      if (line.length === 0) return '<div style="height:8px;line-height:8px;">&nbsp;</div>';
+
+      const field = line.match(/^(Empresa|Etapa atual):\s*(.*)$/i);
+      if (field) {
+        return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 10px;border-collapse:separate;"><tr><td style="padding:12px 14px;background:#f8fafc;border:1px solid #e5eaf2;border-radius:12px;"><span style="display:block;color:#64748b;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;">${escapeHtml(field[1])}</span><span style="display:block;margin-top:3px;color:#0f2442;font-size:15px;font-weight:700;">${escapeHtml(field[2])}</span></td></tr></table>`;
+      }
+
+      if (/^Andamento da alteração Contratual$/i.test(line)) {
+        return `<p style="margin:0 0 12px;color:#0f2442;font-size:14px;font-weight:700;">${escapeHtml(line)}</p>`;
+      }
+
+      return `<p style="margin:0 0 14px;">${escapeHtml(line)}</p>`;
+    })
     .join("");
 };
 

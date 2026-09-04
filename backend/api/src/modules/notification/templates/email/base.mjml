@@ -49,7 +49,7 @@
       <mj-column css-class="card" padding="30px 32px 32px">
         <mj-text css-class="eyebrow" padding="0 0 8px">Portal do cliente</mj-text>
         <mj-text css-class="status" padding="0 0 14px">Solicitação recebida</mj-text>
-        <mj-text font-size="26px" line-height="1.22" font-weight="700" color="#0f172a" padding="0 0 18px">
+        <mj-text font-size="25px" line-height="1.2" font-weight="700" color="#0f172a" padding="0 0 20px">
           {{title}}
         </mj-text>
         <mj-text padding="0">

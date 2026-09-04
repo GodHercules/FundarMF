@@ -21,6 +21,18 @@ describe("NotificationService", () => {
     expect(payload.emails.client.html).not.toContain("{{fundarLogoUrl}}");
   });
 
+  it("renders process status fields as highlighted summary cards", async () => {
+    const service = new NotificationService(prisma as any);
+    const sendWebhook = vi.spyOn(service, "sendWebhook").mockResolvedValue(undefined);
+
+    await service.sendEmail("user@example.com", "Alteração Contratual do(a) Empresa", "Acompanhamento da alteração contratual\n\nAndamento da alteração Contratual\n\nEmpresa: Empresa Alfa\nEtapa atual: DBE/Receita Federal");
+
+    const payload = sendWebhook.mock.calls[0][0];
+    expect(payload.emails.client.html).toContain("background:#f8fafc");
+    expect(payload.emails.client.html).toContain("DBE/Receita Federal");
+    expect(payload.emails.client.html).toContain("text-transform:uppercase");
+  });
+
   it("does not use a direct email provider", async () => {
     const service = new NotificationService(prisma as any);
     const sendWebhook = vi.spyOn(service, "sendWebhook").mockResolvedValue(undefined);
