@@ -1,4 +1,3 @@
-import { ALTERACAO_CONTRATUAL_CATALOG, ALTERACAO_CONTRATUAL_OPERATOR_CATALOG } from "@fundarmf/shared";
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import {
   AlteracaoContratualStage,
@@ -24,6 +23,20 @@ import { SlaService } from "../sla/sla.service";
 
 const CLIENT_STEPS: StepKey[] = ["ETAPA_1", "ETAPA_2", "ETAPA_4", "ETAPA_5", "ETAPA_6"];
 const OPERATOR_STEPS: StepKey[] = ["ETAPA_3"];
+const ALTERACAO_STAGE_EMAIL_LABELS: Partial<Record<AlteracaoContratualStage, string>> = {
+  [AlteracaoContratualStage.DOC_INICIAL_APROVADA]: "Doc. Inicial Aprovada",
+  [AlteracaoContratualStage.VIABILIDADE]: "VIABILIDADE",
+  [AlteracaoContratualStage.DBE_RECEITA_FEDERAL]: "DBE/Receita Federal",
+  [AlteracaoContratualStage.PREPARACAO_DOCUMENTOS]: "Preparação de Documentos",
+  [AlteracaoContratualStage.AGUARDANDO_DOCUMENTOS]: "Aguardando Documentos",
+  [AlteracaoContratualStage.ANALISE_JUCEB]: "Análise JUCEB",
+  [AlteracaoContratualStage.EXIGENCIA_JUCEB]: "Exigência JUCEB",
+  [AlteracaoContratualStage.FINALIZADO]: "Finalizado",
+  [AlteracaoContratualStage.SOLICITACAO_RECEBIDA]: "Solicitação recebida",
+  [AlteracaoContratualStage.ANALISE_JURIDICA]: "Análise jurídica",
+  [AlteracaoContratualStage.AJUSTES_DOCUMENTAIS]: "Ajustes documentais",
+  [AlteracaoContratualStage.PROTOCOLO]: "Protocolo"
+};
 const EDITABLE_CLIENT_STEP2_FIELDS = new Set([
   "razaoSocial1", "razaoSocial2", "razaoSocial3", "municipio", "emailCnpj", "telefoneCnpj", "endereco", "quadroSocietario"
 ]);
@@ -377,13 +390,10 @@ export class ProcessService {
       if (!alteration) return;
       const email = alteration.process?.clientEmail ?? alteration.legacyClient?.email ?? undefined;
       const name = alteration.process?.clientName ?? alteration.legacyClient?.name ?? "sua empresa";
-      const reason = ALTERACAO_CONTRATUAL_OPERATOR_CATALOG.find(([id]) => id === alteration.alterationType)?.[1]
-        ?? ALTERACAO_CONTRATUAL_CATALOG.find(([id]) => id === alteration.alterationType)?.[1]
-        ?? alteration.alterationType.replace(/[-_]/g, " ");
       const isInitialAnalysis = stage === AlteracaoContratualStage.DOC_INICIAL_APROVADA;
       const subject = isInitialAnalysis
         ? "Sua Solicitação de alteração contratual foi recebida com sucesso"
-        : `Alteração Contratual: ${reason} - ${stage}`;
+        : `Alteração Contratual do(a) ${name}`;
       const body = isInitialAnalysis
         ? [
           `Olá, prezado(a) ${name},`,
@@ -397,9 +407,10 @@ export class ProcessService {
         : [
           "Acompanhamento da alteração contratual",
           "",
-          `Motivo da alteração: ${reason}`,
+          "Andamento da alteração Contratual",
+          "",
           `Empresa: ${name}`,
-          `Etapa atual: ${stage}`,
+          `Etapa atual: ${ALTERACAO_STAGE_EMAIL_LABELS[stage] ?? stage}`,
           "",
           "A alteração contratual avançou e se encontra na etapa informada acima."
         ].join("\n");

@@ -344,4 +344,27 @@ describe("ProcessService contractual alterations", () => {
     expect(emailBody).not.toContain("pelo motivo");
     expect(emailBody).not.toContain("Nossa equipe está trabalhando");
   });
+
+  it("notifies later alteration stages without the reason and with the display stage label", async () => {
+    const { service, prisma, notificationService } = createService();
+    prisma.alteracaoContratual.findUnique.mockResolvedValue({
+      id: "alteration-1",
+      alterationType: "razao-social",
+      process: { clientName: "Empresa Alfa", clientEmail: "alfa@example.com" },
+      legacyClient: null
+    });
+
+    const notifyAlteracaoStage = Reflect.get(service, "notifyAlteracaoStage") as (id: string, stage: AlteracaoContratualStage) => Promise<void>;
+    await notifyAlteracaoStage.call(service, "alteration-1", AlteracaoContratualStage.DBE_RECEITA_FEDERAL);
+
+    expect(notificationService.sendEmail).toHaveBeenCalledWith(
+      "alfa@example.com",
+      "Alteração Contratual do(a) Empresa Alfa",
+      expect.stringContaining("Etapa atual: DBE/Receita Federal")
+    );
+    const emailBody = notificationService.sendEmail.mock.calls[0][2] as string;
+    expect(emailBody).toContain("Andamento da alteração Contratual");
+    expect(emailBody).not.toContain("Motivo da alteração");
+    expect(emailBody).not.toContain("DBE_RECEITA_FEDERAL");
+  });
 });
