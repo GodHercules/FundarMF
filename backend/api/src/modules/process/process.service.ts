@@ -392,19 +392,22 @@ export class ProcessService {
       const name = alteration.process?.clientName ?? alteration.legacyClient?.name ?? "sua empresa";
       const isInitialAnalysis = stage === AlteracaoContratualStage.DOC_INICIAL_APROVADA;
       const isAwaitingDocuments = stage === AlteracaoContratualStage.AGUARDANDO_DOCUMENTOS;
+      const isFinalized = stage === AlteracaoContratualStage.FINALIZADO;
       const subject = isInitialAnalysis
         ? "Sua Solicitação de alteração contratual foi recebida com sucesso"
+        : isFinalized
+        ? `Atualização do seu processo, ${name}`
         : `Alteração Contratual do(a) ${name}`;
       const body = isInitialAnalysis
         ? [
-          `Olá, prezado(a) ${name},`,
-          "",
-          "Sua solicitação para alteração contratual foi recebida com sucesso.",
+          `Prezado Cliente, Sua solicitação para alteração contratual da empresa ${name}, foi recebida com sucesso.`,
           "",
           "Você receberá um novo e-mail sempre que houver qualquer movimentação ou atualização sobre o seu pedido, assim como recebeu esta mensagem.",
           "",
           "Agradecemos pela confiança e por aguardar nosso retorno."
         ].join("\n")
+        : isFinalized
+        ? `Olá, ${name}. Excelente notícia! O seu processo acaba de ser liberado. Parabéns! Favor verificar as documentações enviadas no e-mail.`
         : isAwaitingDocuments
         ? `Olá, ${name}. Os documentos foram enviados para proceder com as assinaturas, favor verificar o seu e-mail.`
         : [

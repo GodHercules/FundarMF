@@ -361,10 +361,11 @@ describe("ProcessService contractual alterations", () => {
     expect(notificationService.sendEmail).toHaveBeenCalledWith(
       "alfa@example.com",
       "Sua Solicitação de alteração contratual foi recebida com sucesso",
-      expect.stringContaining("Sua solicitação para alteração contratual foi recebida com sucesso.")
+      expect.stringContaining("Prezado Cliente, Sua solicitação para alteração contratual da empresa Empresa Alfa, foi recebida com sucesso.")
     );
     const emailBody = notificationService.sendEmail.mock.calls[0][2] as string;
     expect(emailBody).not.toContain("pelo motivo");
+    expect(emailBody).not.toContain("Olá, prezado(a)");
     expect(emailBody).not.toContain("Nossa equipe está trabalhando");
   });
 
@@ -407,6 +408,25 @@ describe("ProcessService contractual alterations", () => {
       "semideus@example.com",
       "Alteração Contratual do(a) SemiDeus",
       "Olá, SemiDeus. Os documentos foram enviados para proceder com as assinaturas, favor verificar o seu e-mail."
+    );
+  });
+
+  it("uses the finalization message when an alteration reaches finalizado", async () => {
+    const { service, prisma, notificationService } = createService();
+    prisma.alteracaoContratual.findUnique.mockResolvedValue({
+      id: "alteration-1",
+      alterationType: "razao-social",
+      process: { clientName: "FREIRE COMERCIO LTDA", clientEmail: "freire@example.com" },
+      legacyClient: null
+    });
+
+    const notifyAlteracaoStage = Reflect.get(service, "notifyAlteracaoStage") as (id: string, stage: AlteracaoContratualStage) => Promise<void>;
+    await notifyAlteracaoStage.call(service, "alteration-1", AlteracaoContratualStage.FINALIZADO);
+
+    expect(notificationService.sendEmail).toHaveBeenCalledWith(
+      "freire@example.com",
+      "Atualização do seu processo, FREIRE COMERCIO LTDA",
+      "Olá, FREIRE COMERCIO LTDA. Excelente notícia! O seu processo acaba de ser liberado. Parabéns! Favor verificar as documentações enviadas no e-mail."
     );
   });
 });
