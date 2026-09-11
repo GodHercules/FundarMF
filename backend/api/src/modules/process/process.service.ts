@@ -1434,12 +1434,18 @@ export class ProcessService {
     return updated;
   }
 
-  async submitStep(processId: string, actor: Actor, stepKey: StepKey) {
-    if (actor.role !== "CLIENTE") {
+  async submitStep(processId: string, actor: Actor, stepKey: StepKey, internalMode = false) {
+    if (!internalMode && actor.role !== "CLIENTE") {
+      throw new ForbiddenException();
+    }
+    if (internalMode && actor.role !== "OPERADOR") {
       throw new ForbiddenException();
     }
 
     const process = await this.getProcess(processId, actor);
+    if (internalMode && process.ownerId !== actor.userId) {
+      throw new ForbiddenException();
+    }
     this.ensureNotReadOnly(process);
 
     if (process.currentStep !== stepKey) {
@@ -1531,25 +1537,31 @@ export class ProcessService {
 
     await this.auditService.record(actor, "submit_step", "Process", processId, { stepKey });
 
-    await this.notifyOwner(processId, process.ownerId ?? null, {
-      title: "Cliente enviou o formulário",
-      body: `O cliente ${process.clientEmail} enviou o formulário final da etapa ${getStepLabel(stepKey)}.`,
-      type: "client_submitted"
-    });
+    if (!internalMode) {
+      await this.notifyOwner(processId, process.ownerId ?? null, {
+        title: "Cliente enviou o formulário",
+        body: `O cliente ${process.clientEmail} enviou o formulário final da etapa ${getStepLabel(stepKey)}.`,
+        type: "client_submitted"
+      });
+    }
 
-    await this.notificationService.sendEmail(
-      process.clientEmail,
-      "Recebemos seus dados",
-      [
-        "Obrigado por mandar os seus documentos.",
-        "Aguarde o contato por e-mail ou WhatsApp para acompanhar o andamento.",
-        "",
-        `Processo: ${process.id}`,
-        `Etapa enviada: ${getStepLabel(stepKey)}`
-      ].join("\n")
-    );
+    if (!internalMode) {
+      await this.notificationService.sendEmail(
+        process.clientEmail,
+        "Recebemos seus dados",
+        [
+          "Obrigado por mandar os seus documentos.",
+          "Aguarde o contato por e-mail ou WhatsApp para acompanhar o andamento.",
+          "",
+          `Processo: ${process.id}`,
+          `Etapa enviada: ${getStepLabel(stepKey)}`
+        ].join("\n")
+      );
+    }
 
-    void this.sendProcessWebhook(processId, "client_submitted", actor, { stepKey });
+    if (!internalMode) {
+      void this.sendProcessWebhook(processId, "client_submitted", actor, { stepKey });
+    }
 
     return { ok: true };
   }

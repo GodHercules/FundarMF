@@ -143,8 +143,8 @@ export class ProcessController {
   }
 
   @Post(":id/submit-step")
-  async submit(@Param("id") id: string, @Body() dto: SubmitStepDto, @Req() req: Request) {
-    return this.processService.submitStep(id, req.actor!, dto.stepKey);
+  async submit(@Param("id") id: string, @Body() dto: SubmitStepDto, @Query("internal") internal: string | undefined, @Req() req: Request) {
+    return this.processService.submitStep(id, req.actor!, dto.stepKey, internal === "true");
   }
 
   @Post(":id/approve-step")

@@ -32,6 +32,8 @@ type InAppNotification = {
   type: string;
 };
 
+type ProcessStartMode = "link" | "internal";
+
 export default function OperatorDashboard() {
   const [processes, setProcesses] = useState<ProcessSummary[]>([]);
   const [notifications, setNotifications] = useState<InAppNotification[]>([]);
@@ -41,6 +43,8 @@ export default function OperatorDashboard() {
   const [creating, setCreating] = useState(false);
   const [loadingProcesses, setLoadingProcesses] = useState(false);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [startMode, setStartMode] = useState<ProcessStartMode>("link");
+  const [createMessage, setCreateMessage] = useState<string | null>(null);
   const [processOffset, setProcessOffset] = useState(0);
   const [notificationOffset, setNotificationOffset] = useState(0);
   const [hasMoreProcesses, setHasMoreProcesses] = useState(true);
@@ -105,25 +109,55 @@ export default function OperatorDashboard() {
     loadAll();
   }, []);
 
+  useEffect(() => {
+    function handleInternalProcessComplete(event: MessageEvent) {
+      if (event.origin !== window.location.origin || event.data?.type !== "fundarmf-internal-process-complete") return;
+      notifySuccess("Processo interno preenchido e enviado para validação.");
+      void loadAll();
+    }
+
+    window.addEventListener("message", handleInternalProcessComplete);
+    return () => window.removeEventListener("message", handleInternalProcessComplete);
+  }, []);
+
   async function handleCreate() {
     if (!form.nome || !form.email) return;
+    let internalWindow: Window | null = null;
+    if (startMode === "internal") {
+      internalWindow = window.open("about:blank", "_blank");
+      if (!internalWindow) {
+        setCreateMessage("Permita pop-ups neste site para abrir o preenchimento interno.");
+        return;
+      }
+    }
+    const openedInternalWindow = internalWindow;
     setCreating(true);
+    setCreateMessage(null);
     try {
-      await api("/processes", {
+      const created = await api<{ id: string }>("/processes", {
         method: "POST",
         body: JSON.stringify({
           nome: form.nome,
           email: form.email,
           telefone: form.telefone,
-          sendEmail: form.sendEmail,
-          sendWhatsapp: form.sendWhatsapp
+          sendEmail: startMode === "link" ? form.sendEmail : false,
+          sendWhatsapp: startMode === "link" ? form.sendWhatsapp : false
         })
       });
-      notifySuccess("Processo iniciado e link enviado.");
+      if (startMode === "internal" && openedInternalWindow) {
+        openedInternalWindow.location.href = `/client/process/${created.id}?modo=interno`;
+        openedInternalWindow.focus();
+        notifySuccess("Processo interno iniciado em uma nova aba.");
+      } else {
+        notifySuccess("Processo iniciado e link enviado.");
+      }
       setForm({ nome: "", email: "", telefone: "", sendEmail: true, sendWhatsapp: true });
       await loadProcesses(0, false);
       await loadNotifications(0, false);
       await loadUnreadCount();
+    } catch (error) {
+      openedInternalWindow?.close();
+      throw error;
     } finally {
       setCreating(false);
     }
@@ -359,8 +393,30 @@ export default function OperatorDashboard() {
 
         <Card className="p-6">
           <h2 className="text-lg font-semibold">Iniciar novo processo</h2>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2" role="group" aria-label="Modo de início do processo">
+            <button
+              type="button"
+              className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition ${startMode === "link" ? "border-brass bg-brass/10 text-ink" : "border-ink/10 bg-white/60 text-slate hover:border-brass/50"}`}
+              onClick={() => setStartMode("link")}
+              aria-pressed={startMode === "link"}
+            >
+              Iniciar processo link cliente
+              <span className="mt-1 block text-xs font-normal">Envie o acesso seguro para o cliente preencher.</span>
+            </button>
+            <button
+              type="button"
+              className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition ${startMode === "internal" ? "border-brass bg-brass/10 text-ink" : "border-ink/10 bg-white/60 text-slate hover:border-brass/50"}`}
+              onClick={() => setStartMode("internal")}
+              aria-pressed={startMode === "internal"}
+            >
+              Iniciar processo interno
+              <span className="mt-1 block text-xs font-normal">Abra o formulário do cliente em uma nova aba.</span>
+            </button>
+          </div>
           <p className="mt-1 text-sm text-slate">
-            Preencha os dados da empresa e do contato do cliente para enviar o link seguro por e-mail e/ou WhatsApp.
+            {startMode === "link"
+              ? "Preencha os dados da empresa e do contato do cliente para enviar o link seguro por e-mail e/ou WhatsApp."
+              : "Preencha os dados da empresa e do contato. O processo será aberto em uma nova aba já autenticada para o operador preencher como o cliente."}
           </p>
           <div className="mt-4 grid gap-3">
             <Input
@@ -378,7 +434,7 @@ export default function OperatorDashboard() {
               value={form.telefone}
               onChange={(value) => setForm((prev) => ({ ...prev, telefone: value }))}
             />
-            <div className="flex flex-wrap gap-3 text-sm text-slate">
+            {startMode === "link" && <div className="flex flex-wrap gap-3 text-sm text-slate">
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -395,10 +451,11 @@ export default function OperatorDashboard() {
                 />
                 Enviar por WhatsApp
               </label>
-            </div>
+            </div>}
             <Button onClick={handleCreate} variant="accent" disabled={creating}>
-              {creating ? "Iniciando..." : "Iniciar processo"}
+              {creating ? "Iniciando..." : startMode === "link" ? "Iniciar processo link cliente" : "Iniciar processo interno"}
             </Button>
+            {createMessage && <p role="alert" className="text-sm text-clay">{createMessage}</p>}
           </div>
         </Card>
       </section>

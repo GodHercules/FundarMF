@@ -198,6 +198,7 @@ export default function ClientProcess() {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [internalMode, setInternalMode] = useState(false);
 
   async function load() {
     const [processData, chatData] = await Promise.all([
@@ -214,6 +215,10 @@ export default function ClientProcess() {
       load();
     }
   }, [processId]);
+
+  useEffect(() => {
+    setInternalMode(new URLSearchParams(window.location.search).get("modo") === "interno");
+  }, []);
 
   useEffect(() => {
     if (!process) return;
@@ -239,6 +244,15 @@ export default function ClientProcess() {
       }));
     }
   }, [endereco.escritorioVirtual]);
+
+  useEffect(() => {
+    if (!internalMode || !submittedAll) return;
+    const timer = window.setTimeout(() => {
+      window.opener?.postMessage({ type: "fundarmf-internal-process-complete", processId }, window.location.origin);
+      window.close();
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [internalMode, processId, submittedAll]);
 
   useEffect(() => {
     let active = true;
@@ -285,6 +299,7 @@ export default function ClientProcess() {
           <p className="text-sm text-slate">
             Se precisar complementar alguma informação, aguarde a orientação do operador responsável.
           </p>
+          {internalMode && <Button className="mt-4" onClick={() => window.close()}>Fechar e voltar ao painel</Button>}
         </Card>
         <SupportChat />
       </main>
@@ -509,7 +524,7 @@ export default function ClientProcess() {
         body: JSON.stringify({ stepKey: "ETAPA_2", data: buildPayload(correctionFields, correctionActive) })
       });
       await uploadSelectedDocuments();
-      await api(`/processes/${processId}/submit-step`, {
+      await api(`/processes/${processId}/submit-step${internalMode ? "?internal=true" : ""}`, {
         method: "POST",
         body: JSON.stringify({ stepKey: "ETAPA_2" })
       });

@@ -104,6 +104,38 @@ describe("ProcessService submitStep email", () => {
       expect.stringContaining("Processo: p1")
     );
 
+    prisma.processStep.findUnique = vi.fn(async () => ({
+      id: "s1",
+      locked: false,
+      status: ProcessStatus.EM_ANDAMENTO,
+      data: {
+        razaoSocial1: "Empresa Teste",
+        municipio: "Salvador - BA",
+        emailCnpj: "cliente@exemplo.com",
+        telefoneCnpj: "+5511999999999",
+        endereco: { escritorioVirtual: "Sim" },
+        quadroSocietario: [
+          {
+            socioId: "s1",
+            socioNome: "Joao",
+            socioCpf: "000.000.000-00",
+            socioEmail: "joao@exemplo.com",
+            socioTelefone: "+5511999999999",
+            socioPercentual: "100%",
+            socioAdministrador: "Sim",
+            socioEstadoCivil: "Solteiro(a)",
+            socioProfissao: "Dev"
+          }
+        ]
+      }
+    })) as any;
+    const emailCallsAfterClientSubmit = (notificationService.sendEmail as any).mock.calls.length;
+    await expect(service.submitStep("p1", { role: "OPERADOR", userId: "op-1", email: "op@exemplo.com" }, "ETAPA_2", true)).resolves.toEqual({
+      ok: true
+    });
+    expect((notificationService.sendEmail as any).mock.calls.length).toBe(emailCallsAfterClientSubmit);
+    await expect(service.submitStep("p1", { role: "CLIENTE", email: "cliente@exemplo.com" }, "ETAPA_2", true)).rejects.toThrow();
+
     // Retry: already submitted should not send again.
     prisma.processStep.findUnique = vi.fn(async () => ({
       id: "s1",
