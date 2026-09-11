@@ -53,6 +53,6 @@ describe("OperatorDashboard internal process start", () => {
     ));
     expect(openMock).toHaveBeenCalledWith("about:blank", "_blank");
     const openedWindow = openMock.mock.results[0].value as { location: { href: string } };
-    expect(openedWindow.location.href).toBe("/client/process/process-interno-1?modo=interno");
+    expect(openedWindow.location.href).toBe("http://localhost:3000/client/process/process-interno-1?modo=interno");
   });
 });

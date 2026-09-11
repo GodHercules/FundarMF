@@ -145,7 +145,10 @@ export default function OperatorDashboard() {
         })
       });
       if (startMode === "internal" && openedInternalWindow) {
-        openedInternalWindow.location.href = `/client/process/${created.id}?modo=interno`;
+        openedInternalWindow.location.href = new URL(
+          `/client/process/${created.id}?modo=interno`,
+          window.location.origin
+        ).toString();
         openedInternalWindow.focus();
         notifySuccess("Processo interno iniciado em uma nova aba.");
       } else {
