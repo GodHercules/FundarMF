@@ -34,6 +34,41 @@ type InAppNotification = {
 
 type ProcessStartMode = "link" | "internal";
 
+function showInternalProcessLoader(target: Window) {
+  const loadingDocument = target.document;
+  loadingDocument.open();
+  loadingDocument.write(`<!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Preparando preenchimento interno</title>
+        <style>
+          :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+          * { box-sizing: border-box; }
+          body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f4f7fb; color: #14213d; }
+          .loading { display: grid; justify-items: center; gap: 18px; padding: 32px; text-align: center; }
+          .loader { width: 48px; height: 48px; position: relative; animation: rotate 1.6s linear infinite; }
+          .loader::before, .loader::after { content: ""; position: absolute; inset: 4px; border: 4px solid transparent; border-top-color: #3f9f7a; border-right-color: #3f9f7a; border-radius: 50%; animation: spin 1s ease-in-out infinite; }
+          .loader::after { inset: 11px; border-width: 3px; border-top-color: #14213d; border-right-color: #14213d; animation-direction: reverse; animation-duration: .75s; }
+          h1 { margin: 0; font-size: 18px; font-weight: 700; }
+          p { margin: 0; max-width: 340px; color: #64748b; font-size: 14px; line-height: 1.5; }
+          @keyframes spin { to { transform: rotate(360deg); } }
+          @keyframes rotate { to { transform: rotate(-360deg); } }
+          @media (prefers-reduced-motion: reduce) { .loader, .loader::before, .loader::after { animation-duration: 2s; } }
+        </style>
+      </head>
+      <body>
+        <main class="loading" role="status" aria-live="polite">
+          <div class="loader" aria-hidden="true"></div>
+          <h1>Preparando o preenchimento</h1>
+          <p>Aguarde enquanto abrimos o formulário interno já autenticado.</p>
+        </main>
+      </body>
+    </html>`);
+  loadingDocument.close();
+}
+
 export default function OperatorDashboard() {
   const [processes, setProcesses] = useState<ProcessSummary[]>([]);
   const [notifications, setNotifications] = useState<InAppNotification[]>([]);
@@ -129,6 +164,7 @@ export default function OperatorDashboard() {
         setCreateMessage("Permita pop-ups neste site para abrir o preenchimento interno.");
         return;
       }
+      showInternalProcessLoader(internalWindow);
     }
     const openedInternalWindow = internalWindow;
     setCreating(true);

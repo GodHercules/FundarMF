@@ -27,6 +27,7 @@ describe("OperatorDashboard internal process start", () => {
       return Promise.resolve({ ok: true });
     });
     openMock.mockReturnValue({
+      document: { open: vi.fn(), write: vi.fn(), close: vi.fn() },
       location: { href: "" },
       focus: vi.fn(),
       close: vi.fn()
@@ -54,5 +55,6 @@ describe("OperatorDashboard internal process start", () => {
     expect(openMock).toHaveBeenCalledWith("about:blank", "_blank");
     const openedWindow = openMock.mock.results[0].value as { location: { href: string } };
     expect(openedWindow.location.href).toBe("http://localhost:3000/client/process/process-interno-1?modo=interno");
+    expect(openedWindow.document.write).toHaveBeenCalledWith(expect.stringContaining("Preparando o preenchimento"));
   });
 });
