@@ -1545,19 +1545,17 @@ export class ProcessService {
       });
     }
 
-    if (!internalMode) {
-      await this.notificationService.sendEmail(
-        process.clientEmail,
-        "Recebemos seus dados",
-        [
-          "Obrigado por mandar os seus documentos.",
-          "Aguarde o contato por e-mail ou WhatsApp para acompanhar o andamento.",
-          "",
-          `Processo: ${process.id}`,
-          `Etapa enviada: ${getStepLabel(stepKey)}`
-        ].join("\n")
-      );
-    }
+    await this.notificationService.sendEmail(
+      process.clientEmail,
+      "Recebemos seus dados",
+      [
+        "Obrigado por mandar os seus documentos.",
+        "Aguarde o contato por e-mail ou WhatsApp para acompanhar o andamento.",
+        "",
+        `Processo: ${process.id}`,
+        `Etapa enviada: ${getStepLabel(stepKey)}`
+      ].join("\n")
+    );
 
     if (!internalMode) {
       void this.sendProcessWebhook(processId, "client_submitted", actor, { stepKey });

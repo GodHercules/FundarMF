@@ -133,7 +133,12 @@ describe("ProcessService submitStep email", () => {
     await expect(service.submitStep("p1", { role: "OPERADOR", userId: "op-1", email: "op@exemplo.com" }, "ETAPA_2", true)).resolves.toEqual({
       ok: true
     });
-    expect((notificationService.sendEmail as any).mock.calls.length).toBe(emailCallsAfterClientSubmit);
+    expect((notificationService.sendEmail as any).mock.calls.length).toBe(emailCallsAfterClientSubmit + 1);
+    expect(notificationService.sendEmail).toHaveBeenLastCalledWith(
+      "cliente@exemplo.com",
+      "Recebemos seus dados",
+      expect.stringContaining("Etapa enviada: Preenchimento de dados e informações")
+    );
     await expect(service.submitStep("p1", { role: "CLIENTE", email: "cliente@exemplo.com" }, "ETAPA_2", true)).rejects.toThrow();
 
     // Retry: already submitted should not send again.
