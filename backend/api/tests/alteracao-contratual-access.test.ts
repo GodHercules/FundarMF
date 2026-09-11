@@ -124,6 +124,30 @@ describe("ProcessService contractual alterations", () => {
     expect(auditService.record).toHaveBeenCalledWith(expect.anything(), "alteracao_contratual_requested", "AlteracaoContratual", "alteration-standalone", expect.objectContaining({ documentNumber: "12345678000190" }));
   });
 
+  it("creates one standalone alteration with all selected motives", async () => {
+    const { service, tx } = createStandaloneService();
+
+    await service.createAlteracaoContratual(undefined, { role: "OPERADOR", userId: "operator-1" }, ["razao-social", "endereco-matriz"], undefined, {
+      name: "Empresa Avulsa",
+      email: "cliente@example.com",
+      documentNumber: "12.345.678/0001-90"
+    });
+
+    expect(tx.alteracaoContratual.findFirst).toHaveBeenCalledTimes(1);
+    expect(tx.alteracaoContratual.findFirst).toHaveBeenCalledWith({
+      where: { legacyClientId: "legacy-client-1", alterationType: "razao-social,endereco-matriz" },
+      orderBy: { createdAt: "desc" }
+    });
+    expect(tx.alteracaoContratual.create).toHaveBeenCalledTimes(1);
+    expect(tx.alteracaoContratual.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        legacyClientId: "legacy-client-1",
+        alterationType: "razao-social,endereco-matriz",
+        alterationTypes: ["razao-social", "endereco-matriz"]
+      })
+    });
+  });
+
   it("requires the standalone client's name, email and CNPJ", async () => {
     const { service } = createStandaloneService();
     await expect(service.createAlteracaoContratual(undefined, { role: "MASTER" }, "ALTERACAO_ENDERECO")).rejects.toBeInstanceOf(BadRequestException);
@@ -408,6 +432,39 @@ describe("ProcessService contractual alterations", () => {
       "semideus@example.com",
       "Alteração Contratual do(a) SemiDeus",
       "Olá, SemiDeus. Os documentos foram enviados para proceder com as assinaturas, favor verificar o seu e-mail."
+    );
+  });
+
+  it("creates one alteration process with all selected motives", async () => {
+    const { service, tx, auditService } = createService();
+
+    const result = await service.createAlteracaoContratual(
+      "process-1",
+      { role: "CLIENTE", userId: "client-1", email: "client@example.com" },
+      ["razao-social", "endereco-matriz"]
+    );
+
+    expect(result.id).toBe("alteration-1");
+    expect(tx.alteracaoContratual.upsert).toHaveBeenCalledTimes(1);
+    expect(tx.alteracaoContratual.upsert).toHaveBeenCalledWith({
+      where: { processId_alterationType: { processId: "process-1", alterationType: "razao-social,endereco-matriz" } },
+      update: { alterationTypes: ["razao-social", "endereco-matriz"] },
+      create: {
+        processId: "process-1",
+        alterationType: "razao-social,endereco-matriz",
+        alterationTypes: ["razao-social", "endereco-matriz"],
+        stage: "DOC_INICIAL_APROVADA",
+        requestedByRole: "CLIENTE",
+        requestedById: "client-1"
+      }
+    });
+    expect(tx.alteracaoContratualHistory.createMany).toHaveBeenCalledTimes(1);
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({ role: "CLIENTE" }),
+      "alteracao_contratual_requested",
+      "AlteracaoContratual",
+      "alteration-1",
+      expect.objectContaining({ alterationTypes: ["razao-social", "endereco-matriz"] })
     );
   });
 

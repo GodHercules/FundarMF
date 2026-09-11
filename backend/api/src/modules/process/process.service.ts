@@ -1125,7 +1125,7 @@ export class ProcessService {
         throw new BadRequestException("Informe um CNPJ válido com 14 posições e dois dígitos verificadores numéricos.");
       }
 
-      const requests = await this.prisma.$transaction(async (tx) => {
+      const request = await this.prisma.$transaction(async (tx) => {
         const client = standaloneClient.legacyClientId
           ? await tx.legacyClient.findFirst({ where: { id: standaloneClient.legacyClientId, tenantKey } })
           : await tx.legacyClient.upsert({
@@ -1140,36 +1140,32 @@ export class ProcessService {
               email: standaloneClient.email!.trim(),
               createdById: actor.userId
             }
-          });
+        });
         if (!client) throw new NotFoundException("Cliente não encontrado.");
 
-        const created = [];
-        for (const alterationType of types) {
-          const existing = await tx.alteracaoContratual.findFirst({ where: { legacyClientId: client.id, alterationType }, orderBy: { createdAt: "desc" } });
-          const request = existing ?? await tx.alteracaoContratual.create({
-            data: {
-              legacyClientId: client.id,
-              alterationType,
-              alterationTypes: types,
-              tenantKey,
-              stage: AlteracaoContratualStage.DOC_INICIAL_APROVADA,
-              dueAt: new Date(Date.now() + 72 * 60 * 60 * 1000),
-              requestedByRole: actor.role,
-              requestedById: actor.userId
-            }
-          });
-          await tx.alteracaoContratualHistory.createMany({
-            skipDuplicates: true,
-            data: [{ alteracaoId: request.id, toStage: request.stage, version: request.version, actorRole: actor.role, actorId: actor.userId, comment: otherDescription?.trim() }]
-          });
-          created.push(request);
-        }
-        return created;
+        const alterationType = types.join(",");
+        const existing = await tx.alteracaoContratual.findFirst({ where: { legacyClientId: client.id, alterationType }, orderBy: { createdAt: "desc" } });
+        const request = existing ?? await tx.alteracaoContratual.create({
+          data: {
+            legacyClientId: client.id,
+            alterationType,
+            alterationTypes: types,
+            tenantKey,
+            stage: AlteracaoContratualStage.DOC_INICIAL_APROVADA,
+            dueAt: new Date(Date.now() + 72 * 60 * 60 * 1000),
+            requestedByRole: actor.role,
+            requestedById: actor.userId
+          }
+        });
+        await tx.alteracaoContratualHistory.createMany({
+          skipDuplicates: true,
+          data: [{ alteracaoId: request.id, toStage: request.stage, version: request.version, actorRole: actor.role, actorId: actor.userId, comment: otherDescription?.trim() }]
+        });
+        return request;
       });
-      const request = requests[0];
       await this.auditService.record(actor, "alteracao_contratual_requested", "AlteracaoContratual", request.id, { legacyClientId: standaloneClient.legacyClientId, clientName: standaloneClient.name, documentNumber, alterationTypes: types });
       await this.notifyAlteracaoStage(request.id, request.stage);
-      return requests.length === 1 ? request : { requests };
+      return request;
     }
 
     const process = await this.getProcess(processId, actor);
@@ -1177,36 +1173,32 @@ export class ProcessService {
       throw new BadRequestException("A alteração contratual só pode ser solicitada após a conclusão do processo.");
     }
 
-    const requests = await this.prisma.$transaction(async (tx) => {
-      const created = [];
-      for (const alterationType of types) {
-        const legacyTx = tx.alteracaoContratual as unknown as { findFirst?: (...args: unknown[]) => Promise<unknown>; create?: (...args: unknown[]) => Promise<unknown> };
-        const request = (legacyTx.findFirst && legacyTx.create
-          ? ((await legacyTx.findFirst({ where: { processId, alterationType }, orderBy: { createdAt: "desc" } })) ?? await legacyTx.create({
-            data: { processId, alterationType, alterationTypes: types, tenantKey: process.tenantKey, stage: AlteracaoContratualStage.DOC_INICIAL_APROVADA, dueAt: new Date(Date.now() + 72 * 60 * 60 * 1000), requestedByRole: actor.role, requestedById: actor.userId }
-            }))
-          : await (tx.alteracaoContratual.upsert as unknown as (args: unknown) => Promise<unknown>)({
-              where: { processId_alterationType: { processId, alterationType } },
-              update: {},
-              create: { processId, alterationType, stage: AlteracaoContratualStage.DOC_INICIAL_APROVADA, requestedByRole: actor.role, requestedById: actor.userId }
-            })) as { id: string; stage: AlteracaoContratualStage; version: number };
-        await tx.alteracaoContratualHistory.createMany({
-          skipDuplicates: true,
-          data: [{ alteracaoId: request.id, toStage: request.stage, version: request.version, actorRole: actor.role, actorId: actor.userId, comment: otherDescription?.trim() }]
-        });
-        created.push(request);
-      }
-      return created;
+    const request = await this.prisma.$transaction(async (tx) => {
+      const alterationType = types.join(",");
+      const legacyTx = tx.alteracaoContratual as unknown as { findFirst?: (...args: unknown[]) => Promise<unknown>; create?: (...args: unknown[]) => Promise<unknown>; upsert?: (...args: unknown[]) => Promise<unknown> };
+      const request = (legacyTx.findFirst && legacyTx.create
+        ? ((await legacyTx.findFirst({ where: { processId, alterationType }, orderBy: { createdAt: "desc" } })) ?? await legacyTx.create({
+          data: { processId, alterationType, alterationTypes: types, tenantKey: process.tenantKey, stage: AlteracaoContratualStage.DOC_INICIAL_APROVADA, dueAt: new Date(Date.now() + 72 * 60 * 60 * 1000), requestedByRole: actor.role, requestedById: actor.userId }
+        }))
+        : await (legacyTx.upsert as (...args: unknown[]) => Promise<unknown>)({
+          where: { processId_alterationType: { processId, alterationType } },
+          update: types.length > 1 ? { alterationTypes: types } : {},
+          create: { processId, alterationType, ...(types.length > 1 ? { alterationTypes: types } : {}), stage: AlteracaoContratualStage.DOC_INICIAL_APROVADA, requestedByRole: actor.role, requestedById: actor.userId }
+        })) as { id: string; stage: AlteracaoContratualStage; version: number };
+      await tx.alteracaoContratualHistory.createMany({
+        skipDuplicates: true,
+        data: [{ alteracaoId: request.id, toStage: request.stage, version: request.version, actorRole: actor.role, actorId: actor.userId, comment: otherDescription?.trim() }]
+      });
+      return request;
     });
 
-    const request = requests[0];
     await this.auditService.record(actor, "alteracao_contratual_requested", "AlteracaoContratual", request.id, {
       processId,
       alterationTypes: types
     });
     await this.notifyAlteracaoStage(request.id, request.stage);
 
-    return requests.length === 1 ? request : { requests };
+    return request;
   }
 
   async deleteAlteracaoContratual(id: string, actor: Actor) {
