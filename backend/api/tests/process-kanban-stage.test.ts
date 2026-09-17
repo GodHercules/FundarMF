@@ -179,7 +179,7 @@ describe("ProcessService updateKanbanStage", () => {
     expect(auditService.record).toHaveBeenCalledWith(actor, "kanban_stage_email_suppressed", "Process", "p1", expect.objectContaining({ kanbanStage: "EXIGENCIA_JUCEB" }));
   });
 
-  it("normalizes eligible VIABILIDADE cards to DOC_INICIAL_APROVADA in process list", async () => {
+  it("preserves the persisted VIABILIDADE stage in process list after reload", async () => {
     const prisma = {
       process: {
         findMany: vi.fn(async () => [
@@ -250,7 +250,7 @@ describe("ProcessService updateKanbanStage", () => {
 
     expect(list).toHaveLength(1);
     expect((list[0] as any).kanbanEligible).toBe(true);
-    expect((list[0] as any).kanbanStage).toBe("DOC_INICIAL_APROVADA");
+    expect((list[0] as any).kanbanStage).toBe("VIABILIDADE");
   });
 
   it("returns only eligible items in dedicated kanban list", async () => {
@@ -340,7 +340,7 @@ describe("ProcessService updateKanbanStage", () => {
     expect(list).toHaveLength(1);
     expect((list[0] as any).id).toBe("eligible");
     expect((list[0] as any).kanbanEligible).toBe(true);
-    expect((list[0] as any).kanbanStage).toBe("DOC_INICIAL_APROVADA");
+    expect((list[0] as any).kanbanStage).toBe("VIABILIDADE");
   });
 });
 

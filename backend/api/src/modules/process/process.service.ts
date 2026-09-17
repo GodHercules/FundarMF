@@ -688,12 +688,10 @@ export class ProcessService {
     const { steps: _steps, documents: _documents, ...rest } = process;
     void _steps;
     void _documents;
-    const kanbanStage =
-      kanbanEligible && rest.kanbanStage === KanbanStage.VIABILIDADE
-        ? KanbanStage.DOC_INICIAL_APROVADA
-        : (rest.kanbanStage as KanbanStage);
-
-    return { ...rest, kanbanEligible, kanbanStage };
+    // The persisted stage is the source of truth. In particular, VIABILIDADE
+    // is a real Kanban column and must not be rewritten on reads; doing so
+    // made a successful drag appear to move back after a reload.
+    return { ...rest, kanbanEligible, kanbanStage: rest.kanbanStage as KanbanStage };
   }
 
   private isKanbanEligible(
