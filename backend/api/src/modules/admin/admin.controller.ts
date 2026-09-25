@@ -45,6 +45,11 @@ export class AdminController {
     return this.adminService.listUnassigned(req.actor?.tenantKey ?? "default");
   }
 
+  @Get("processes/:processId/audit")
+  async processAudit(@Param("processId") processId: string, @Req() req: Request) {
+    return this.adminService.listProcessAudit(processId, req.actor!);
+  }
+
   @Get("audit")
   async audit(@Req() req: Request) {
     return this.adminService.listAudit(req.actor?.tenantKey ?? "default");

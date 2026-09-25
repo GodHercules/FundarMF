@@ -57,6 +57,11 @@ export class BackgroundService implements OnModuleInit, OnModuleDestroy {
         name: "cancelInactiveProcesses",
         everyMs: toPositiveMs(process.env.WORKER_CANCEL_INACTIVE_EVERY_MS, 3_600_000),
         handler: () => this.cancelInactiveProcesses()
+      },
+      {
+        name: "purgeExpiredAuditEvents",
+        everyMs: toPositiveMs(process.env.WORKER_AUDIT_RETENTION_EVERY_MS, 21_600_000),
+        handler: () => this.purgeExpiredAuditEvents()
       }
     ];
 
@@ -349,5 +354,11 @@ export class BackgroundService implements OnModuleInit, OnModuleDestroy {
     }
 
     return { cancelled };
+  }
+
+  private async purgeExpiredAuditEvents() {
+    const cutoff = dayjs().subtract(30, "day").toDate();
+    const result = await this.prisma.auditEvent.deleteMany({ where: { createdAt: { lt: cutoff } } });
+    return { deleted: result.count };
   }
 }

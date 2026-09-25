@@ -1,10 +1,47 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { ProcessStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 import { Actor } from "../../common/auth/types";
 import { timeAsync } from "../../shared/perf";
 import { PrismaService } from "../../shared/prisma.service";
 import { AuditService } from "../audit/audit.service";
+
+const AUDIT_RETENTION_DAYS = 30;
+const SAFE_AUDIT_DETAIL_KEYS = new Set([
+  "source",
+  "stepKey",
+  "nextStep",
+  "status",
+  "newStatus",
+  "previousStatus",
+  "kanbanStage",
+  "from",
+  "to",
+  "sendEmail",
+  "sendWhatsapp",
+  "count",
+  "version",
+  "format",
+  "conversion",
+  "editable",
+  "stage"
+]);
+
+function sanitizeAuditDetails(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return {};
+  const safeDetails: Record<string, string | number | boolean> = {};
+  for (const [key, value] of Object.entries(metadata as Record<string, unknown>)) {
+    if (!SAFE_AUDIT_DETAIL_KEYS.has(key)) continue;
+    if (typeof value === "string") {
+      const normalized = value.replace(/[\r\n\t]/g, " ").trim();
+      if (normalized.length > 0 && normalized.length <= 120) safeDetails[key] = normalized;
+    } else if (typeof value === "number" || typeof value === "boolean") {
+      safeDetails[key] = value;
+    }
+  }
+  return safeDetails;
+}
 
 @Injectable()
 export class AdminService {
@@ -210,6 +247,73 @@ export class AdminService {
       orderBy: { createdAt: "desc" },
       take: 200
     });
+  }
+
+  async listProcessAudit(processId: string, actor: Actor) {
+    const tenantKey = actor.tenantKey ?? "default";
+    const process = await this.prisma.process.findFirst({
+      where: { id: processId, tenantKey },
+      select: {
+        id: true,
+        status: true,
+        updatedAt: true,
+        steps: { select: { id: true } },
+        checklists: { select: { id: true } },
+        documents: { select: { id: true, files: { select: { id: true } } } },
+        chats: { select: { id: true } },
+        alteracoesContratuais: { select: { id: true } },
+        contracts: { select: { id: true } },
+        reports: { select: { id: true } }
+      }
+    });
+    if (!process) throw new NotFoundException("Processo não encontrado.");
+
+    const idsByEntity = {
+      ProcessStep: process.steps.map((item) => item.id),
+      Checklist: process.checklists.map((item) => item.id),
+      DocumentItem: process.documents.map((item) => item.id),
+      DocumentFile: process.documents.flatMap((item) => item.files.map((file) => file.id)),
+      ChatThread: process.chats.map((item) => item.id),
+      AlteracaoContratual: process.alteracoesContratuais.map((item) => item.id),
+      Contract: process.contracts.map((item) => item.id),
+      Report: process.reports.map((item) => item.id)
+    };
+    const entityFilters = Object.entries(idsByEntity)
+      .filter(([, ids]) => ids.length > 0)
+      .map(([entity, ids]) => ({ entity, entityId: { in: ids } }));
+    const processFilter = { entity: "Process", entityId: process.id };
+    const auditScope = { tenantKey, OR: [processFilter, ...entityFilters] };
+    const retentionCutoff = new Date(Date.now() - AUDIT_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+
+    const [events, latestEvent] = await Promise.all([
+      this.prisma.auditEvent.findMany({
+        where: { ...auditScope, createdAt: { gte: retentionCutoff } },
+        orderBy: { createdAt: "desc" },
+        take: 500,
+        select: { id: true, action: true, entity: true, actorRole: true, createdAt: true, metadata: true }
+      }),
+      this.prisma.auditEvent.findFirst({
+        where: auditScope,
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true }
+      })
+    ]);
+
+    const lastActivityAt = latestEvent && latestEvent.createdAt > process.updatedAt ? latestEvent.createdAt : process.updatedAt;
+    return {
+      retentionDays: AUDIT_RETENTION_DAYS,
+      retentionCutoff,
+      lastActivityAt,
+      activityStatus: process.status === ProcessStatus.CONCLUIDO ? "CONCLUIDA" : "SEM_MOVIMENTACAO",
+      events: events.map((event) => ({
+        id: event.id,
+        action: event.action,
+        entity: event.entity,
+        actorRole: event.actorRole,
+        createdAt: event.createdAt,
+        details: sanitizeAuditDetails(event.metadata)
+      }))
+    };
   }
 
   async getReport(processId: string, tenantKey = "default") {

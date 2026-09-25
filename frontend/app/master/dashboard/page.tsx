@@ -12,7 +12,7 @@ import { PhoneInput } from "@/components/PhoneInput";
 import { PasswordField } from "@/components/PasswordField";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { logClientPerf } from "@/lib/perf";
-import { FiAlertTriangle, FiTrash2, FiUserX, FiX } from "react-icons/fi";
+import { FiAlertTriangle, FiClock, FiShield, FiTrash2, FiUserX, FiX } from "react-icons/fi";
 import { WorkspaceNav } from "@/components/WorkspaceNav";
 
 type DashboardProcess = {
@@ -29,6 +29,57 @@ type DashboardUser = {
   email?: string;
   role: string;
 };
+
+type ProcessAuditEvent = {
+  id: string;
+  action: string;
+  entity: string;
+  actorRole: string;
+  createdAt: string;
+  details: Record<string, string | number | boolean>;
+};
+
+type ProcessAuditResponse = {
+  retentionDays: number;
+  retentionCutoff: string;
+  lastActivityAt: string;
+  activityStatus: "CONCLUIDA" | "SEM_MOVIMENTACAO";
+  events: ProcessAuditEvent[];
+};
+
+const auditActionLabels: Record<string, string> = {
+  process_started: "Processo iniciado",
+  update_step: "Etapa atualizada",
+  submit_step: "Etapa enviada",
+  approve_step: "Etapa aprovada",
+  request_correction: "Correção solicitada",
+  mark_in_progress: "Processo colocado em andamento",
+  client_status_update: "Status enviado ao cliente",
+  kanban_stage_updated: "Etapa do Kanban atualizada",
+  process_completed: "Processo concluído",
+  process_cancelled: "Processo cancelado",
+  assign_owner: "Responsável atribuído",
+  upload_documents: "Documento enviado",
+  validate_documents: "Documento validado",
+  update_checklist: "Checklist atualizado",
+  chat_message: "Mensagem registrada",
+  contract_created: "Contrato criado",
+  contract_saved: "Contrato salvo",
+  contract_finalized: "Contrato finalizado",
+  process_reopened: "Processo reaberto",
+  process_deleted: "Processo excluído"
+};
+
+const actorLabels: Record<string, string> = {
+  MASTER: "Master",
+  OPERADOR: "Operador",
+  CLIENTE: "Cliente",
+  SYSTEM: "Sistema"
+};
+
+function formatAuditDate(value: string) {
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+}
 
 export default function MasterDashboard() {
   const [processes, setProcesses] = useState<DashboardProcess[]>([]);
@@ -52,6 +103,9 @@ export default function MasterDashboard() {
   const [confirmProcessText, setConfirmProcessText] = useState("");
   const [confirmOperatorText, setConfirmOperatorText] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [auditProcess, setAuditProcess] = useState<DashboardProcess | null>(null);
+  const [auditData, setAuditData] = useState<ProcessAuditResponse | null>(null);
+  const [loadingAudit, setLoadingAudit] = useState(false);
 
   const processPageSize = 8;
   const userPageSize = 10;
@@ -214,6 +268,18 @@ export default function MasterDashboard() {
     }
   }
 
+  async function openProcessAudit(process: DashboardProcess) {
+    setAuditProcess(process);
+    setAuditData(null);
+    setLoadingAudit(true);
+    try {
+      const data = await api<ProcessAuditResponse>(`/admin/processes/${process.id}/audit`);
+      setAuditData(data);
+    } finally {
+      setLoadingAudit(false);
+    }
+  }
+
   return (
     <main className="app-container flex min-h-screen flex-col gap-8 py-12">
       <WorkspaceNav role="master" />
@@ -307,7 +373,16 @@ export default function MasterDashboard() {
           {processes.map((process) => (
             <div
               key={process.id}
-              className="rounded-2xl border border-ink/10 bg-white/70 p-4 shadow-soft transition hover:-translate-y-0.5 hover:bg-white/90"
+              className="cursor-pointer rounded-2xl border border-ink/10 bg-white/70 p-4 shadow-soft transition hover:-translate-y-0.5 hover:bg-white/90 focus-within:ring-2 focus-within:ring-brass/40"
+              role="button"
+              tabIndex={0}
+              onClick={() => openProcessAudit(process)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  void openProcessAudit(process);
+                }
+              }}
             >
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0">
@@ -330,6 +405,7 @@ export default function MasterDashboard() {
                       onChange={(event) => handleAssign(process.id, event.target.value)}
                       disabled={assigning === process.id}
                       aria-label="Responsável"
+                      onClick={(event) => event.stopPropagation()}
                     >
                       <option value="">Selecione</option>
                       {users
@@ -345,7 +421,10 @@ export default function MasterDashboard() {
                   <button
                     type="button"
                     className="rounded-xl border border-clay/30 bg-clay/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink hover:border-clay"
-                    onClick={() => setProcessToDelete(process)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setProcessToDelete(process);
+                    }}
                   >
                     Excluir caso
                   </button>
@@ -413,6 +492,107 @@ export default function MasterDashboard() {
                 Criar operador
               </Button>
               {message && <p className="text-sm text-slate">{message}</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {auditProcess && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 px-4 py-6"
+          onClick={() => setAuditProcess(null)}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-soft"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-ink/10 px-6 py-5">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-brass/15 text-ink">
+                  <FiShield className="h-5 w-5" />
+                </span>
+                <div>
+                  <h2 className="text-lg font-semibold text-ink">Auditoria do processo</h2>
+                  <p className="mt-1 text-sm text-slate">{auditProcess.clientName ?? "Empresa"}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate/10 text-slate hover:bg-slate/15"
+                aria-label="Fechar auditoria"
+                onClick={() => setAuditProcess(null)}
+              >
+                <FiX className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="max-h-[calc(90vh-105px)] overflow-y-auto px-6 py-6">
+              {loadingAudit && <p className="text-sm text-slate">Carregando auditoria segura...</p>}
+              {!loadingAudit && auditData && (
+                <>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-2xl border border-ink/10 bg-slate/5 p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate">Situação</p>
+                      <p className="mt-2 text-sm font-semibold text-ink">
+                        {auditData.activityStatus === "CONCLUIDA"
+                          ? "Empresa concluída"
+                          : `Sem movimentação desde ${formatAuditDate(auditData.lastActivityAt)}`}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-ink/10 bg-slate/5 p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate">Retenção</p>
+                      <p className="mt-2 text-sm text-slate">
+                        Eventos disponíveis por {auditData.retentionDays} dias. Após esse prazo, deixam de ser exibidos.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 rounded-2xl border border-brass/20 bg-brass/5 p-4 text-xs text-slate">
+                    <div className="flex gap-2">
+                      <FiShield className="mt-0.5 h-4 w-4 shrink-0 text-ink" />
+                      <p>
+                        Esta visão contém somente eventos sanitizados. IP, e-mail, payloads, documentos, stack traces e
+                        logs internos do servidor não são enviados para a página.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 space-y-3">
+                    {auditData.events.length === 0 && (
+                      <p className="rounded-2xl border border-dashed border-ink/15 p-5 text-sm text-slate">
+                        Nenhum evento de auditoria disponível nos últimos 30 dias.
+                      </p>
+                    )}
+                    {auditData.events.map((event) => (
+                      <div key={event.id} className="rounded-2xl border border-ink/10 bg-white p-4 shadow-sm">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-ink">
+                              {auditActionLabels[event.action] ?? "Evento de segurança"}
+                            </p>
+                            <p className="mt-1 text-xs text-slate">
+                              {actorLabels[event.actorRole] ?? "Ator autorizado"} · {event.entity}
+                            </p>
+                          </div>
+                          <p className="flex items-center gap-1 text-xs text-slate">
+                            <FiClock className="h-3.5 w-3.5" />
+                            {formatAuditDate(event.createdAt)}
+                          </p>
+                        </div>
+                        {Object.keys(event.details).length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {Object.entries(event.details).map(([key, value]) => (
+                              <span key={key} className="rounded-full bg-slate/10 px-2.5 py-1 text-[11px] text-slate">
+                                {key}: {String(value)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
