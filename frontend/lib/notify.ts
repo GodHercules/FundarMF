@@ -1,4 +1,6 @@
-﻿export type NotifyType = "success" | "error" | "info";
+import { toast } from "react-toastify";
+
+export type NotifyType = "success" | "error" | "info";
 
 export type NotifyPayload = {
   type: NotifyType;
@@ -20,11 +22,10 @@ const fixMojibake = (value: string) => {
 
 export function notify(payload: NotifyPayload) {
   if (typeof window === "undefined") return;
-  const normalized = {
-    ...payload,
-    message: fixMojibake(payload.message)
-  };
-  window.dispatchEvent(new CustomEvent("app-notify", { detail: normalized }));
+  const message = fixMojibake(payload.message);
+  if (payload.type === "success") toast.success(message);
+  else if (payload.type === "error") toast.error(message);
+  else toast.info(message);
 }
 
 export function notifySuccess(message: string) {
@@ -38,4 +39,3 @@ export function notifyError(message: string) {
 export function notifyInfo(message: string) {
   notify({ type: "info", message });
 }
-

@@ -1,4 +1,5 @@
 import "./globals.css";
+import "react-toastify/dist/ReactToastify.css";
 import type { Metadata } from "next";
 import { Merriweather, Work_Sans } from "next/font/google";
 import { Notifications } from "@/components/Notifications";
