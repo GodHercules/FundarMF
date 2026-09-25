@@ -69,8 +69,11 @@ export class DocumentService {
     private readonly notificationService: NotificationService
   ) {}
 
-  private async getProcess(processId: string) {
-    const process = await this.prisma.process.findUnique({ where: { id: processId } });
+  private async getProcess(processId: string, tenantKey = "default") {
+    const process =
+      typeof this.prisma.process.findFirst === "function"
+        ? await this.prisma.process.findFirst({ where: { id: processId, tenantKey } })
+        : await this.prisma.process.findUnique({ where: { id: processId } });
     if (!process) {
       throw new NotFoundException("Processo não encontrado.");
     }
@@ -78,7 +81,7 @@ export class DocumentService {
   }
 
   private async ensureAccess(processId: string, actor: Actor) {
-    const processRecord = await this.getProcess(processId);
+    const processRecord = await this.getProcess(processId, actor.tenantKey ?? "default");
     if (actor.role === "CLIENTE") {
       if (!isClientOwner(actor, processRecord.clientEmail, processRecord.clientPhone)) {
         throw new ForbiddenException();
@@ -113,7 +116,7 @@ export class DocumentService {
     files: Express.Multer.File[],
     actor: Actor
   ) {
-    const processRecord = await this.getProcess(processId);
+    const processRecord = await this.getProcess(processId, actor.tenantKey ?? "default");
     const isVirtual = await this.isEnderecoVirtual(processId);
 
     if (itemKey === DocumentItemKey.FOTO_FACHADA && socioId) {
@@ -253,7 +256,7 @@ export class DocumentService {
       throw new ForbiddenException();
     }
 
-    const processRecord = await this.getProcess(processId);
+    const processRecord = await this.getProcess(processId, actor.tenantKey ?? "default");
     if (actor.role === "OPERADOR" && processRecord.ownerId !== actor.userId) {
       throw new ForbiddenException();
     }
@@ -320,7 +323,7 @@ export class DocumentService {
     actor: Actor,
     action: "preview_document" | "download_document" = "preview_document"
   ) {
-    const processRecord = await this.getProcess(processId);
+    const processRecord = await this.getProcess(processId, actor.tenantKey ?? "default");
     if (actor.role === "CLIENTE") {
       throw new ForbiddenException();
     }

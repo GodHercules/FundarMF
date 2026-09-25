@@ -300,7 +300,12 @@ export class ProcessService {
   }
 
   private async sendKanbanStageEmail(processId: string, stage: KanbanStage, actor: Actor) {
-    const process = await this.prisma.process.findUnique({ where: { id: processId } });
+    const process =
+      typeof this.prisma.process.findFirst === "function"
+        ? await this.prisma.process.findFirst({
+            where: { id: processId, tenantKey: actor.tenantKey ?? "default" }
+          })
+        : await this.prisma.process.findUnique({ where: { id: processId } });
     if (!process) return;
 
     if (stage === KanbanStage.EXIGENCIA_JUCEB) {
@@ -916,7 +921,9 @@ export class ProcessService {
       throw new ForbiddenException();
     }
 
-    const process = await this.prisma.process.findUnique({ where: { id: processId } });
+    const process = await this.prisma.process.findFirst({
+      where: { id: processId, tenantKey: actor.tenantKey ?? "default" }
+    });
     if (!process) {
       throw new NotFoundException("Processo não encontrado.");
     }
@@ -937,7 +944,7 @@ export class ProcessService {
       sendWhatsapp ? process.clientPhone ?? undefined : undefined,
       process.clientName ?? undefined,
       { email: actor.email, role: actor.role },
-      { forceNew: true }
+      { forceNew: true, tenantKey: actor.tenantKey ?? "default" }
     );
 
     await this.auditService.record(actor, "client_link_sent", "Process", processId, {
@@ -949,12 +956,13 @@ export class ProcessService {
   }
 
   async listProcesses(actor: Actor, options?: { take?: number; skip?: number }) {
+    const tenantKey = actor.tenantKey ?? "default";
     const take = options?.take && options.take > 0 ? Math.min(options.take, 200) : 100;
     const skip = options?.skip && options.skip > 0 ? options.skip : 0;
     if (actor.role === "CLIENTE") {
       if (actor.email) {
         return this.prisma.process.findMany({
-          where: { clientEmail: actor.email },
+          where: { clientEmail: actor.email, tenantKey },
           orderBy: { createdAt: "desc" },
           take,
           skip
@@ -962,14 +970,14 @@ export class ProcessService {
       }
       if (actor.whatsapp) {
         return this.prisma.process.findMany({
-          where: { clientPhone: normalizePhone(actor.whatsapp) ?? actor.whatsapp },
+          where: { clientPhone: normalizePhone(actor.whatsapp) ?? actor.whatsapp, tenantKey },
           orderBy: { createdAt: "desc" },
           take,
           skip
         });
       }
       return this.prisma.process.findMany({
-        where: { clientEmail: "" },
+        where: { clientEmail: "", tenantKey },
         orderBy: { createdAt: "desc" },
         take,
         skip
@@ -978,7 +986,7 @@ export class ProcessService {
 
     if (actor.role === "OPERADOR" || actor.role === "MASTER") {
       const processes = await this.prisma.process.findMany({
-        where: actor.role === "OPERADOR" ? { ownerId: actor.userId } : undefined,
+        where: actor.role === "OPERADOR" ? { ownerId: actor.userId, tenantKey } : { tenantKey },
         orderBy: { createdAt: "desc" },
         take,
         skip,
@@ -1008,11 +1016,12 @@ export class ProcessService {
       throw new ForbiddenException();
     }
 
+    const tenantKey = actor.tenantKey ?? "default";
     const take = options?.take && options.take > 0 ? Math.min(options.take, 200) : 200;
     const skip = options?.skip && options.skip > 0 ? options.skip : 0;
 
     const processes = await this.prisma.process.findMany({
-      where: actor.role === "OPERADOR" ? { ownerId: actor.userId, status: { not: ProcessStatus.CONCLUIDO } } : { status: { not: ProcessStatus.CONCLUIDO } },
+      where: actor.role === "OPERADOR" ? { ownerId: actor.userId, tenantKey, status: { not: ProcessStatus.CONCLUIDO } } : { tenantKey, status: { not: ProcessStatus.CONCLUIDO } },
       orderBy: { createdAt: "desc" },
       take,
       skip,
@@ -1070,8 +1079,9 @@ export class ProcessService {
   }
 
   async getProcess(processId: string, actor: Actor) {
+    const tenantKey = actor.tenantKey ?? "default";
     const process = await this.prisma.process.findUnique({
-      where: { id: processId },
+      where: { id: processId, tenantKey },
       include: {
         steps: true,
         checklists: true,
@@ -1567,7 +1577,9 @@ export class ProcessService {
       throw new ForbiddenException();
     }
 
-    const process = await this.prisma.process.findUnique({ where: { id: processId } });
+    const process = await this.prisma.process.findFirst({
+      where: { id: processId, tenantKey: actor.tenantKey ?? "default" }
+    });
     if (!process) {
       throw new NotFoundException("Processo não encontrado.");
     }
@@ -1771,7 +1783,9 @@ export class ProcessService {
       throw new ForbiddenException();
     }
 
-    const process = await this.prisma.process.findUnique({ where: { id: processId } });
+    const process = await this.prisma.process.findFirst({
+      where: { id: processId, tenantKey: actor.tenantKey ?? "default" }
+    });
     if (!process) {
       throw new NotFoundException("Processo não encontrado.");
     }
@@ -1815,9 +1829,11 @@ export class ProcessService {
       throw new ForbiddenException();
     }
 
-    const process = await this.prisma.process.findUnique({
-      where: { id: processId },
-      include: {
+    const process =
+      typeof this.prisma.process.findFirst === "function"
+        ? await this.prisma.process.findFirst({
+            where: { id: processId, tenantKey: actor.tenantKey ?? "default" },
+            include: {
         steps: {
           where: { stepKey: { in: [StepKey.ETAPA_2, StepKey.ETAPA_3] } },
           select: { stepKey: true, data: true, locked: true, status: true }
@@ -1825,8 +1841,18 @@ export class ProcessService {
         documents: {
           select: { itemKey: true, socioId: true, status: true }
         }
-      }
-    });
+            }
+          })
+        : await this.prisma.process.findUnique({
+            where: { id: processId },
+            include: {
+              steps: {
+                where: { stepKey: { in: [StepKey.ETAPA_2, StepKey.ETAPA_3] } },
+                select: { stepKey: true, data: true, locked: true, status: true }
+              },
+              documents: { select: { itemKey: true, socioId: true, status: true } }
+            }
+          });
     if (!process) {
       throw new NotFoundException("Processo não encontrado.");
     }

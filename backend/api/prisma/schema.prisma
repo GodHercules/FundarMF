@@ -445,6 +445,7 @@ model Session {
   userId         String?
   clientEmail    String?
   clientWhatsapp String?
+  tenantKey      String        @default("default")
   tokenHash      String         @unique
   expiresAt      DateTime
   lastActiveAt   DateTime
@@ -460,6 +461,7 @@ model CustomerLinkToken {
   id                String    @id @default(uuid())
   email             String?
   whatsapp          String?
+  tenantKey         String    @default("default")
   tokenHash         String    @unique
   tokenExpiresAt    DateTime
   otpHash           String?
@@ -493,6 +495,7 @@ model AuditEvent {
   actorRole  AuditActorRole
   actorId    String?
   actorEmail String?
+  tenantKey  String         @default("default")
   action     String
   entity     String
   entityId   String?
@@ -501,7 +504,7 @@ model AuditEvent {
   userAgent  String?
   createdAt  DateTime       @default(now())
 
-  @@index([createdAt(sort: Desc), entity, action])
+  @@index([tenantKey, createdAt(sort: Desc), entity, action])
 }
 
 model SlaConfigStep {

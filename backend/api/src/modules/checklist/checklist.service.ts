@@ -10,15 +10,17 @@ export class ChecklistService {
   constructor(private readonly prisma: PrismaService, private readonly auditService: AuditService) {}
 
   async getChecklist(processId: string, stepKey: StepKey, actor: Actor) {
-    const checklist = await this.prisma.checklist.findUnique({
-      where: { processId_stepKey: { processId, stepKey } }
+    const checklist = await this.prisma.checklist.findFirst({
+      where: { processId, stepKey, process: { tenantKey: actor.tenantKey ?? "default" } }
     });
     if (!checklist) {
       throw new NotFoundException("Checklist não encontrado.");
     }
 
     if (actor.role === "OPERADOR") {
-      const process = await this.prisma.process.findUnique({ where: { id: processId } });
+      const process = await this.prisma.process.findFirst({
+        where: { id: processId, tenantKey: actor.tenantKey ?? "default" }
+      });
       if (process?.ownerId !== actor.userId) {
         throw new ForbiddenException();
       }
@@ -36,7 +38,9 @@ export class ChecklistService {
       throw new ForbiddenException();
     }
 
-    const process = await this.prisma.process.findUnique({ where: { id: processId } });
+    const process = await this.prisma.process.findFirst({
+      where: { id: processId, tenantKey: actor.tenantKey ?? "default" }
+    });
     if (!process || process.ownerId !== actor.userId) {
       throw new ForbiddenException();
     }

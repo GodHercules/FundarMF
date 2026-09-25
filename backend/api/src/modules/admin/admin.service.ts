@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import bcrypt from "bcryptjs";
 
+import { Actor } from "../../common/auth/types";
 import { timeAsync } from "../../shared/perf";
 import { PrismaService } from "../../shared/prisma.service";
 import { AuditService } from "../audit/audit.service";
@@ -22,10 +23,11 @@ export class AdminService {
     }
   }
 
-  async listUsers(limit?: number, offset?: number) {
+  async listUsers(actor: Actor, limit?: number, offset?: number) {
     const take = Number.isFinite(limit) && limit && limit > 0 ? Math.min(limit, 200) : 100;
     const skip = Number.isFinite(offset) && offset && offset > 0 ? offset : 0;
     return this.prisma.user.findMany({
+      where: { tenantKey: actor.tenantKey ?? "default" },
       orderBy: { createdAt: "desc" },
       take,
       skip,
@@ -33,7 +35,7 @@ export class AdminService {
     });
   }
 
-  async createOperator(email: string, name: string, password: string, whatsapp?: string) {
+  async createOperator(email: string, name: string, password: string, whatsapp?: string, actor?: Actor) {
     const exists = await this.prisma.user.findUnique({ where: { email } });
     if (exists) {
       throw new BadRequestException("E-mail j cadastrado.");
@@ -46,16 +48,17 @@ export class AdminService {
         name,
         passwordHash,
         whatsapp,
-        role: "OPERATOR"
+        role: "OPERATOR",
+        tenantKey: actor?.tenantKey ?? "default"
       },
       select: { id: true, email: true, name: true, whatsapp: true, role: true, createdAt: true, updatedAt: true }
     });
     return user;
   }
 
-  async deleteOperator(userId: string, actorId?: string) {
+  async deleteOperator(userId: string, actorId?: string, tenantKey = "default") {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
+    if (!user || (user.tenantKey !== undefined && user.tenantKey !== tenantKey)) {
       throw new NotFoundException("Usuário não encontrado.");
     }
     if (user.role !== "OPERATOR") {
@@ -65,6 +68,7 @@ export class AdminService {
     const activeProcesses = await this.prisma.process.count({
       where: {
         ownerId: userId,
+        tenantKey,
         status: { notIn: ["CONCLUIDO", "CANCELADO"] }
       }
     });
@@ -76,7 +80,7 @@ export class AdminService {
 
     await this.prisma.$transaction(async (tx) => {
       await tx.process.updateMany({
-        where: { ownerId: userId },
+        where: { ownerId: userId, tenantKey },
         data: { ownerId: null }
       });
 
@@ -103,9 +107,9 @@ export class AdminService {
     return { ok: true };
   }
 
-  async deleteProcess(processId: string, actorId?: string, reason?: string) {
+  async deleteProcess(processId: string, actorId?: string, reason?: string, tenantKey = "default") {
     const process = await this.prisma.process.findUnique({ where: { id: processId } });
-    if (!process) {
+    if (!process || (process.tenantKey !== undefined && process.tenantKey !== tenantKey)) {
       throw new NotFoundException("Processo não encontrado.");
     }
 
@@ -160,13 +164,16 @@ export class AdminService {
     return { ok: true };
   }
 
-  async assignOwner(processId: string, ownerId: string, actorId?: string) {
+  async assignOwner(processId: string, ownerId: string, actorId?: string, tenantKey = "default") {
     await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Process" WHERE id = ${processId} FOR UPDATE`;
-      const process = await tx.process.findUnique({ where: { id: processId } });
+      const process = await tx.process.findFirst({ where: { id: processId, tenantKey } });
       if (!process) {
         throw new NotFoundException("Processo não encontrado.");
       }
+
+      const owner = await tx.user.findFirst({ where: { id: ownerId, role: "OPERATOR", active: true, tenantKey } });
+      if (!owner) throw new NotFoundException("Operador não encontrado neste tenant.");
 
       await tx.process.update({
         where: { id: processId },
@@ -189,24 +196,25 @@ export class AdminService {
     return { ok: true };
   }
 
-  async listUnassigned() {
+  async listUnassigned(tenantKey = "default") {
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
     return this.prisma.process.findMany({
-      where: { ownerId: null, createdAt: { lt: tenMinutesAgo } },
+      where: { ownerId: null, tenantKey, createdAt: { lt: tenMinutesAgo } },
       orderBy: { createdAt: "asc" }
     });
   }
 
-  async listAudit() {
+  async listAudit(tenantKey = "default") {
     return this.prisma.auditEvent.findMany({
+      where: { tenantKey },
       orderBy: { createdAt: "desc" },
       take: 200
     });
   }
 
-  async getReport(processId: string) {
+  async getReport(processId: string, tenantKey = "default") {
     const report = await this.prisma.report.findFirst({
-      where: { processId },
+      where: { processId, process: { tenantKey } },
       orderBy: { createdAt: "desc" }
     });
     if (!report) {

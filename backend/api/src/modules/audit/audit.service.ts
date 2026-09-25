@@ -21,6 +21,7 @@ export class AuditService {
         actorRole: actor?.role ?? "SYSTEM",
         actorId: actor?.userId,
         actorEmail: actor?.email,
+        tenantKey: actor?.tenantKey ?? "default",
         action,
         entity,
         entityId,

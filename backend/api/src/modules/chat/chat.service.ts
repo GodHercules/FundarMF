@@ -97,7 +97,9 @@ export class ChatService {
   ) {}
 
   private async ensureAccess(processId: string, actor: Actor) {
-    const process = await this.prisma.process.findUnique({ where: { id: processId } });
+    const process = await this.prisma.process.findFirst({
+      where: { id: processId, tenantKey: actor.tenantKey ?? "default" }
+    });
     if (!process) {
       throw new NotFoundException("Processo não encontrado.");
     }

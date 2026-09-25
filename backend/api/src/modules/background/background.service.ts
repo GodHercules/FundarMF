@@ -111,8 +111,14 @@ export class BackgroundService implements OnModuleInit, OnModuleDestroy {
 
     if (unassigned.length === 0) return { assigned: 0 };
 
-    const operators = await this.prisma.user.findMany({ where: { role: "OPERATOR", active: true } });
+    const operators = await this.prisma.user.findMany({ where: { role: "OPERATOR", active: true }, select: { id: true, tenantKey: true } });
     if (operators.length === 0) return { assigned: 0 };
+    const operatorsByTenant = new Map<string, typeof operators>();
+    for (const operator of operators) {
+      const candidates = operatorsByTenant.get(operator.tenantKey) ?? [];
+      candidates.push(operator);
+      operatorsByTenant.set(operator.tenantKey, candidates);
+    }
 
     const load = await this.prisma.process.groupBy({
       by: ["ownerId"],
@@ -130,7 +136,9 @@ export class BackgroundService implements OnModuleInit, OnModuleDestroy {
     );
 
     for (const process of unassigned) {
-      const sorted = [...operators].sort((a, b) => {
+      const tenantOperators = operatorsByTenant.get(process.tenantKey) ?? [];
+      if (tenantOperators.length === 0) continue;
+      const sorted = [...tenantOperators].sort((a, b) => {
         const countA = loadMap.get(a.id) ?? 0;
         const countB = loadMap.get(b.id) ?? 0;
         if (countA !== countB) return countA - countB;
@@ -140,16 +148,20 @@ export class BackgroundService implements OnModuleInit, OnModuleDestroy {
       });
 
       const chosen = sorted[0];
-      await this.prisma.$transaction(async (tx) => {
+      const assigned = await this.prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM "Process" WHERE id = ${process.id} FOR UPDATE`;
-        await tx.process.update({
-          where: { id: process.id },
+        const updated = await tx.process.updateMany({
+          where: { id: process.id, tenantKey: process.tenantKey, ownerId: null },
           data: { ownerId: chosen.id }
         });
+        if (updated.count !== 1) return false;
         await tx.processOwnerHistory.create({
           data: { processId: process.id, ownerId: chosen.id, assignedBy: "system" }
         });
+        return true;
       });
+
+      if (!assigned) continue;
 
       loadMap.set(chosen.id, (loadMap.get(chosen.id) ?? 0) + 1);
       lastAssignedMap.set(chosen.id, Date.now());

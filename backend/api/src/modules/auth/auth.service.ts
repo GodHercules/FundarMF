@@ -106,7 +106,7 @@ export class AuthService {
     whatsapp?: string,
     name?: string,
     requestedBy?: { email?: string; role?: string },
-    options?: { forceNew?: boolean; idempotencyKey?: string }
+    options?: { forceNew?: boolean; idempotencyKey?: string; tenantKey?: string }
   ): Promise<{ otpRequired: boolean; deduped?: boolean }> {
     if (!email && !whatsapp) {
       throw new BadRequestException("Informe e-mail ou WhatsApp.");
@@ -118,10 +118,11 @@ export class AuthService {
       const result = await this.idempotencyService.execute<{ otpRequired: boolean; deduped?: boolean }>(
         IdempotencyScope.CUSTOMER_LINK_REQUEST,
         options.idempotencyKey,
-        { email, whatsapp: normalizedWhatsapp, name, requestedBy },
+        { email, whatsapp: normalizedWhatsapp, name, requestedBy, tenantKey: options?.tenantKey ?? "default" },
         async () =>
           this.requestCustomerLink(email, normalizedWhatsapp, name, requestedBy, {
-            forceNew: true
+            forceNew: true,
+            tenantKey: options?.tenantKey ?? "default"
           }),
         900
       );
@@ -135,6 +136,7 @@ export class AuthService {
       const since = dayjs().subtract(dedupSeconds, "second").toDate();
       const existing = await this.prisma.customerLinkToken.findFirst({
         where: {
+          tenantKey: options?.tenantKey ?? "default",
           usedAt: null,
           tokenExpiresAt: { gt: new Date() },
           createdAt: { gt: since },
@@ -177,7 +179,8 @@ export class AuthService {
         otpHash,
         otpExpiresAt,
         otpSentCount: 1,
-        lastOtpSentAt: new Date()
+        lastOtpSentAt: new Date(),
+        tenantKey: options?.tenantKey ?? "default"
       }
     });
 
@@ -368,7 +371,7 @@ export class AuthService {
 
     const link = verification.link;
 
-    const actor: Actor = { role: "CLIENTE", email: link.email ?? undefined, whatsapp: link.whatsapp ?? undefined };
+    const actor: Actor = { role: "CLIENTE", email: link.email ?? undefined, whatsapp: link.whatsapp ?? undefined, tenantKey: link.tenantKey };
     const { token: sessionToken } = await this.sessionService.createSession(
       actor,
       Number(process.env.SESSION_TTL_HOURS ?? 48)

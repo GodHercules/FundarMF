@@ -33,6 +33,7 @@ export class SessionService {
         userId: actor.userId,
         clientEmail: actor.email,
         clientWhatsapp: actor.whatsapp,
+        tenantKey: actor.tenantKey ?? "default",
         tokenHash,
         expiresAt,
         lastActiveAt: new Date()
