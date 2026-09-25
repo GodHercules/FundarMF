@@ -1011,6 +1011,22 @@ export class ProcessService {
     });
   }
 
+  async getOperatorEntryDestination(actor: Actor) {
+    if (actor.role !== "OPERADOR") {
+      throw new ForbiddenException();
+    }
+
+    const count = await this.prisma.process.count({
+      where: {
+        ownerId: actor.userId,
+        tenantKey: actor.tenantKey ?? "default",
+        status: { not: ProcessStatus.CANCELADO }
+      }
+    });
+
+    return { hasProcesses: count > 0 };
+  }
+
   async listKanbanProcesses(actor: Actor, options?: { take?: number; skip?: number }) {
     if (actor.role !== "OPERADOR" && actor.role !== "MASTER") {
       throw new ForbiddenException();

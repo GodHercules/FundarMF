@@ -7,6 +7,7 @@ import { Logo } from "@/components/Logo";
 import { WorkspaceNav } from "@/components/WorkspaceNav";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
+import { api } from "@/lib/api";
 
 export default function OperatorStart() {
   const router = useRouter();
@@ -26,6 +27,9 @@ export default function OperatorStart() {
           router.replace("/master/dashboard");
         } else if (role !== "OPERADOR") {
           router.replace("/");
+        } else {
+          const entry = await api<{ hasProcesses: boolean }>("/processes/entry-destination");
+          if (entry.hasProcesses) router.replace("/operator/dashboard");
         }
       } finally {
         if (active) setChecking(false);

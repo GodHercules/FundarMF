@@ -25,7 +25,8 @@ export default function OperatorLogin() {
         body: JSON.stringify({ email, password })
       });
       notifySuccess("Login realizado com sucesso.");
-      router.push("/operator/dashboard");
+      const entry = await api<{ hasProcesses: boolean }>("/processes/entry-destination");
+      router.push(entry.hasProcesses ? "/operator/dashboard" : "/operator/start");
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : "Erro ao entrar.");
     }

@@ -32,7 +32,8 @@ export default function LoginPage() {
       if (result.role === "MASTER") {
         router.push("/master/dashboard");
       } else {
-        router.push("/operator/start");
+        const entry = await api<{ hasProcesses: boolean }>("/processes/entry-destination");
+        router.push(entry.hasProcesses ? "/operator/dashboard" : "/operator/start");
       }
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : "Erro ao entrar.");

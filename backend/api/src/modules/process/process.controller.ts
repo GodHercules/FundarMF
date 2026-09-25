@@ -61,6 +61,12 @@ export class ProcessController {
     });
   }
 
+  @Get("entry-destination")
+  @Roles("OPERADOR")
+  async entryDestination(@Req() req: Request) {
+    return this.processService.getOperatorEntryDestination(req.actor!);
+  }
+
   @Get("kanban")
   @Roles("OPERADOR", "MASTER")
   async listKanban(
