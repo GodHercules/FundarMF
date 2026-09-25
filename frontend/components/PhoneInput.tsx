@@ -17,10 +17,11 @@ type PhoneInputProps = {
   label?: string;
   required?: boolean;
   disabled?: boolean;
+  invalid?: boolean;
   className?: string;
 };
 
-export function PhoneInput({ value, onChange, label, required, disabled, className }: PhoneInputProps) {
+export function PhoneInput({ value, onChange, label, required, disabled, invalid, className }: PhoneInputProps) {
   const countries = useMemo(() => {
     return getCountries().map((code) => ({
       code,
@@ -116,11 +117,12 @@ export function PhoneInput({ value, onChange, label, required, disabled, classNa
         <div ref={containerRef} className="relative">
           <button
             type="button"
-            className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-ink/15 bg-white/90 px-4 py-2.5 text-sm text-ink shadow-sm focus:border-brass focus:outline-none focus:ring-4 focus:ring-brass/15 focus-visible:ring-2 focus-visible:ring-brass/40 disabled:cursor-not-allowed disabled:border-ink/10 disabled:bg-slate/5 disabled:text-slate/70"
+            className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border bg-white/90 px-4 py-2.5 text-sm text-ink shadow-sm focus:border-brass focus:outline-none focus:ring-4 focus:ring-brass/15 focus-visible:ring-2 focus-visible:ring-brass/40 disabled:cursor-not-allowed disabled:border-ink/10 disabled:bg-slate/5 disabled:text-slate/70 ${invalid ? "border-clay ring-2 ring-clay/15" : "border-ink/15"}`}
             onClick={() => setOpen((prev) => !prev)}
             disabled={disabled}
             aria-expanded={open}
             aria-haspopup="listbox"
+            aria-invalid={invalid || undefined}
           >
             <span className="flex items-center gap-2">
               {selected?.code && (

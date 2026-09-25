@@ -8,6 +8,7 @@ import { PhoneInput } from "@/components/PhoneInput";
 import { Select } from "@/components/Select";
 import { DOCS_API_BASE } from "@/lib/api";
 import { maskCep, maskCnpj, maskCpf, maskIptu, maskPercent } from "@/lib/masks";
+import { notifyError } from "@/lib/notify";
 import { MunicipalityData, ProcessDocument, ProcessRecord, ProcessStepData, toProcessRecords } from "@/lib/process-types";
 
 type Props = {
@@ -53,6 +54,7 @@ const documentKey = (itemKey: string, socioId?: string) => socioId ? `${itemKey}
 export function OperatorClientDataEditor({ initialData, processId, documents, onDocumentsChanged, saving, onSave, onCancel }: Props) {
   const [draft, setDraft] = useState<ProcessStepData>({});
   const [error, setError] = useState<string | null>(null);
+  const [missingFields, setMissingFields] = useState<string[]>([]);
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [selectedFileNames, setSelectedFileNames] = useState<Record<string, string[]>>({});
@@ -92,6 +94,7 @@ export function OperatorClientDataEditor({ initialData, processId, documents, on
       quadroSocietario: socios.length ? socios : [{ tipoPessoa: "CPF", socioId: createSocioId() }]
     });
     setError(null);
+    setMissingFields([]);
   }, [initialData]);
 
   useEffect(() => {
@@ -134,6 +137,15 @@ export function OperatorClientDataEditor({ initialData, processId, documents, on
     ...current,
     quadroSocietario: toProcessRecords(current.quadroSocietario).map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item)
   }));
+  const isMissing = (key: string) => missingFields.includes(key);
+  const fieldId = (key: string) => `required-field-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const socioFieldKey = (index: number, key: string) => `socio:${index}:${key}`;
+  const clearMissing = (key: string) => setMissingFields((current) => current.filter((item) => item !== key));
+  const requiredProps = (key: string) => ({
+    id: fieldId(key),
+    "aria-invalid": isMissing(key) || undefined,
+    className: isMissing(key) ? "border-clay ring-2 ring-clay/15" : undefined
+  });
 
   function updateSocioType(index: number, value: string) {
     setDraft((current) => ({
@@ -211,16 +223,46 @@ export function OperatorClientDataEditor({ initialData, processId, documents, on
 
   async function submit() {
     setError(null);
-    if (["razaoSocial1", "municipio", "emailCnpj", "telefoneCnpj"].some((key) => !text(draft[key]).trim())) return setError("Preencha os campos empresariais obrigatórios.");
-    if (!text(address.escritorioVirtual)) return setError("Informe se o endereço é virtual.");
-    if (text(address.escritorioVirtual) !== "Sim" && ["cep", "endereco", "numero", "bairro", "cidade", "uf", "iptu"].some((key) => !text(address[key]).trim())) return setError("Preencha todos os campos obrigatórios do endereço.");
-    if (!socios.length) return setError("Inclua pelo menos um sócio.");
+    const missing: Array<{ key: string; label: string }> = [];
+    const addMissing = (key: string, label: string, value: unknown) => { if (!text(value).trim()) missing.push({ key, label }); };
+    addMissing("razaoSocial1", "Razão social 1", draft.razaoSocial1);
+    addMissing("municipio", "Município", draft.municipio);
+    addMissing("emailCnpj", "E-mail do CNPJ", draft.emailCnpj);
+    addMissing("telefoneCnpj", "Telefone do CNPJ", draft.telefoneCnpj);
+    addMissing("escritorioVirtual", "Endereço é virtual?", address.escritorioVirtual);
+    if (text(address.escritorioVirtual) !== "Sim") {
+      (["cep", "endereco", "numero", "bairro", "cidade", "uf", "iptu"] as const).forEach((key) => addMissing(`address:${key}`, key === "cep" ? "CEP" : key[0].toUpperCase() + key.slice(1), address[key]));
+    }
+    if (!socios.length) {
+      const message = "Inclua pelo menos um sócio.";
+      setMissingFields([]);
+      setError(message);
+      notifyError(message);
+      return;
+    }
     for (const socio of socios) {
+      const index = socios.indexOf(socio);
+      const socioPrefix = `socio:${index}`;
       const isCompany = text(socio.tipoPessoa) === "CNPJ";
       const required = isCompany
-        ? ["socioRazaoSocial", "socioCnpj", "socioEmail", "socioTelefone", "socioPercentual", "socioAdministrador", "adminNomeCompleto", "adminCpf", "adminProfissao", "adminEstadoCivil"]
-        : ["socioNome", "socioCpf", "socioEmail", "socioTelefone", "socioPercentual", "socioAdministrador", "socioEstadoCivil", "socioProfissao"];
-      if (required.some((key) => !text(socio[key]).trim()) || (text(socio.socioEstadoCivil) === "Casado(a)" && !text(socio.socioRegimeCasamento).trim()) || (text(socio.adminEstadoCivil) === "Casado(a)" && !text(socio.adminRegimeCasamento).trim())) return setError("Preencha os campos obrigatórios de cada sócio.");
+        ? [["socioRazaoSocial", "Razão social"], ["socioCnpj", "CNPJ"], ["socioEmail", "E-mail corporativo"], ["socioTelefone", "Telefone do sócio"], ["socioPercentual", "Percentual de participação"], ["socioAdministrador", "Administrador"], ["adminNomeCompleto", "Nome do responsável"], ["adminCpf", "CPF do responsável"], ["adminProfissao", "Profissão do responsável"], ["adminEstadoCivil", "Estado civil do responsável"]]
+        : [["socioNome", "Nome completo"], ["socioCpf", "CPF"], ["socioEmail", "E-mail do sócio"], ["socioTelefone", "Telefone do sócio"], ["socioPercentual", "Percentual de participação"], ["socioAdministrador", "Administrador"], ["socioEstadoCivil", "Estado civil"], ["socioProfissao", "Profissão"]];
+      required.forEach(([key, label]) => addMissing(`${socioPrefix}:${key}`, `Sócio ${index + 1} — ${label}`, socio[key]));
+      if (text(socio.socioEstadoCivil) === "Casado(a)") addMissing(`${socioPrefix}:socioRegimeCasamento`, `Sócio ${index + 1} — Regime de casamento`, socio.socioRegimeCasamento);
+      if (text(socio.adminEstadoCivil) === "Casado(a)") addMissing(`${socioPrefix}:adminRegimeCasamento`, `Sócio ${index + 1} — Regime do responsável`, socio.adminRegimeCasamento);
+    }
+    if (missing.length) {
+      const labels = missing.map(({ label }) => label);
+      const message = `Preencha os campos obrigatórios: ${labels.slice(0, 4).join(", ")}${labels.length > 4 ? ` e mais ${labels.length - 4}.` : "."}`;
+      setMissingFields(missing.map(({ key }) => key));
+      setError(message);
+      notifyError(message);
+      window.setTimeout(() => {
+        const first = document.getElementById(fieldId(missing[0].key));
+        first?.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (first instanceof HTMLElement) first.focus({ preventScroll: true });
+      }, 0);
+      return;
     }
     await onSave({ ...draft, quadroSocietario: socios });
   }
@@ -228,28 +270,28 @@ export function OperatorClientDataEditor({ initialData, processId, documents, on
   return <div className="flex flex-col space-y-6">
     {error && <p role="alert" className="rounded-xl bg-clay/10 px-4 py-3 text-sm text-clay">{error}</p>}
     <section className="grid gap-4 md:grid-cols-2">
-      <Field label="Razão social 1" required hint="Sugestão principal, sem pontuação desnecessária."><Input placeholder="Ex: Fundar MF Serviços Ltda" value={text(draft.razaoSocial1)} onChange={(event) => setTop("razaoSocial1", event.target.value)} /></Field>
+      <Field label="Razão social 1" required error={isMissing("razaoSocial1")} hint="Sugestão principal, sem pontuação desnecessária."><Input {...requiredProps("razaoSocial1")} placeholder="Ex: Fundar MF Serviços Ltda" value={text(draft.razaoSocial1)} onChange={(event) => { clearMissing("razaoSocial1"); setTop("razaoSocial1", event.target.value); }} /></Field>
       <Field label="Razão social 2" hint="Opção alternativa caso a principal já exista."><Input placeholder="Ex: Fundar MF Holdings Ltda" value={text(draft.razaoSocial2)} onChange={(event) => setTop("razaoSocial2", event.target.value)} /></Field>
       <Field label="Razão social 3" hint="Terceira opção de contingência."><Input placeholder="Ex: Fundar MF Soluções Empresariais" value={text(draft.razaoSocial3)} onChange={(event) => setTop("razaoSocial3", event.target.value)} /></Field>
-      <Field label="Município" required hint={municipalityNote ?? "Digite para filtrar e selecione."}><Input list="operator-municipios-list" placeholder="Digite o município" value={text(draft.municipio)} onChange={(event) => setTop("municipio", event.target.value)} /><datalist id="operator-municipios-list">{municipalities.map((municipio) => <option key={municipio} value={municipio} />)}</datalist></Field>
-      <Field label="E-mail do CNPJ" required hint="E-mail que receberá notificações oficiais."><Input type="email" placeholder="contato@empresa.com.br" value={text(draft.emailCnpj)} onChange={(event) => setTop("emailCnpj", event.target.value)} /></Field>
-      <Field label="Telefone do CNPJ" required hint="Com DDD e WhatsApp se possível."><PhoneInput value={text(draft.telefoneCnpj)} onChange={(value) => setTop("telefoneCnpj", value)} /></Field>
+      <Field label="Município" required error={isMissing("municipio")} hint={municipalityNote ?? "Digite para filtrar e selecione."}><Input {...requiredProps("municipio")} list="operator-municipios-list" placeholder="Digite o município" value={text(draft.municipio)} onChange={(event) => { clearMissing("municipio"); setTop("municipio", event.target.value); }} /><datalist id="operator-municipios-list">{municipalities.map((municipio) => <option key={municipio} value={municipio} />)}</datalist></Field>
+      <Field label="E-mail do CNPJ" required error={isMissing("emailCnpj")} hint="E-mail que receberá notificações oficiais."><Input {...requiredProps("emailCnpj")} type="email" placeholder="contato@empresa.com.br" value={text(draft.emailCnpj)} onChange={(event) => { clearMissing("emailCnpj"); setTop("emailCnpj", event.target.value); }} /></Field>
+      <Field label="Telefone do CNPJ" required error={isMissing("telefoneCnpj")} hint="Com DDD e WhatsApp se possível."><PhoneInput value={text(draft.telefoneCnpj)} invalid={isMissing("telefoneCnpj")} onChange={(value) => { clearMissing("telefoneCnpj"); setTop("telefoneCnpj", value); }} /></Field>
     </section>
     <section><h3 className="text-lg font-semibold">Endereço da empresa</h3><div className="mt-3 grid gap-4 md:grid-cols-2">
-      <Field label="Endereço é virtual?" required hint="Selecione para auto-preenchimento." className="md:col-span-2"><Select value={text(address.escritorioVirtual)} onChange={(event) => updateAddressType(event.target.value)}><option value="">Selecione</option><option value="Sim">Sim</option><option value="Não">Não</option></Select></Field>
-      {([["cep", "CEP"], ["endereco", "Endereço"], ["numero", "Número"], ["complemento", "Complemento"], ["bairro", "Bairro"], ["cidade", "Cidade"], ["uf", "UF"], ["iptu", "IPTU"]] as const).map(([key, label]) => <Field key={key} label={label} required={key !== "complemento"}><Input placeholder={key === "cep" ? "00000-000" : undefined} value={text(address[key])} onChange={(event) => setAddress(key, key === "cep" ? maskCep(event.target.value) : key === "iptu" ? maskIptu(event.target.value) : key === "uf" ? event.target.value.toUpperCase() : event.target.value)} disabled={text(address.escritorioVirtual) === "Sim"} inputMode={key === "cep" || key === "iptu" ? "numeric" : undefined} maxLength={key === "cep" ? 9 : key === "uf" ? 2 : key === "iptu" ? 15 : undefined} /></Field>)}
+      <Field label="Endereço é virtual?" required error={isMissing("escritorioVirtual")} hint="Selecione para auto-preenchimento." className="md:col-span-2"><Select {...requiredProps("escritorioVirtual")} value={text(address.escritorioVirtual)} onChange={(event) => { clearMissing("escritorioVirtual"); updateAddressType(event.target.value); }}><option value="">Selecione</option><option value="Sim">Sim</option><option value="Não">Não</option></Select></Field>
+      {([["cep", "CEP"], ["endereco", "Endereço"], ["numero", "Número"], ["complemento", "Complemento"], ["bairro", "Bairro"], ["cidade", "Cidade"], ["uf", "UF"], ["iptu", "IPTU"]] as const).map(([key, label]) => { const missingKey = `address:${key}`; return <Field key={key} label={label} required={key !== "complemento"} error={key !== "complemento" && isMissing(missingKey)}><Input {...(key !== "complemento" ? requiredProps(missingKey) : {})} placeholder={key === "cep" ? "00000-000" : undefined} value={text(address[key])} onChange={(event) => { clearMissing(missingKey); setAddress(key, key === "cep" ? maskCep(event.target.value) : key === "iptu" ? maskIptu(event.target.value) : key === "uf" ? event.target.value.toUpperCase() : event.target.value); }} disabled={text(address.escritorioVirtual) === "Sim"} inputMode={key === "cep" || key === "iptu" ? "numeric" : undefined} maxLength={key === "cep" ? 9 : key === "uf" ? 2 : key === "iptu" ? 15 : undefined} /></Field>; })}
     </div></section>
     <section><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-lg font-semibold">Quadro societário</h3><p className="mt-1 text-sm text-slate">Use os mesmos campos do formulário enviado ao cliente.</p></div><Button type="button" onClick={() => setDraft((current) => ({ ...current, quadroSocietario: [...toProcessRecords(current.quadroSocietario), { tipoPessoa: "CPF", socioId: createSocioId() }] }))}>Adicionar sócio</Button></div><div className="mt-3 space-y-4">
       {socios.map((socio, index) => { const isCompany = text(socio.tipoPessoa) === "CNPJ"; return <div key={index} className={`rounded-2xl border border-ink/10 p-4 ${isCompany ? "bg-emerald/5" : "bg-white/80"}`}><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-semibold">Sócio {index + 1}</p>{index > 0 && <Button type="button" className="bg-clay" onClick={() => setDraft((current) => ({ ...current, quadroSocietario: toProcessRecords(current.quadroSocietario).filter((_, itemIndex) => itemIndex !== index) }))}>Remover sócio</Button>}</div><div className="mt-4 grid gap-4 md:grid-cols-2">
         <Field label="Tipo de sócio" required><button type="button" role="switch" aria-checked={isCompany} aria-label="Tipo de sócio" className="relative flex h-11 w-full items-center rounded-full border border-ink/10 bg-ink/5 p-1" onClick={() => updateSocioType(index, isCompany ? "CPF" : "CNPJ")}><span className={`relative z-10 flex-1 text-center text-[11px] font-semibold uppercase ${!isCompany ? "text-ink" : "text-slate"}`}>CPF</span><span className={`relative z-10 flex-1 text-center text-[11px] font-semibold uppercase ${isCompany ? "text-ink" : "text-slate"}`}>CNPJ</span><span className={`absolute left-1 top-1 h-9 w-[calc(50%-0.25rem)] rounded-full bg-white shadow-sm transition-transform ${isCompany ? "translate-x-full" : "translate-x-0"}`} /></button></Field>
-        <Field label={isCompany ? "Razão social" : "Nome completo"} required><Input value={text(socio[isCompany ? "socioRazaoSocial" : "socioNome"])} onChange={(event) => setSocio(index, isCompany ? "socioRazaoSocial" : "socioNome", event.target.value)} /></Field>
-        <Field label={isCompany ? "CNPJ" : "CPF"} required><Input value={text(socio[isCompany ? "socioCnpj" : "socioCpf"])} onChange={(event) => setSocio(index, isCompany ? "socioCnpj" : "socioCpf", isCompany ? maskCnpj(event.target.value) : maskCpf(event.target.value))} inputMode="numeric" maxLength={isCompany ? 18 : 14} /></Field>
-        <Field label={isCompany ? "E-mail corporativo" : "E-mail do sócio"} required><Input type="email" value={text(socio.socioEmail)} onChange={(event) => setSocio(index, "socioEmail", event.target.value)} /></Field>
-        <Field label="Telefone do sócio" required><PhoneInput value={text(socio.socioTelefone)} onChange={(value) => setSocio(index, "socioTelefone", value)} /></Field>
-        <Field label="Percentual de participação" required><Input value={text(socio.socioPercentual)} onChange={(event) => setSocio(index, "socioPercentual", maskPercent(event.target.value))} inputMode="numeric" maxLength={4} /></Field>
-        {!isCompany && <><Field label="Estado civil" required><Select value={text(socio.socioEstadoCivil)} onChange={(event) => setSocio(index, "socioEstadoCivil", event.target.value)}><option value="">Selecione</option>{ESTADOS_CIVIS.map((value) => <option key={value}>{value}</option>)}</Select></Field><Field label="Profissão" required><Input value={text(socio.socioProfissao)} onChange={(event) => setSocio(index, "socioProfissao", event.target.value)} /></Field>{text(socio.socioEstadoCivil) === "Casado(a)" && <Field label="Regime de casamento" required><Select value={text(socio.socioRegimeCasamento)} onChange={(event) => setSocio(index, "socioRegimeCasamento", event.target.value)}><option value="">Selecione</option>{REGIMES_CASAMENTO.map((value) => <option key={value}>{value}</option>)}</Select></Field>}</>}
-        <Field label="Administrador" required><Select value={text(socio.socioAdministrador)} onChange={(event) => setSocio(index, "socioAdministrador", event.target.value)}><option value="">Selecione</option><option value="Sim">Sim</option><option value="Não">Não</option></Select></Field>
-        {isCompany && <div className="md:col-span-2 rounded-2xl border border-ink/10 bg-white/70 p-4"><p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate">Dados do responsável pela empresa</p><div className="mt-3 grid gap-4 md:grid-cols-2"><Field label="Nome completo" required><Input value={text(socio.adminNomeCompleto)} onChange={(event) => setSocio(index, "adminNomeCompleto", event.target.value)} /></Field><Field label="CPF" required><Input value={text(socio.adminCpf)} onChange={(event) => setSocio(index, "adminCpf", maskCpf(event.target.value))} inputMode="numeric" maxLength={14} /></Field><Field label="Profissão" required><Input value={text(socio.adminProfissao)} onChange={(event) => setSocio(index, "adminProfissao", event.target.value)} /></Field><Field label="Estado civil" required><Select value={text(socio.adminEstadoCivil)} onChange={(event) => setSocio(index, "adminEstadoCivil", event.target.value)}><option value="">Selecione</option>{ESTADOS_CIVIS.map((value) => <option key={value}>{value}</option>)}</Select></Field>{text(socio.adminEstadoCivil) === "Casado(a)" && <Field label="Regime de casamento" required><Select value={text(socio.adminRegimeCasamento)} onChange={(event) => setSocio(index, "adminRegimeCasamento", event.target.value)}><option value="">Selecione</option>{REGIMES_CASAMENTO.map((value) => <option key={value}>{value}</option>)}</Select></Field>}</div></div>}
+        <Field label={isCompany ? "Razão social" : "Nome completo"} required error={isMissing(socioFieldKey(index, isCompany ? "socioRazaoSocial" : "socioNome"))}><Input {...requiredProps(socioFieldKey(index, isCompany ? "socioRazaoSocial" : "socioNome"))} value={text(socio[isCompany ? "socioRazaoSocial" : "socioNome"])} onChange={(event) => { clearMissing(socioFieldKey(index, isCompany ? "socioRazaoSocial" : "socioNome")); setSocio(index, isCompany ? "socioRazaoSocial" : "socioNome", event.target.value); }} /></Field>
+        <Field label={isCompany ? "CNPJ" : "CPF"} required error={isMissing(socioFieldKey(index, isCompany ? "socioCnpj" : "socioCpf"))}><Input {...requiredProps(socioFieldKey(index, isCompany ? "socioCnpj" : "socioCpf"))} value={text(socio[isCompany ? "socioCnpj" : "socioCpf"])} onChange={(event) => { clearMissing(socioFieldKey(index, isCompany ? "socioCnpj" : "socioCpf")); setSocio(index, isCompany ? "socioCnpj" : "socioCpf", isCompany ? maskCnpj(event.target.value) : maskCpf(event.target.value)); }} inputMode="numeric" maxLength={isCompany ? 18 : 14} /></Field>
+        <Field label={isCompany ? "E-mail corporativo" : "E-mail do sócio"} required error={isMissing(socioFieldKey(index, "socioEmail"))}><Input {...requiredProps(socioFieldKey(index, "socioEmail"))} type="email" value={text(socio.socioEmail)} onChange={(event) => { clearMissing(socioFieldKey(index, "socioEmail")); setSocio(index, "socioEmail", event.target.value); }} /></Field>
+        <Field label="Telefone do sócio" required error={isMissing(socioFieldKey(index, "socioTelefone"))}><PhoneInput value={text(socio.socioTelefone)} invalid={isMissing(socioFieldKey(index, "socioTelefone"))} onChange={(value) => { clearMissing(socioFieldKey(index, "socioTelefone")); setSocio(index, "socioTelefone", value); }} /></Field>
+        <Field label="Percentual de participação" required error={isMissing(socioFieldKey(index, "socioPercentual"))}><Input {...requiredProps(socioFieldKey(index, "socioPercentual"))} value={text(socio.socioPercentual)} onChange={(event) => { clearMissing(socioFieldKey(index, "socioPercentual")); setSocio(index, "socioPercentual", maskPercent(event.target.value)); }} inputMode="numeric" maxLength={4} /></Field>
+        {!isCompany && <><Field label="Estado civil" required error={isMissing(socioFieldKey(index, "socioEstadoCivil"))}><Select {...requiredProps(socioFieldKey(index, "socioEstadoCivil"))} value={text(socio.socioEstadoCivil)} onChange={(event) => { clearMissing(socioFieldKey(index, "socioEstadoCivil")); setSocio(index, "socioEstadoCivil", event.target.value); }}><option value="">Selecione</option>{ESTADOS_CIVIS.map((value) => <option key={value}>{value}</option>)}</Select></Field><Field label="Profissão" required error={isMissing(socioFieldKey(index, "socioProfissao"))}><Input {...requiredProps(socioFieldKey(index, "socioProfissao"))} value={text(socio.socioProfissao)} onChange={(event) => { clearMissing(socioFieldKey(index, "socioProfissao")); setSocio(index, "socioProfissao", event.target.value); }} /></Field>{text(socio.socioEstadoCivil) === "Casado(a)" && <Field label="Regime de casamento" required error={isMissing(socioFieldKey(index, "socioRegimeCasamento"))}><Select {...requiredProps(socioFieldKey(index, "socioRegimeCasamento"))} value={text(socio.socioRegimeCasamento)} onChange={(event) => { clearMissing(socioFieldKey(index, "socioRegimeCasamento")); setSocio(index, "socioRegimeCasamento", event.target.value); }}><option value="">Selecione</option>{REGIMES_CASAMENTO.map((value) => <option key={value}>{value}</option>)}</Select></Field>}</>}
+        <Field label="Administrador" required error={isMissing(socioFieldKey(index, "socioAdministrador"))}><Select {...requiredProps(socioFieldKey(index, "socioAdministrador"))} value={text(socio.socioAdministrador)} onChange={(event) => { clearMissing(socioFieldKey(index, "socioAdministrador")); setSocio(index, "socioAdministrador", event.target.value); }}><option value="">Selecione</option><option value="Sim">Sim</option><option value="Não">Não</option></Select></Field>
+        {isCompany && <div className="md:col-span-2 rounded-2xl border border-ink/10 bg-white/70 p-4"><p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate">Dados do responsável pela empresa</p><div className="mt-3 grid gap-4 md:grid-cols-2"><Field label="Nome completo" required error={isMissing(socioFieldKey(index, "adminNomeCompleto"))}><Input {...requiredProps(socioFieldKey(index, "adminNomeCompleto"))} value={text(socio.adminNomeCompleto)} onChange={(event) => { clearMissing(socioFieldKey(index, "adminNomeCompleto")); setSocio(index, "adminNomeCompleto", event.target.value); }} /></Field><Field label="CPF" required error={isMissing(socioFieldKey(index, "adminCpf"))}><Input {...requiredProps(socioFieldKey(index, "adminCpf"))} value={text(socio.adminCpf)} onChange={(event) => { clearMissing(socioFieldKey(index, "adminCpf")); setSocio(index, "adminCpf", maskCpf(event.target.value)); }} inputMode="numeric" maxLength={14} /></Field><Field label="Profissão" required error={isMissing(socioFieldKey(index, "adminProfissao"))}><Input {...requiredProps(socioFieldKey(index, "adminProfissao"))} value={text(socio.adminProfissao)} onChange={(event) => { clearMissing(socioFieldKey(index, "adminProfissao")); setSocio(index, "adminProfissao", event.target.value); }} /></Field><Field label="Estado civil" required error={isMissing(socioFieldKey(index, "adminEstadoCivil"))}><Select {...requiredProps(socioFieldKey(index, "adminEstadoCivil"))} value={text(socio.adminEstadoCivil)} onChange={(event) => { clearMissing(socioFieldKey(index, "adminEstadoCivil")); setSocio(index, "adminEstadoCivil", event.target.value); }}><option value="">Selecione</option>{ESTADOS_CIVIS.map((value) => <option key={value}>{value}</option>)}</Select></Field>{text(socio.adminEstadoCivil) === "Casado(a)" && <Field label="Regime de casamento" required error={isMissing(socioFieldKey(index, "adminRegimeCasamento"))}><Select {...requiredProps(socioFieldKey(index, "adminRegimeCasamento"))} value={text(socio.adminRegimeCasamento)} onChange={(event) => { clearMissing(socioFieldKey(index, "adminRegimeCasamento")); setSocio(index, "adminRegimeCasamento", event.target.value); }}><option value="">Selecione</option>{REGIMES_CASAMENTO.map((value) => <option key={value}>{value}</option>)}</Select></Field>}</div></div>}
       </div></div>; })}
     </div></section>
     <div className="order-3 flex flex-wrap justify-end gap-3 border-t border-ink/10 pt-4"><Button type="button" variant="ghost" onClick={onCancel} disabled={saving || Boolean(uploadingKey)}>Cancelar</Button><Button type="button" variant="accent" onClick={() => void submit()} disabled={saving || Boolean(uploadingKey)}>{saving ? "Salvando..." : "Salvar alterações"}</Button></div>

@@ -5,14 +5,15 @@ type FieldProps = {
   label: string;
   hint?: string;
   required?: boolean;
+  error?: boolean;
   className?: string;
   children: ReactNode;
 };
 
-export function Field({ label, hint, required, className, children }: FieldProps) {
+export function Field({ label, hint, required, error, className, children }: FieldProps) {
   return (
     <label className={clsx("flex flex-col gap-2 text-sm text-ink", className)}>
-      <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate">
+      <span className={clsx("text-[11px] font-bold uppercase tracking-[0.16em]", error ? "text-clay" : "text-slate")}>
         {label}
         {required && (
           <span className="ml-2 rounded-full bg-brass/10 px-2 py-0.5 text-[10px] text-ink">
@@ -21,6 +22,7 @@ export function Field({ label, hint, required, className, children }: FieldProps
         )}
       </span>
       {children}
+      {error && <span role="alert" className="text-xs font-medium text-clay">Preenchimento obrigatório.</span>}
       {hint && <span className="text-xs text-slate/80">{hint}</span>}
     </label>
   );
