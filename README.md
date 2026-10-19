@@ -53,7 +53,7 @@ Ao mover um card, a API atualiza `Process.kanbanStage`, registra auditoria e pod
 
 ## Quickstart (dev local)
 Pré-requisitos:
-- Node.js **20.x**
+- Node.js **24.x**
 - pnpm **9.x**
 - Docker + Docker Compose (no Windows, Docker Desktop “Running”)
 
