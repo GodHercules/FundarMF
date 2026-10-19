@@ -102,11 +102,11 @@ export default function OperatorRequestLink() {
         <p className="text-slate">Informe a empresa e os contatos do cliente para envio do link seguro.</p>
       </div>
       <Card className="p-6">
-        <label className="text-sm font-semibold text-slate">Nome do cliente</label>
-        <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.:  Fulando da Silva Santos" />
+        <label htmlFor="request-link-name" className="text-sm font-semibold text-slate">Nome do cliente</label>
+        <Input id="request-link-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Fulano da Silva Santos" />
         <div className="mt-4">
-          <label className="text-sm font-semibold text-slate">E-mail do cliente</label>
-          <Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="cliente@email.com" />
+          <label htmlFor="request-link-email" className="text-sm font-semibold text-slate">E-mail do cliente</label>
+          <Input id="request-link-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="cliente@email.com" />
         </div>
         <div className="mt-4">
           <PhoneInput

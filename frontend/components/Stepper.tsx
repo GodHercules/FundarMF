@@ -26,7 +26,7 @@ export function Stepper({ steps, current }: { steps: string[]; current: string }
         const done = currentIndex >= 0 && index < currentIndex;
         return (
           <li key={step} className="flex items-center gap-3" aria-current={step === current ? "step" : undefined}>
-            <span className={clsx("step-dot", done ? "bg-emerald" : step === current ? "bg-brass" : "bg-slate/30")} aria-hidden="true" />
+            <span className={clsx("step-dot", done ? "is-done" : step === current ? "is-current" : "is-upcoming")} aria-hidden="true" />
             <span className={clsx("text-sm font-semibold", step === current ? "text-ink" : "text-slate")}>{stepLabels[step] ?? step}</span>
           </li>
         );

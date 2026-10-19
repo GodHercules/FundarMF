@@ -42,22 +42,57 @@ function editorFromHtml(html: string): EditorDoc {
   }).filter(Boolean) as EditorDoc["content"];
   return { type: "doc", content: content.length ? content : editorFromText(root.textContent).content };
 }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isSafeEditorHref(value: string) {
+  const href = value.trim();
+  if (/^(?:\/(?!\/)|#|\?)/.test(href)) return true;
+  try {
+    return ["http:", "https:", "mailto:"].includes(new URL(href).protocol.toLowerCase());
+  } catch {
+    return false;
+  }
+}
 function textFromEditor(content: unknown) {
   const doc = content as EditorDoc;
   return Array.isArray(doc?.content) ? doc.content.map((p) => (p.content ?? []).map((x) => x.text).join("")).join("\n\n") : "";
 }
 function validateEditor(content: unknown): asserts content is EditorDoc {
-  const doc = content as EditorDoc;
-  if (!doc || doc.type !== "doc" || !Array.isArray(doc.content) || doc.content.length > 5000) throw new BadRequestException("Conteúdo estruturado inválido.");
-  for (const block of doc.content) {
-    if (!["paragraph", "heading", "blockquote", "bulletList", "orderedList"].includes(block.type) || !Array.isArray(block.content)) throw new BadRequestException("Bloco de editor inválido.");
-    if (block.attrs?.level !== undefined && (![1, 2, 3, 4, 5, 6].includes(block.attrs.level))) throw new BadRequestException("Nível de título inválido.");
-    if (block.attrs?.textAlign !== undefined && !["left", "center", "right", "justify"].includes(block.attrs.textAlign)) throw new BadRequestException("Alinhamento inválido.");
+  if (!isRecord(content) || content.type !== "doc" || !Array.isArray(content.content) || content.content.length > 5000) {
+    throw new BadRequestException("Conteúdo estruturado inválido.");
+  }
+  for (const block of content.content) {
+    if (!isRecord(block) || !["paragraph", "heading", "blockquote", "bulletList", "orderedList"].includes(String(block.type)) || !Array.isArray(block.content)) {
+      throw new BadRequestException("Bloco de editor inválido.");
+    }
+    const attrs = block.attrs;
+    if (attrs !== undefined && !isRecord(attrs)) throw new BadRequestException("Atributos de bloco inválidos.");
+    const level = attrs?.level;
+    const textAlign = attrs?.textAlign;
+    if (level !== undefined && (!Number.isInteger(level) || ![1, 2, 3, 4, 5, 6].includes(level as number))) {
+      throw new BadRequestException("Nível de título inválido.");
+    }
+    if (textAlign !== undefined && (typeof textAlign !== "string" || !["left", "center", "right", "justify"].includes(textAlign))) {
+      throw new BadRequestException("Alinhamento inválido.");
+    }
     for (const mark of block.content) {
-      if (!mark || typeof mark.text !== "string" || mark.text.length > 10000) throw new BadRequestException("Texto de editor inválido.");
+      if (!isRecord(mark) || mark.type !== "text" || typeof mark.text !== "string" || mark.text.length > 10000) {
+        throw new BadRequestException("Texto de editor inválido.");
+      }
+      if (mark.marks !== undefined && !Array.isArray(mark.marks)) throw new BadRequestException("Formatação inválida.");
       for (const decoration of mark.marks ?? []) {
-        if (!["bold", "italic", "underline", "strike", "code", "link"].includes(decoration.type)) throw new BadRequestException("Formatação inválida.");
-        if (decoration.type === "link" && (!decoration.attrs?.href || decoration.attrs.href.length > 2048)) throw new BadRequestException("Link inválido.");
+        if (!isRecord(decoration) || !["bold", "italic", "underline", "strike", "code", "link"].includes(String(decoration.type))) {
+          throw new BadRequestException("Formatação inválida.");
+        }
+        if (decoration.type === "link") {
+          const linkAttrs = decoration.attrs;
+          if (!isRecord(linkAttrs) || typeof linkAttrs.href !== "string" || linkAttrs.href.length > 2048 || !isSafeEditorHref(linkAttrs.href)) {
+            throw new BadRequestException("Link inválido.");
+          }
+        }
       }
     }
   }

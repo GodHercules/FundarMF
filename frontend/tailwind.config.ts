@@ -17,23 +17,24 @@ const config: Config = {
         body: ["\"Work Sans\"", "sans-serif"]
       },
       colors: {
-        ink: "#0e1a2b",
-        paper: "#f8f4ef",
-        canvas: "#f4efe8",
-        ledger: "#e8edf3",
-        brass: "#2f6bff",
-        emerald: "#2f9b79",
-        clay: "#d97063",
-        navy: "#0b1424",
+        ink: "#121a29",
+        paper: "#f8f9fb",
+        canvas: "#edf0f4",
+        ledger: "#f3f5f8",
+        brass: "#315efb",
+        emerald: "#177a5b",
+        clay: "#c45252",
+        navy: "#172235",
         slate: "#4b5f78",
-        sand: "#e7dccb",
-        gold: "#d1a34a",
-        steel: "#90a4b8"
+        sand: "#e5e9ef",
+        gold: "#b97b21",
+        steel: "#8d98a8",
+        cream: "#f3f5f8"
       },
       boxShadow: {
-        soft: "0 22px 50px rgba(14, 26, 43, 0.12)",
-        glow: "0 0 0 3px rgba(47, 107, 255, 0.2)",
-        lift: "0 10px 26px rgba(14, 26, 43, 0.12)"
+        soft: "0 12px 28px rgba(18, 26, 41, 0.12)",
+        glow: "0 0 0 3px rgba(49, 94, 251, 0.2)",
+        lift: "0 8px 18px rgba(18, 26, 41, 0.08)"
       }
     }
   },

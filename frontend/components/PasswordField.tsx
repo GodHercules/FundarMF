@@ -7,6 +7,7 @@ type PasswordFieldProps = {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  autoComplete?: string;
   className?: string;
   showStrength?: boolean;
   matchWith?: string;
@@ -34,6 +35,7 @@ export function PasswordField({
   value,
   onChange,
   placeholder,
+  autoComplete,
   className,
   showStrength = true,
   matchWith
@@ -52,12 +54,13 @@ export function PasswordField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
+        autoComplete={autoComplete}
         className="pr-16"
       />
       <button
         type="button"
         onClick={() => setVisible((prev) => !prev)}
-        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-brass/10 p-2 text-ink"
+        className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md bg-brass/10 text-ink"
         aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
       >
         {visible ? (
@@ -76,7 +79,7 @@ export function PasswordField({
       {showStrength && strength.label && (
         <div className="space-y-1">
           <div className="h-1.5 w-full rounded-full bg-slate/10">
-            <div className={clsx("h-1.5 rounded-full transition-all", strength.color)} style={{ width: `${strength.percent}%` }} />
+            <div className={clsx("h-1.5 rounded-full transition-[width]", strength.color)} style={{ width: `${strength.percent}%` }} />
           </div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate">
             Força: <span className="text-ink">{strength.label}</span>

@@ -21,17 +21,17 @@ let municipalitiesCache: MunicipalityCache | null = null;
 export class PublicService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getMetrics() {
+  async getMetrics(tenantKey = "default") {
     const [slaConfigs, slaAlerts, auditedDocuments, completedProcesses] = await Promise.all([
       this.prisma.slaConfigStep.count(),
-      this.prisma.slaEvent.count({ where: { status: { in: [SlaStatus.AT_RISK, SlaStatus.OVERDUE] } } }),
+      this.prisma.slaEvent.count({ where: { status: { in: [SlaStatus.AT_RISK, SlaStatus.OVERDUE] }, process: { tenantKey } } }),
       this.prisma.documentItem.count({
-        where: { status: { in: [DocumentItemStatus.APROVADO, DocumentItemStatus.REPROVADO] } }
+        where: { status: { in: [DocumentItemStatus.APROVADO, DocumentItemStatus.REPROVADO] }, process: { tenantKey } }
       }),
       this.prisma.$queryRaw<Array<{ avg_days: number | null }>>`
         SELECT AVG(EXTRACT(EPOCH FROM ("updatedAt" - "createdAt")) / 86400.0)::float8 AS avg_days
         FROM "Process"
-        WHERE "status" = ${ProcessStatus.CONCLUIDO}::"ProcessStatus"
+        WHERE "status" = ${ProcessStatus.CONCLUIDO}::"ProcessStatus" AND "tenantKey" = ${tenantKey}
       `
     ]);
 

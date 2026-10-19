@@ -12,7 +12,7 @@ export function Logo({ size = 56, withText = false, className }: LogoProps) {
   return (
     <div className={clsx("flex items-center gap-3", className)}>
       <div
-        className="flex items-center justify-center rounded-2xl bg-white/90 shadow-sm ring-1 ring-ink/10"
+  className="flex items-center justify-center rounded-xl bg-white"
         style={{ width: box, height: box }}
       >
         <Image

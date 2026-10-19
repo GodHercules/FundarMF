@@ -18,9 +18,17 @@ const links: Record<WorkspaceRole, Array<{ href: string; label: string }>> = {
 
 export function WorkspaceNav({ role }: { role: WorkspaceRole }) {
   const pathname = typeof window === "undefined" ? "" : window.location.pathname;
+  const brandHref = role === "master"
+    ? "/master/dashboard"
+    : pathname === "/operator/start" || pathname === "/operator/request-link"
+      ? "/operator/start"
+      : "/operator/dashboard";
   return (
     <nav className="workspace-nav" aria-label="Navegação principal">
-      <div className="workspace-nav-brand"><span className="workspace-nav-mark">FM</span><span>FundarMF</span></div>
+      <Link href={brandHref} className="workspace-nav-brand" aria-label="FundarMF, ir para o painel">
+        <span className="workspace-nav-mark">FM</span>
+        <span className="workspace-nav-name">FundarMF</span>
+      </Link>
       <div className="workspace-nav-links">
         {links[role].map((link) => {
           const active = pathname === link.href || pathname.startsWith(`${link.href}/`);

@@ -54,6 +54,7 @@ function createService(options?: { process?: unknown; request?: AlterationReques
     process: { findUnique: vi.fn().mockResolvedValue(options?.process ?? completedProcess) },
     alteracaoContratual: {
       findUnique: vi.fn().mockResolvedValue(request),
+      findFirst: vi.fn().mockResolvedValue(request),
       findMany: vi.fn().mockResolvedValue([request])
     },
     $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx))

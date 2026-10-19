@@ -2,12 +2,13 @@ services:
   postgres:
     image: postgres:16
     container_name: fundarmf-postgres
+    # Development-only database. Keep ports bound to the local machine.
     environment:
       POSTGRES_DB: fundarmf
       POSTGRES_USER: fundarmf
-      POSTGRES_PASSWORD: fundarmf
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fundarmf}
     ports:
-      - "5499:5432"
+      - "127.0.0.1:5499:5432"
 
     volumes:
       - fundarmf_pg:/var/lib/postgresql/data
@@ -15,7 +16,7 @@ services:
     image: axllent/mailpit:latest
     container_name: fundarmf-mailpit
     ports:
-      - "1025:1025"
-      - "8025:8025"
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
 volumes:
   fundarmf_pg:

@@ -92,7 +92,10 @@ describe("ProcessService access isolation", () => {
     await service.listAllAlteracaoContratual(operator);
 
     expect(prisma.alteracaoContratual.findMany).toHaveBeenCalledWith({
-      where: { OR: [{ process: { ownerId: "operator-1" } }, { legacyClient: { createdById: "operator-1" } }] },
+      where: {
+        tenantKey: "default",
+        OR: [{ process: { ownerId: "operator-1" } }, { legacyClient: { createdById: "operator-1" } }]
+      },
       orderBy: { updatedAt: "desc" },
       take: 200,
       include: {

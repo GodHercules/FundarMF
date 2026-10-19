@@ -117,7 +117,7 @@ export function PhoneInput({ value, onChange, label, required, disabled, invalid
         <div ref={containerRef} className="relative">
           <button
             type="button"
-            className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border bg-white/90 px-4 py-2.5 text-sm text-ink shadow-sm focus:border-brass focus:outline-none focus:ring-4 focus:ring-brass/15 focus-visible:ring-2 focus-visible:ring-brass/40 disabled:cursor-not-allowed disabled:border-ink/10 disabled:bg-slate/5 disabled:text-slate/70 ${invalid ? "border-clay ring-2 ring-clay/15" : "border-ink/15"}`}
+            className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border bg-white px-4 py-2.5 text-sm text-ink focus:border-brass focus:outline-none focus:ring-4 focus:ring-brass/15 focus-visible:ring-2 focus-visible:ring-brass/40 disabled:cursor-not-allowed disabled:border-ink/10 disabled:bg-slate/5 disabled:text-slate/70 ${invalid ? "border-clay ring-2 ring-clay/15" : "border-ink/15"}`}
             onClick={() => setOpen((prev) => !prev)}
             disabled={disabled}
             aria-expanded={open}
@@ -179,6 +179,7 @@ export function PhoneInput({ value, onChange, label, required, disabled, invalid
         {country === "BR" ? (
           <div className="grid gap-3 md:grid-cols-[90px_1fr]">
             <Input
+              aria-label="DDD"
               placeholder="DDD"
               value={ddd}
               onChange={(event) => onDddChange(event.target.value)}
@@ -188,6 +189,7 @@ export function PhoneInput({ value, onChange, label, required, disabled, invalid
               className="text-center"
             />
             <Input
+              aria-label="Número de telefone"
               placeholder="Número"
               value={maskPhoneNumberBR(number)}
               onChange={(event) => onNumberChange(event.target.value)}
@@ -198,6 +200,7 @@ export function PhoneInput({ value, onChange, label, required, disabled, invalid
           </div>
         ) : (
           <Input
+            aria-label="Número de telefone"
             placeholder={`Número (sem +${selected?.callingCode})`}
             value={number}
             onChange={(event) => onNumberChange(event.target.value)}

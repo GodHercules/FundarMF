@@ -13,10 +13,10 @@ type FieldProps = {
 export function Field({ label, hint, required, error, className, children }: FieldProps) {
   return (
     <label className={clsx("flex flex-col gap-2 text-sm text-ink", className)}>
-      <span className={clsx("text-[11px] font-bold uppercase tracking-[0.16em]", error ? "text-clay" : "text-slate")}>
+      <span className={clsx("text-sm font-semibold", error ? "text-clay" : "text-ink")}>
         {label}
         {required && (
-          <span className="ml-2 rounded-full bg-brass/10 px-2 py-0.5 text-[10px] text-ink">
+          <span className="ml-2 rounded-md bg-brass/10 px-2 py-0.5 text-xs font-medium text-ink">
             Obrigatório
           </span>
         )}

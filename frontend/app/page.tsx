@@ -48,20 +48,19 @@ export default function LoginPage() {
         <div className="login-brand">
           <Logo size={68} />
           <div>
-            <p className="login-brand-kicker">FundarMF</p>
+            <p className="login-brand-label">FundarMF</p>
             <p className="login-brand-name">Portal contábil</p>
           </div>
         </div>
         <div className="login-aside-copy">
-          <span className="login-eyebrow">Workflow para abertura de empresa</span>
-          <h1>Clareza para cada etapa do processo.</h1>
-          <p>Organize validações, documentos e decisões em um único lugar — do primeiro contato à conclusão.</p>
+          <p className="login-aside-title">Próximo passo claro.</p>
+          <p className="login-aside-copy-subtitle">Workflow para abertura de empresa. Organize validações, documentos e decisões em um único lugar — do primeiro contato à conclusão.</p>
         </div>
         <div className="login-process-mark" aria-hidden="true">
           <span className="login-process-line" />
-          <div><strong>01</strong><span>Dados recebidos</span></div>
-          <div><strong>02</strong><span>Validação assistida</span></div>
-          <div><strong>03</strong><span>Empresa concluída</span></div>
+          <div><strong>Dados</strong><span>Informações recebidas</span></div>
+          <div><strong>Validação</strong><span>Conferência assistida</span></div>
+          <div><strong>Conclusão</strong><span>Empresa pronta</span></div>
         </div>
         <p className="login-aside-footer">Acesso restrito à equipe FundarMF</p>
       </section>
@@ -69,21 +68,20 @@ export default function LoginPage() {
       <section className="login-content" aria-labelledby="login-title">
         <div className="login-mobile-brand"><Logo size={52} /><span>FundarMF</span></div>
         <div className="login-form-wrap">
-          <span className="login-eyebrow login-eyebrow-light">Acesso interno</span>
-          <h2 id="login-title">Entrar no painel</h2>
-          <p className="login-intro">Use suas credenciais para continuar a operação.</p>
+          <h1 id="login-title">Entrar no painel</h1>
+          <p className="login-intro">Acesso interno. Use suas credenciais para continuar a operação.</p>
           <Card className="login-card w-full p-6 sm:p-8">
             <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void handleLogin(); }}>
             <div className="login-field">
               <label htmlFor="login-email">E-mail</label>
-              <Input id="login-email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" />
+              <Input id="login-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" />
             </div>
             <div className="login-field">
               <div className="flex items-center justify-between gap-3">
                 <label htmlFor="login-password">Senha</label>
                 <span className="login-field-hint">Acesso protegido</span>
               </div>
-              <PasswordField id="login-password" value={password} onChange={setPassword} placeholder="Digite sua senha" showStrength={false} />
+              <PasswordField id="login-password" autoComplete="current-password" value={password} onChange={setPassword} placeholder="Digite sua senha" showStrength={false} />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Entrando..." : "Entrar"}

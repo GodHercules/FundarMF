@@ -40,7 +40,7 @@ describe("AdminService hard delete", () => {
     const result = await service.deleteProcess("p1", "master", "teste");
     expect(result).toEqual({ ok: true });
     expect(auditService.record).toHaveBeenCalledWith(
-      { role: "MASTER", userId: "master" },
+      { role: "MASTER", userId: "master", tenantKey: "default" },
       "process_deleted",
       "Process",
       "p1",

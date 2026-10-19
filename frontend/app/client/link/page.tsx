@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ApiError, api } from "@/lib/api";
 import { Button } from "@/components/Button";
@@ -19,11 +19,18 @@ interface ProcessSummary {
 function ClientLinkInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [token, setToken] = useState(searchParams.get("token") ?? "");
+  const queryToken = searchParams.get("token") ?? "";
+  const [token, setToken] = useState(queryToken);
   const [otp, setOtp] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [otpStatus, setOtpStatus] = useState<string | null>(null);
   const [sendingOtp, setSendingOtp] = useState(false);
+
+  useEffect(() => {
+    if (queryToken && typeof window !== "undefined") {
+      window.history.replaceState(null, "", "/client/link");
+    }
+  }, [queryToken]);
 
   function parseError(error: unknown) {
     const details = error instanceof ApiError ? error : error instanceof Error ? error : null;
@@ -138,7 +145,7 @@ function ClientLinkInner() {
         </div>
         <div>
           <label htmlFor="client-link-otp" className="text-sm font-semibold text-slate">OTP</label>
-          <Input id="client-link-otp" value={otp} onChange={(event) => setOtp(event.target.value)} placeholder="123456" />
+          <Input id="client-link-otp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="123456" />
         </div>
         <Button onClick={handleVerify} className="w-full">
           Entrar

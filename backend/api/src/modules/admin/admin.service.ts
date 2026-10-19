@@ -135,7 +135,7 @@ export class AdminService {
     });
 
     await this.auditService.record(
-      actorId ? { role: "MASTER", userId: actorId } : { role: "SYSTEM" },
+    actorId ? { role: "MASTER", userId: actorId, tenantKey } : { role: "SYSTEM", tenantKey },
       "user_deleted",
       "User",
       userId
@@ -191,7 +191,7 @@ export class AdminService {
     });
 
     await this.auditService.record(
-      actorId ? { role: "MASTER", userId: actorId } : { role: "SYSTEM" },
+      actorId ? { role: "MASTER", userId: actorId, tenantKey } : { role: "SYSTEM", tenantKey },
       "process_deleted",
       "Process",
       processId,
@@ -223,7 +223,7 @@ export class AdminService {
     });
 
     await this.auditService.record(
-      actorId ? { role: "MASTER", userId: actorId } : { role: "SYSTEM" },
+    actorId ? { role: "MASTER", userId: actorId, tenantKey } : { role: "SYSTEM", tenantKey },
       "assign_owner",
       "Process",
       processId,

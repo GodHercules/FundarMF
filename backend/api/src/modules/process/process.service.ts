@@ -621,10 +621,11 @@ export class ProcessService {
     return { missing, missingFields };
   }
 
-  private async ensureCompanyKeyAvailable(companyKey: string, currentProcessId?: string) {
+  private async ensureCompanyKeyAvailable(companyKey: string, tenantKey: string, currentProcessId?: string) {
     const duplicate = await this.prisma.process.findFirst({
       where: {
         companyKey,
+        tenantKey,
         status: { notIn: [ProcessStatus.CONCLUIDO, ProcessStatus.CANCELADO] },
         ...(currentProcessId ? { id: { not: currentProcessId } } : {})
       },
@@ -815,9 +816,9 @@ export class ProcessService {
         sendWhatsapp: payload.sendWhatsapp ?? Boolean(normalizedPhone)
       },
       async () => {
-        await this.cancelInactiveProcessesForCompany(companyKey, clientEmail, normalizedPhone);
+        await this.cancelInactiveProcessesForCompany(companyKey, clientEmail, normalizedPhone, actor.tenantKey ?? "default");
 
-        await this.ensureCompanyKeyAvailable(companyKey);
+        await this.ensureCompanyKeyAvailable(companyKey, actor.tenantKey ?? "default");
 
         const checklistDefaults = this.buildChecklistData();
         let process;
@@ -1057,12 +1058,13 @@ export class ProcessService {
       .filter((process) => process.kanbanEligible === true);
   }
 
-  private async cancelInactiveProcessesForCompany(companyKey: string, email: string, phone?: string | null) {
+  private async cancelInactiveProcessesForCompany(companyKey: string, email: string, phone?: string | null, tenantKey = "default") {
     const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
     const normalizedPhone = phone ? normalizePhone(phone) ?? phone : undefined;
     const candidates = await this.prisma.process.findMany({
       where: {
         companyKey,
+        tenantKey,
         status: ProcessStatus.AGUARDANDO_CLIENTE,
         currentStep: StepKey.ETAPA_2,
         createdAt: { lte: fiveDaysAgo },
@@ -1227,8 +1229,8 @@ export class ProcessService {
 
   async deleteAlteracaoContratual(id: string, actor: Actor) {
     if (actor.role !== "OPERADOR" && actor.role !== "MASTER") throw new ForbiddenException();
-    const alteration = await this.prisma.alteracaoContratual.findUnique({
-      where: { id },
+    const alteration = await this.prisma.alteracaoContratual.findFirst({
+      where: { id, tenantKey: actor.tenantKey ?? "default" },
       include: { process: { select: { ownerId: true } }, legacyClient: { select: { createdById: true } } }
     });
     if (!alteration) throw new NotFoundException("Solicitação de alteração não encontrada.");
@@ -1257,7 +1259,12 @@ export class ProcessService {
     }
 
     return this.prisma.alteracaoContratual.findMany({
-      where: actor.role === "OPERADOR" ? { OR: [{ process: { ownerId: actor.userId } }, { legacyClient: { createdById: actor.userId } }] } : undefined,
+      where: {
+        tenantKey: actor.tenantKey ?? "default",
+        ...(actor.role === "OPERADOR"
+          ? { OR: [{ process: { ownerId: actor.userId } }, { legacyClient: { createdById: actor.userId } }] }
+          : {})
+      },
       orderBy: { updatedAt: "desc" },
       take: 200,
       include: {
@@ -1268,7 +1275,7 @@ export class ProcessService {
   }
 
   async listAlteracaoContratualHistory(id: string, actor: Actor) {
-    const alteration = await this.prisma.alteracaoContratual.findUnique({ where: { id }, include: { process: { select: { ownerId: true } }, legacyClient: { select: { createdById: true } } } });
+    const alteration = await this.prisma.alteracaoContratual.findFirst({ where: { id, tenantKey: actor.tenantKey ?? "default" }, include: { process: { select: { ownerId: true } }, legacyClient: { select: { createdById: true } } } });
     if (!alteration) throw new NotFoundException("Solicitação de alteração não encontrada.");
     if (actor.role === "OPERADOR" && alteration.process?.ownerId !== actor.userId && alteration.legacyClient?.createdById !== actor.userId) throw new ForbiddenException();
     return this.prisma.alteracaoContratualHistory.findMany({ where: { alteracaoId: id }, orderBy: { createdAt: "asc" } });
@@ -1279,8 +1286,8 @@ export class ProcessService {
       throw new ForbiddenException();
     }
 
-    const current = await this.prisma.alteracaoContratual.findUnique({
-      where: { id },
+    const current = await this.prisma.alteracaoContratual.findFirst({
+      where: { id, tenantKey: actor.tenantKey ?? "default" },
       include: { process: { select: { ownerId: true } }, legacyClient: { select: { createdById: true } } }
     });
     if (!current) throw new NotFoundException("Solicitação de alteração não encontrada.");
@@ -1426,7 +1433,7 @@ export class ProcessService {
     if (stepKey === "ETAPA_2") {
       const step2CompanyKey = this.getStep2CompanyKey(merged as Record<string, unknown>);
       if (step2CompanyKey) {
-        await this.ensureCompanyKeyAvailable(step2CompanyKey, processId);
+        await this.ensureCompanyKeyAvailable(step2CompanyKey, actor.tenantKey ?? "default", processId);
         await this.prisma.process.update({
           where: { id: processId },
           data: { companyKey: step2CompanyKey }
@@ -1501,7 +1508,7 @@ export class ProcessService {
 
       const step2CompanyKey = this.getStep2CompanyKey(step2Data);
       if (step2CompanyKey) {
-        await this.ensureCompanyKeyAvailable(step2CompanyKey, processId);
+        await this.ensureCompanyKeyAvailable(step2CompanyKey, actor.tenantKey ?? "default", processId);
       }
 
       const docs = await this.prisma.documentItem.findMany({

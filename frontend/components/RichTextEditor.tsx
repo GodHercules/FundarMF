@@ -14,6 +14,17 @@ function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character] ?? character);
 }
 
+function safeHref(value: string) {
+  const href = value.trim();
+  if (/^(?:\/(?!\/)|#|\?)/.test(href)) return href;
+  try {
+    const protocol = new URL(href).protocol.toLowerCase();
+    return ["http:", "https:", "mailto:"].includes(protocol) ? href : "#";
+  } catch {
+    return "#";
+  }
+}
+
 export function editorDocToHtml(input: unknown) {
   const doc = (input && typeof input === "object" ? input : emptyDoc) as EditorDoc;
   return (Array.isArray(doc.content) ? doc.content : emptyDoc.content).map((block) => {
@@ -26,7 +37,7 @@ export function editorDocToHtml(input: unknown) {
         if (mark.type === "underline") text = `<u>${text}</u>`;
         if (mark.type === "strike") text = `<s>${text}</s>`;
         if (mark.type === "code") text = `<code>${text}</code>`;
-        if (mark.type === "link" && mark.attrs?.href) text = `<a href="${escapeHtml(mark.attrs.href)}">${text}</a>`;
+        if (mark.type === "link" && mark.attrs?.href) text = `<a href="${escapeHtml(safeHref(mark.attrs.href))}">${text}</a>`;
       }
       return text;
     }).join("") || "<br />";
@@ -104,7 +115,7 @@ export function RichTextEditor({ value, onChange }: { value: unknown; onChange: 
     if (href) command("createLink", href);
   }
 
-  return <div className="overflow-hidden rounded-2xl border border-ink/15 bg-white shadow-sm">
+  return <div className="overflow-hidden rounded-xl border border-ink/15 bg-white">
     <div className="flex flex-wrap items-center gap-1 border-b border-ink/10 bg-cream/60 p-2">
       <select aria-label="Estilo do texto" defaultValue="p" onChange={(event) => command("formatBlock", event.target.value)} className="h-9 rounded-lg border border-ink/10 bg-white px-2 text-xs font-semibold text-ink"><option value="p">Parágrafo</option><option value="h1">Título 1</option><option value="h2">Título 2</option><option value="h3">Título 3</option><option value="blockquote">Citação</option></select>
       <span className="mx-1 h-6 w-px bg-ink/10" />
@@ -114,7 +125,7 @@ export function RichTextEditor({ value, onChange }: { value: unknown; onChange: 
       <span className="mx-1 h-6 w-px bg-ink/10" /><ToolButton label="Alinhar à esquerda" onClick={() => command("justifyLeft")}><FiAlignLeft /></ToolButton><ToolButton label="Centralizar" onClick={() => command("justifyCenter")}><FiAlignCenter /></ToolButton><ToolButton label="Alinhar à direita" onClick={() => command("justifyRight")}><FiAlignRight /></ToolButton><ToolButton label="Justificar" onClick={() => command("justifyFull")}><FiAlignJustify /></ToolButton>
       <ToolButton label="Limpar formatação" onClick={() => command("removeFormat")}><span className="text-xs font-bold">Tx</span></ToolButton>
     </div>
-    <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={emit} className="min-h-[480px] p-6 text-[15px] leading-7 text-ink outline-none empty:before:text-slate/60 empty:before:content-['Comece_a_digitar_seu_documento...'] [&_a]:text-brass [&_a]:underline [&_blockquote]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-brass [&_blockquote]:pl-4 [&_code]:rounded [&_code]:bg-ink/5 [&_code]:px-1 [&_code]:font-mono [&_h1]:mb-3 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:mb-2 [&_h3]:text-xl [&_h3]:font-bold [&_li]:ml-6 [&_ol]:list-decimal [&_p]:mb-3 [&_ul]:list-disc" />
+    <div ref={editorRef} contentEditable role="textbox" aria-label="Conteúdo do documento" aria-multiline="true" suppressContentEditableWarning onInput={emit} className="min-h-[480px] p-6 text-[15px] leading-7 text-ink outline-none empty:before:text-slate/60 empty:before:content-['Comece_a_digitar_seu_documento…'] [&_a]:text-brass [&_a]:underline [&_blockquote]:my-3 [&_blockquote]:rounded-lg [&_blockquote]:bg-cream [&_blockquote]:px-4 [&_blockquote]:py-3 [&_blockquote]:text-ink [&_code]:rounded [&_code]:bg-ink/5 [&_code]:px-1 [&_code]:font-mono [&_h1]:mb-3 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:mb-2 [&_h3]:text-xl [&_h3]:font-bold [&_li]:ml-6 [&_ol]:list-decimal [&_p]:mb-3 [&_ul]:list-disc" />
     <div className="flex items-center justify-between border-t border-ink/10 bg-cream/40 px-4 py-2 text-xs text-slate"><span>Editor visual · alterações preservadas em nova versão</span><span>Ctrl/Cmd + Z para desfazer</span></div>
   </div>;
 }

@@ -79,9 +79,10 @@ async function bootstrap() {
   app.use(helmet());
   app.use(cookieParser());
   const allowedOrigins = new Set([
-    ...(process.env.FRONTEND_URL ?? "http://localhost:3000").split(",").map((origin) => origin.trim()),
+    ...(process.env.FRONTEND_URL ?? "http://localhost:3000").split(","),
+    ...(process.env.FRONTEND_ALLOWED_ORIGINS ?? "").split(","),
     "https://fundar-mf.vercel.app"
-  ]);
+  ].map((origin) => origin.trim()).filter(Boolean));
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
       const origin = req.header("origin");
@@ -93,7 +94,13 @@ async function bootstrap() {
     next();
   });
   app.enableCors({
-    origin: process.env.FRONTEND_URL?.split(",") ?? "http://localhost:3000",
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
     credentials: true
   });
 
