@@ -211,6 +211,8 @@ describe("ClientProcess submit flow", () => {
 
     await user.click(await screen.findByRole("button", { name: /quadro societário/i }));
     expect(screen.getByText("Tipo de pessoa")).toBeInTheDocument();
+    expect(screen.getByText("Pessoa física")).toBeInTheDocument();
+    expect(screen.getByText("Pessoa jurídica")).toBeInTheDocument();
     expect(screen.getByText("Nome completo do sócio")).toBeInTheDocument();
     expect(screen.getByText("CPF do sócio")).toBeInTheDocument();
     expect(screen.getByText("E-mail do sócio")).toBeInTheDocument();
@@ -219,8 +221,10 @@ describe("ClientProcess submit flow", () => {
     expect(screen.getByText("O Sócio é administrador?")).toBeInTheDocument();
     const adminToggle = screen.getByRole("switch", { name: "O Sócio é administrador?" });
     expect(adminToggle).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("Será administrador")).toBeInTheDocument();
     await user.click(adminToggle);
     expect(adminToggle).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByText("Não será administrador")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("socio-type-toggle-0-cnpj"));
     expect(screen.getByText("Razão social da empresa sócia")).toBeInTheDocument();

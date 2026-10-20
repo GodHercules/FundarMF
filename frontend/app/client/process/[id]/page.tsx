@@ -62,10 +62,14 @@ function getClientStatusLabel(status: string) { return CLIENT_STATUS_LABELS[stat
 function PartnerTypeSwitch({ index, cnpj, disabled, onChange }: { index: number; cnpj: boolean; disabled: boolean; onChange: (value: "CPF" | "CNPJ") => void }) {
   return <div className="client-person-type-switch" role="radiogroup" aria-label="Tipo de pessoa">
     <button type="button" role="radio" aria-label="CPF — Pessoa física" aria-checked={!cnpj} data-testid={`socio-type-toggle-${index}-cpf`} className={`client-person-type-option ${!cnpj ? "is-active" : ""}`} onClick={() => onChange("CPF")} disabled={disabled}>
-      <strong>CPF</strong><span>Pessoa física</span>
+      <span className="client-person-type-mark" aria-hidden="true">PF</span>
+      <span className="client-person-type-copy"><strong>CPF</strong><span>Pessoa física</span></span>
+      <span className="client-person-type-indicator" aria-hidden="true" />
     </button>
     <button type="button" role="radio" aria-label="CNPJ — Pessoa jurídica" aria-checked={cnpj} data-testid={`socio-type-toggle-${index}-cnpj`} className={`client-person-type-option ${cnpj ? "is-active" : ""}`} onClick={() => onChange("CNPJ")} disabled={disabled}>
-      <strong>CNPJ</strong><span>Pessoa jurídica</span>
+      <span className="client-person-type-mark" aria-hidden="true">PJ</span>
+      <span className="client-person-type-copy"><strong>CNPJ</strong><span>Pessoa jurídica</span></span>
+      <span className="client-person-type-indicator" aria-hidden="true" />
     </button>
   </div>;
 }
@@ -73,8 +77,8 @@ function PartnerTypeSwitch({ index, cnpj, disabled, onChange }: { index: number;
 function AdministratorToggle({ index, value, disabled, onChange }: { index: number; value: string; disabled: boolean; onChange: (value: string) => void }) {
   const isAdministrator = value === "Sim";
   return <button type="button" role="switch" aria-checked={isAdministrator} aria-label="O Sócio é administrador?" data-testid={`socio-admin-toggle-${index}`} className={`client-admin-toggle ${isAdministrator ? "is-on" : ""} ${value ? "" : "is-unset"}`} onClick={() => onChange(isAdministrator ? "Não" : "Sim")} disabled={disabled}>
+    <span className="client-admin-toggle-copy"><strong>{value === "Sim" ? "Sim" : value === "Não" ? "Não" : "Selecione"}</strong><span>{value === "Sim" ? "Será administrador" : value === "Não" ? "Não será administrador" : "Defina uma opção"}</span></span>
     <span className="client-admin-toggle-track" aria-hidden="true"><span /></span>
-    <span className="client-admin-toggle-value">{value || "Selecione"}</span>
   </button>;
 }
 
@@ -151,7 +155,7 @@ export default function ClientProcess() {
   const reviewItems: Array<[string, boolean]> = [["Dados da empresa", hasCompanyData()], ["Sociedade e participações", hasPartnersData()], ["Endereço", hasAddressData()], ["Documentos", hasDocumentsData()]];
 
   return <main className="client-portal"><div className="client-shell">
-    <div className="client-topbar"><Logo withText className="client-logo" /><Link href="/client/dashboard" className="client-topbar-link">Voltar ao acompanhamento</Link></div>
+    <div className="client-topbar"><Logo withText className="client-logo" /></div>
     <section className="client-hero"><div><span className="client-eyebrow">Jornada de abertura</span><h1>Vamos deixar tudo<br /><span>pronto para começar.</span></h1><p className="client-hero-copy">Preencha cada etapa no seu ritmo. Nós organizamos as informações e a equipe da MF Contabilidade cuida do próximo passo.</p></div><div className="client-process-card client-process-card--meta"><div className="client-meta-row"><dl><dt>Empresa</dt><dd>{process.clientName?.trim() || "Sua empresa"}</dd></dl><span className="client-status-pill">{getClientStatusLabel(process.status)}</span></div><dl className="mt-4"><dt>Etapa oficial</dt><dd>{process.currentStep === "ETAPA_2" ? "Dados do cliente" : process.currentStep}</dd></dl></div></section>
     {message && <p className="mb-4 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert">{message}</p>}
     {process.status === "CONCLUIDO" && <div className="mb-5 rounded-2xl border border-emerald/20 bg-emerald/5 p-4"><p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate">Novo fluxo disponível</p><h2 className="mt-1 text-xl font-semibold text-ink">Solicitar alteração contratual</h2><p className="mt-2 text-sm text-slate">A criação já foi concluída e esta empresa pode abrir uma solicitação de alteração.</p><Link href={`/client/process/${process.id}/alteracao-contratual`} className="mt-3 inline-flex rounded-xl bg-emerald px-5 py-2.5 text-sm font-semibold text-white">Abrir alteração</Link></div>}
