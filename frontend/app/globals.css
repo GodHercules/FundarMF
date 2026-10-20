@@ -285,7 +285,7 @@ button:disabled { cursor: not-allowed; }
 .client-person-type-option.is-active .client-person-type-indicator { border-color: var(--client-blue); background: var(--client-blue); }
 .client-person-type-option:focus-visible, .client-admin-toggle:focus-visible { outline: 3px solid rgba(17, 70, 221, .22); outline-offset: 2px; }
 .client-person-type-option:disabled, .client-admin-toggle:disabled { cursor: not-allowed; opacity: .65; }
-.client-admin-toggle { display: inline-flex; min-height: 3.75rem; align-items: center; justify-content: space-between; gap: 1rem; width: min(100%, 24rem); padding: .55rem .7rem .55rem .85rem; border: 1px solid #dce4f1; border-radius: 14px; background: #f6f8fc; color: #68778e; cursor: pointer; text-align: left; transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 180ms ease; }
+.client-admin-toggle { display: inline-flex; min-height: 3.75rem; align-items: center; justify-content: space-between; gap: 1rem; width: 100%; padding: .55rem .7rem .55rem .85rem; border: 1px solid #dce4f1; border-radius: 14px; background: #f6f8fc; color: #68778e; cursor: pointer; text-align: left; transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 180ms ease; }
 .client-admin-toggle:hover:not(:disabled) { border-color: rgba(17, 70, 221, .3); }
 .client-admin-toggle:hover:not(:disabled) { transform: translateY(-1px); }
 .client-admin-toggle-copy { display: grid; min-width: 0; gap: .1rem; }

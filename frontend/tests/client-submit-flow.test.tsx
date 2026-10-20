@@ -239,6 +239,32 @@ describe("ClientProcess submit flow", () => {
     expect(screen.getByText("O Sócio é administrador?").parentElement).toHaveClass("md:col-span-2");
   });
 
+  it("defaults an empty partner administrator choice to Não", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/processes/process-123") {
+        return Promise.resolve({
+          id: "process-123",
+          status: "EM_ANDAMENTO",
+          currentStep: "ETAPA_2",
+          steps: [{ stepKey: "ETAPA_2", locked: false, data: { quadroSocietario: [{}] } }]
+        });
+      }
+      if (path === "/chats/process-123") return Promise.resolve({ messages: [] });
+      if (path === "/documents/process-123/items") return Promise.resolve([]);
+      return Promise.resolve({});
+    });
+
+    const { default: ClientProcess } = await import("@/app/client/process/[id]/page");
+    const user = userEvent.setup();
+    render(<ClientProcess />);
+
+    await user.click(await screen.findByRole("button", { name: /quadro societário/i }));
+    const adminToggle = screen.getByRole("switch", { name: "O Sócio é administrador?" });
+    expect(adminToggle).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByText("Não será administrador")).toBeInTheDocument();
+    expect(screen.getByText("O Sócio é administrador?").parentElement).toHaveClass("md:col-span-2");
+  });
+
   it("shows a human-readable status while the client is filling the process", async () => {
     apiMock.mockImplementation((path: string) => {
       if (path === "/processes/process-123") return Promise.resolve({ id: "process-123", status: "AGUARDANDO_CLIENTE", currentStep: "ETAPA_2", steps: [] });
