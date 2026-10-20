@@ -83,7 +83,8 @@ export default function ClientProcess() {
   useEffect(() => { let active = true; void fetch("https://servicodados.ibge.gov.br/api/v1/localidades/municipios").then((response) => response.json()).then((data: Array<{ nome?: string; microrregiao?: { mesorregiao?: { UF?: { sigla?: string } } } }>) => { if (!active) return; setMunicipalities(data.map((item) => `${item.nome ?? ""} - ${item.microrregiao?.mesorregiao?.UF?.sigla ?? ""}`).filter(Boolean)); }).catch(() => { if (active) setMunicipalityNote("Não foi possível carregar a lista. Você pode digitar o município."); }); return () => { active = false; }; }, []);
 
   const participationTotal = getParticipationTotal(socios);
-  const participationMessage = getParticipationMessage(participationTotal);
+  const hasParticipationInput = socios.some((socio) => socio.socioPercentual.trim().length > 0);
+  const participationMessage = hasParticipationInput ? getParticipationMessage(participationTotal) : null;
   const participationValid = participationMessage === null;
 
   function buildPayload(correctionFields?: string[], correctionActive?: boolean) { const payload = { ...step2, quadroSocietario: socios, endereco }; if (!correctionActive || !correctionFields?.length) return payload; const filtered: Record<string, unknown> = {}; correctionFields.forEach((field) => { if (field in payload) filtered[field] = (payload as Record<string, unknown>)[field]; }); return filtered; }

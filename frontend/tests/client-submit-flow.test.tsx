@@ -166,6 +166,29 @@ describe("ClientProcess submit flow", () => {
     expect(screen.getByRole("button", { name: /endereço/i })).toBeDisabled();
   });
 
+  it("does not show a participation error before the user enters a percentage", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/processes/process-123") return Promise.resolve({
+        id: "process-123",
+        status: "EM_ANDAMENTO",
+        currentStep: "ETAPA_2",
+        steps: [{ stepKey: "ETAPA_2", locked: false, data: { quadroSocietario: [{}] } }]
+      });
+      if (path === "/chats/process-123") return Promise.resolve({ messages: [] });
+      if (path === "/documents/process-123/items") return Promise.resolve([]);
+      return Promise.resolve({});
+    });
+
+    const { default: ClientProcess } = await import("@/app/client/process/[id]/page");
+    const user = userEvent.setup();
+    render(<ClientProcess />);
+
+    await user.click(await screen.findByRole("button", { name: /quadro societário/i }));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Ex: 60%")).toHaveValue("");
+  });
+
   it("shows the socio type selector with CPF and CNPJ options", async () => {
     const { default: ClientProcess } = await import("@/app/client/process/[id]/page");
     const user = userEvent.setup();
