@@ -56,6 +56,8 @@ export interface ProcessChatMessage {
 
 export interface ProcessData {
   id: string;
+clientName?: string | null;
+clientEmail?: string | null;
   status: string;
   currentStep: string;
   steps: ProcessStep[];

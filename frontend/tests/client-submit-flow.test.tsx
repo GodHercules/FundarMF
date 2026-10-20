@@ -83,6 +83,31 @@ describe("ClientProcess submit flow", () => {
     });
   });
 
+  it("prefills the company name and originating email when step data is empty", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/processes/process-123") {
+        return Promise.resolve({
+          id: "process-123",
+          clientName: "Empresa iniciada pelo escritório Ltda",
+          clientEmail: "origem@empresa.com.br",
+          status: "EM_ANDAMENTO",
+          currentStep: "ETAPA_2",
+          steps: [{ stepKey: "ETAPA_2", locked: false, data: {} }]
+        });
+      }
+      if (path === "/chats/process-123") return Promise.resolve({ messages: [] });
+      if (path === "/documents/process-123/items") return Promise.resolve([]);
+      return Promise.resolve({});
+    });
+
+    const { default: ClientProcess } = await import("@/app/client/process/[id]/page");
+    render(<ClientProcess />);
+
+    expect(await screen.findByDisplayValue("Empresa iniciada pelo escritório Ltda")).toBeInTheDocument();
+    expect(screen.getByText("Empresa iniciada pelo escritório Ltda")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("origem@empresa.com.br")).toBeInTheDocument();
+  });
+
   it("shows sending screen and then the submitted confirmation without crashing", async () => {
     const { default: ClientProcess } = await import("@/app/client/process/[id]/page");
     const user = userEvent.setup();

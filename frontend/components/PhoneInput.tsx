@@ -128,7 +128,7 @@ export function PhoneInput({ value, onChange, label, required, disabled, invalid
               {selected?.code && (
                 <ReactCountryFlag
                   countryCode={selected.code}
-                  svg
+                  svg={false}
                   style={{ width: "1.2em", height: "1.2em" }}
                   aria-label={selected.code}
                 />
@@ -162,7 +162,7 @@ export function PhoneInput({ value, onChange, label, required, disabled, invalid
                 >
                   <ReactCountryFlag
                     countryCode={item.code}
-                    svg
+                    svg={false}
                     style={{ width: "1.2em", height: "1.2em" }}
                     aria-label={item.code}
                   />
