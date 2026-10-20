@@ -9,6 +9,7 @@ import { NotificationService } from "../notification/notification.service";
 import { StorageService } from "../storage/storage.service";
 
 const ALLOWED_MIME = ["application/pdf", "image/jpeg", "image/png"];
+const ALLOWED_EXTENSIONS = new Set([".pdf", ".jpg", ".jpeg", ".png"]);
 const SOCIO_ITEM_KEYS: DocumentItemKey[] = [
   DocumentItemKey.IDENTIFICACAO_SOCIOS,
   DocumentItemKey.COMPROVANTE_RESIDENCIA
@@ -165,7 +166,16 @@ export class DocumentService {
       if (sizeMb > maxFileMb) {
         throw new BadRequestException(`Arquivo ${file.originalname} excede ${maxFileMb}MB.`);
       }
+      const fileName = String(file.originalname ?? "").trim();
+      const extension = fileName.includes(".") ? fileName.slice(fileName.lastIndexOf(".")).toLowerCase() : "";
+      if (!ALLOWED_EXTENSIONS.has(extension)) {
+        throw new BadRequestException(`Arquivo ${fileName || "enviado"} não permitido. Envie apenas PDF, JPG ou PNG.`);
+      }
       const normalizedMime = normalizeMimeType(file);
+      const expectedMime = extension === ".pdf" ? "application/pdf" : extension === ".png" ? "image/png" : "image/jpeg";
+      if (normalizedMime !== expectedMime) {
+        throw new BadRequestException(`A extensão de ${fileName} não corresponde ao tipo informado.`);
+      }
       const signatureMatches =
         (normalizedMime === "application/pdf" && looksLikePdf(file.buffer)) ||
         (normalizedMime === "image/png" && looksLikePng(file.buffer)) ||

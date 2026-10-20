@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { validateDocumentFiles } from "@/lib/document-validation";
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ id: "process-123" })
@@ -263,6 +264,23 @@ describe("ClientProcess submit flow", () => {
     expect(adminToggle).toHaveAttribute("aria-checked", "false");
     expect(screen.getByText("Não será administrador")).toBeInTheDocument();
     expect(screen.getByText("O Sócio é administrador?").parentElement).toHaveClass("md:col-span-2");
+  });
+
+  it("exposes only the supported document types in the upload controls", async () => {
+    const { default: ClientProcess } = await import("@/app/client/process/[id]/page");
+    const user = userEvent.setup();
+    render(<ClientProcess />);
+
+    await user.click(await screen.findByRole("button", { name: /documentos/i }));
+    const fileInputs = Array.from(document.querySelectorAll('input[type="file"]')) as HTMLInputElement[];
+    expect(fileInputs.length).toBeGreaterThan(0);
+    expect(fileInputs[0]).toHaveAttribute("accept", expect.stringContaining(".pdf"));
+    expect(fileInputs[0]).toHaveAttribute("accept", expect.stringContaining(".jpg"));
+    expect(fileInputs[0]).toHaveAttribute("accept", expect.stringContaining(".png"));
+  });
+
+  it("rejects unsupported document extensions before upload", async () => {
+    await expect(validateDocumentFiles([new File(["malicious payload"], "arquivo.exe", { type: "application/octet-stream" })])).resolves.toMatch(/não permitido/);
   });
 
   it("shows a human-readable status while the client is filling the process", async () => {

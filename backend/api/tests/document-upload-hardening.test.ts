@@ -173,6 +173,20 @@ describe("Document upload hardening", () => {
     expect(state.files).toHaveLength(0);
   });
 
+  it("rejects a valid PDF payload with a forbidden extension", async () => {
+    const { service, storage, state } = makeHarness();
+
+    await expect(
+      service.uploadFiles("process-1", DocumentItemKey.IDENTIFICACAO_SOCIOS, "socio-1", [
+        makeFile({ originalname: "documento.exe" })
+      ], client)
+    ).rejects.toThrow("não permitido");
+
+    expect(storage.saveFile).not.toHaveBeenCalled();
+    expect(state.items).toHaveLength(0);
+    expect(state.files).toHaveLength(0);
+  });
+
   it("enforces per-item file count and file-size limits before opening a transaction", async () => {
     const { service, prisma } = makeHarness();
     const previousMaxFiles = process.env.UPLOAD_MAX_FILES_PER_ITEM;
