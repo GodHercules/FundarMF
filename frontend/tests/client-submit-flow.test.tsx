@@ -151,14 +151,14 @@ describe("ClientProcess submit flow", () => {
     expect(screen.getByText("Soma dos percentuais de participações dos socios é inferior a 100%")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /continuar/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /endereço/i })).toBeDisabled();
-    const participationInput = screen.getByPlaceholderText("Ex: 60%");
+    const participationInput = screen.getByPlaceholderText("Ex.: 60%");
     await user.clear(participationInput);
     await user.type(participationInput, "100");
     expect(screen.queryByText("Soma dos percentuais de participações dos socios é inferior a 100%")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /continuar/i })).toBeEnabled();
     expect(screen.getByRole("button", { name: /endereço/i })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: /adicionar sócio/i }));
-    const participationInputs = screen.getAllByPlaceholderText("Ex: 60%");
+    const participationInputs = screen.getAllByPlaceholderText("Ex.: 60%");
     await user.clear(participationInputs[1]);
     await user.type(participationInputs[1], "20");
     expect(screen.getByText("Soma dos percentuais de participações dos socioas é superior a 100%")).toBeInTheDocument();
@@ -186,7 +186,7 @@ describe("ClientProcess submit flow", () => {
     await user.click(await screen.findByRole("button", { name: /quadro societário/i }));
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Ex: 60%")).toHaveValue("");
+    expect(screen.getByPlaceholderText("Ex.: 60%")).toHaveValue("");
   });
 
   it("shows the socio type selector with CPF and CNPJ options", async () => {
@@ -200,6 +200,32 @@ describe("ClientProcess submit flow", () => {
     expect(tipoSocioSwitch).toHaveAttribute("aria-checked", "false");
     await user.click(tipoSocioSwitch);
     expect(tipoSocioSwitch).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("uses clear visible labels for CPF and CNPJ partners", async () => {
+    const { default: ClientProcess } = await import("@/app/client/process/[id]/page");
+    const user = userEvent.setup();
+    render(<ClientProcess />);
+
+    await user.click(await screen.findByRole("button", { name: /quadro societário/i }));
+    expect(screen.getByText("Tipo de pessoa")).toBeInTheDocument();
+    expect(screen.getByText("Nome completo do sócio")).toBeInTheDocument();
+    expect(screen.getByText("CPF do sócio")).toBeInTheDocument();
+    expect(screen.getByText("E-mail do sócio")).toBeInTheDocument();
+    expect(screen.getByText("Telefone do sócio")).toBeInTheDocument();
+    expect(screen.getByText("Participação societária (%)")).toBeInTheDocument();
+    expect(screen.getByText("Sócio administrador?")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("socio-type-toggle-0"));
+    expect(screen.getByText("Razão social da empresa sócia")).toBeInTheDocument();
+    expect(screen.getByText("CNPJ da empresa sócia")).toBeInTheDocument();
+    expect(screen.getByText("E-mail da empresa sócia")).toBeInTheDocument();
+    expect(screen.getByText("Telefone da empresa sócia")).toBeInTheDocument();
+    expect(screen.getByText("Dados do representante da empresa sócia")).toBeInTheDocument();
+    expect(screen.getByText("Nome completo do representante")).toBeInTheDocument();
+    expect(screen.getByText("CPF do representante")).toBeInTheDocument();
+    expect(screen.getByText("Profissão do representante")).toBeInTheDocument();
+    expect(screen.getByText("Estado civil do representante")).toBeInTheDocument();
   });
 
   it("does not show responsavel CNPJ or responsavel email/telefone fields in quadro societario", async () => {
