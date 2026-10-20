@@ -6,7 +6,7 @@ import { Field } from "@/components/Field";
 import { Input } from "@/components/Input";
 import { PhoneInput } from "@/components/PhoneInput";
 import { Select } from "@/components/Select";
-import { DOCS_API_BASE } from "@/lib/api";
+import { DOCS_API_BASE, handleSessionExpiry } from "@/lib/api";
 import { maskCep, maskCnpj, maskCpf, maskIptu, maskPercent } from "@/lib/masks";
 import { notifyError } from "@/lib/notify";
 import { MunicipalityData, ProcessDocument, ProcessRecord, ProcessStepData, toProcessRecords } from "@/lib/process-types";
@@ -194,6 +194,7 @@ export function OperatorClientDataEditor({ initialData, processId, documents, on
         credentials: "include",
         body: formData
       });
+      if (await handleSessionExpiry(response, `/documents/${processId}/items/${itemKey}/upload${query}`)) return;
       if (!response.ok) throw new Error((await response.text()) || "Erro ao enviar documentos.");
       await onDocumentsChanged?.();
     } catch (uploadError) {

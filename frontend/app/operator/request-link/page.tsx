@@ -26,9 +26,7 @@ export default function OperatorRequestLink() {
 
     async function checkSession() {
       try {
-        const response = await fetch("/api/auth/me", { credentials: "include" });
-        if (!response.ok) return;
-        const data = await response.json();
+        const data = await api<{ actor?: { role?: string } }>("/auth/me");
         if (!active) return;
         const role = data?.actor?.role;
         if (role === "MASTER") {
@@ -36,6 +34,8 @@ export default function OperatorRequestLink() {
         } else if (role !== "OPERADOR") {
           router.replace("/");
         }
+      } catch {
+        return;
       } finally {
         if (active) setChecking(false);
       }

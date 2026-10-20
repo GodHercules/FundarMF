@@ -18,6 +18,46 @@ import { notifyError } from "@/lib/notify";
 import { logClientPerf } from "@/lib/perf";
 import { reportClientError } from "@/lib/observability";
 
+const SESSION_EXPIRED_MESSAGE = "Sessão expirada. Faça login novamente.";
+let sessionRecoveryStarted = false;
+
+function isProtectedWorkspaceRequest(path: string) {
+  if (typeof window === "undefined") return false;
+  const currentPath = window.location.pathname;
+  const inStaffWorkspace = currentPath.startsWith("/operator/") || currentPath.startsWith("/master/");
+  const isLoginRoute = currentPath === "/operator" || path === "/auth/login" || path === "/auth/operator/login" || path === "/auth/master/login";
+  return inStaffWorkspace && !isLoginRoute;
+}
+
+async function recoverExpiredSession() {
+  if (typeof window === "undefined" || sessionRecoveryStarted) return;
+  sessionRecoveryStarted = true;
+
+  try {
+    window.sessionStorage.setItem("fundarmf:session-message", SESSION_EXPIRED_MESSAGE);
+  } catch {
+    // Storage can be unavailable in private browsing; the redirect still logs out the session.
+  }
+
+  try {
+    await fetch(`${API_BASE}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store"
+    });
+  } catch {
+    // Logout is best effort when the original session is already invalid.
+  }
+
+  window.location.assign("/?reason=session-expired");
+}
+
+export async function handleSessionExpiry(response: Response, path: string) {
+  if (response.status !== 401 || !isProtectedWorkspaceRequest(path)) return false;
+  await recoverExpiredSession();
+  return true;
+}
+
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   try {
     const base = path.startsWith("/documents/") ? DOCS_API_BASE : API_BASE;
@@ -95,6 +135,10 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
         reportClientError({ message: `API ${response.status}: ${path}`, operation: `${method} ${path}`, route: typeof window !== "undefined" ? window.location.pathname : undefined, correlationId: response.headers.get("x-correlation-id") ?? undefined });
       }
 
+      const sessionExpired = await handleSessionExpiry(response, path);
+      if (sessionExpired) {
+        errorMessage = SESSION_EXPIRED_MESSAGE;
+      }
       notifyError(errorMessage);
       const err = new ApiError(
         errorMessage,

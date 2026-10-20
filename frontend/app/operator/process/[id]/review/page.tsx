@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import clsx from "clsx";
-import { DOCS_API_BASE, api } from "@/lib/api";
+import { DOCS_API_BASE, api, handleSessionExpiry } from "@/lib/api";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Logo } from "@/components/Logo";
@@ -66,6 +66,7 @@ export default function OperatorProcessReview() {
       try {
         const endpoint = `${DOCS_API_BASE}/documents/${processId}/items/${selectedFile.itemKey}/preview/${selectedFile.file.id}`;
         const response = await fetch(endpoint, { credentials: "include" });
+        if (await handleSessionExpiry(response, endpoint)) return;
         if (!response.ok) {
           const text = await response.text();
           throw new Error(text || `Erro ao carregar documento (${response.status}).`);

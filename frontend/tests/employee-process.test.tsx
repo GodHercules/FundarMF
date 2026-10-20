@@ -20,7 +20,8 @@ const apiMock = vi.fn();
 vi.mock("@/lib/api", () => ({
   API_BASE: "/api",
   DOCS_API_BASE: "/apix",
-  api: (...args: any[]) => apiMock(...args)
+  api: (...args: any[]) => apiMock(...args),
+  handleSessionExpiry: vi.fn().mockResolvedValue(false)
 }));
 
 const processPayload = {

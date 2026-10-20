@@ -20,6 +20,11 @@ export default function LoginPage() {
   useEffect(() => {
     // Warm up backend on free-tier cold starts so login request is faster.
     void fetch("/api/public/health", { method: "GET", credentials: "include", cache: "no-store" }).catch(() => {});
+    const reason = new URLSearchParams(window.location.search).get("reason");
+    if (reason === "session-expired") {
+      setMessage("Sessão expirada. Faça login novamente.");
+      window.history.replaceState({}, "", "/");
+    }
   }, []);
 
   async function handleLogin() {

@@ -18,9 +18,7 @@ export default function OperatorStart() {
 
     async function checkSession() {
       try {
-        const response = await fetch("/api/auth/me", { credentials: "include" });
-        if (!response.ok) return;
-        const data = await response.json();
+        const data = await api<{ actor?: { role?: string } }>("/auth/me");
         if (!active) return;
         const role = data?.actor?.role;
         if (role === "MASTER") {
@@ -31,6 +29,8 @@ export default function OperatorStart() {
           const entry = await api<{ hasProcesses: boolean }>("/processes/entry-destination");
           if (entry.hasProcesses) router.replace("/operator/dashboard");
         }
+      } catch {
+        return;
       } finally {
         if (active) setChecking(false);
       }
