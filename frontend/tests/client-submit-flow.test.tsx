@@ -132,6 +132,40 @@ describe("ClientProcess submit flow", () => {
     });
   });
 
+  it("blocks the remaining sections until partner participation totals 100%", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/processes/process-123") return Promise.resolve({
+        id: "process-123",
+        status: "EM_ANDAMENTO",
+        currentStep: "ETAPA_2",
+        steps: [{ stepKey: "ETAPA_2", locked: false, data: { quadroSocietario: [{ socioId: "s1", tipoPessoa: "CPF", socioNome: "Joao", socioCpf: "000.000.000-00", socioEmail: "joao@exemplo.com", socioTelefone: "+5571999999999", socioPercentual: "50%", socioAdministrador: "Sim", socioEstadoCivil: "Solteiro(a)", socioProfissao: "Dev", socioRegimeCasamento: "" }] } }]
+      });
+      if (path === "/chats/process-123") return Promise.resolve({ messages: [] });
+      if (path === "/documents/process-123/items") return Promise.resolve([]);
+      return Promise.resolve({});
+    });
+    const { default: ClientProcess } = await import("@/app/client/process/[id]/page");
+    const user = userEvent.setup();
+    render(<ClientProcess />);
+    await user.click(await screen.findByRole("button", { name: /quadro societário/i }));
+    expect(screen.getByText("Soma dos percentuais de participações dos socios é inferior a 100%")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /continuar/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /endereço/i })).toBeDisabled();
+    const participationInput = screen.getByPlaceholderText("Ex: 60%");
+    await user.clear(participationInput);
+    await user.type(participationInput, "100");
+    expect(screen.queryByText("Soma dos percentuais de participações dos socios é inferior a 100%")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /continuar/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /endereço/i })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: /adicionar sócio/i }));
+    const participationInputs = screen.getAllByPlaceholderText("Ex: 60%");
+    await user.clear(participationInputs[1]);
+    await user.type(participationInputs[1], "20");
+    expect(screen.getByText("Soma dos percentuais de participações dos socioas é superior a 100%")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /continuar/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /endereço/i })).toBeDisabled();
+  });
+
   it("shows the socio type selector with CPF and CNPJ options", async () => {
     const { default: ClientProcess } = await import("@/app/client/process/[id]/page");
     const user = userEvent.setup();

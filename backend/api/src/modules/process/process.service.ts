@@ -494,6 +494,16 @@ export class ProcessService {
     return typeof value === "string" && value.trim().length > 0;
   }
 
+  private getParticipationMessage(socios: Record<string, unknown>[]) {
+    const total = socios.reduce((sum, socio) => {
+      const value = Number(String(socio.socioPercentual ?? "").replace(/[^\d,.-]/g, "").replace(",", "."));
+      return sum + (Number.isFinite(value) ? value : 0);
+    }, 0);
+    if (total < 100) return "Soma dos percentuais de participações dos socios é inferior a 100%";
+    if (total > 100) return "Soma dos percentuais de participações dos socioas é superior a 100%";
+    return null;
+  }
+
   private getSocioTipoPessoa(socio: Record<string, unknown>) {
     return socio.tipoPessoa === "CNPJ" ? "CNPJ" : "CPF";
   }
@@ -541,6 +551,9 @@ export class ProcessService {
     const socios = this.normalizeSocios(data.quadroSocietario);
     if (socios.length === 0) {
       addMissing("Quadro societário", "quadroSocietario");
+    } else {
+      const participationMessage = this.getParticipationMessage(socios);
+      if (participationMessage) addMissing(participationMessage, "quadroSocietario");
     }
 
     socios.forEach((socio, index) => {
