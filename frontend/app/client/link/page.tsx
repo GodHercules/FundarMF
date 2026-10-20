@@ -5,7 +5,6 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { ApiError, api } from "@/lib/api";
 import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
-import { Card } from "@/components/Card";
 import { Logo } from "@/components/Logo";
 import { SupportChat } from "@/components/SupportChat";
 import { notifySuccess } from "@/lib/notify";
@@ -25,6 +24,7 @@ function ClientLinkInner() {
   const [message, setMessage] = useState<string | null>(null);
   const [otpStatus, setOtpStatus] = useState<string | null>(null);
   const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     if (queryToken && typeof window !== "undefined") {
@@ -65,8 +65,10 @@ function ClientLinkInner() {
   }
 
   async function handleVerify() {
+    if (verifying) return;
     setMessage(null);
     setOtpStatus(null);
+    setVerifying(true);
     try {
       await api("/auth/customer/verify", {
         method: "POST",
@@ -97,6 +99,8 @@ function ClientLinkInner() {
         return;
       }
       if (displayMessage) setMessage(displayMessage);
+    } finally {
+      setVerifying(false);
     }
   }
 
@@ -128,34 +132,32 @@ function ClientLinkInner() {
   }
 
   return (
-    <main className="app-container flex min-h-screen flex-col gap-8 py-12">
-      <Link href="/" className="text-sm font-semibold text-slate">
-        Voltar
-      </Link>
-      <div className="flex flex-col gap-3">
-        <Logo withText />
-        <span className="badge bg-brass/15 text-ink">Validação segura</span>
-        <h1 className="text-3xl font-semibold">Confirmar acesso</h1>
-        <p className="text-slate">Insira o token e o OTP enviado pelo escritório.</p>
+    <main className="client-portal client-auth-shell">
+      <div className="client-auth-orbit" aria-hidden="true" />
+      <div className="client-auth-layout">
+        <section className="client-auth-intro">
+          <Logo withText className="client-logo" />
+          <span className="client-eyebrow">Acesso protegido</span>
+          <h1>Seu processo,<br /><span>no seu ritmo.</span></h1>
+          <p>Você está a poucos passos de enviar as informações para a abertura da sua empresa. A jornada foi desenhada para ser simples, segura e acompanhada.</p>
+          <div className="client-auth-promise"><span aria-hidden="true">✓</span><div><strong>Ambiente seguro</strong><small>Seu token é usado somente para confirmar este acesso.</small></div></div>
+        </section>
+        <section className="client-auth-card" aria-labelledby="client-link-title">
+          <Link href="/" className="client-topbar-link">← Voltar</Link>
+          <span className="client-eyebrow mt-8">Confirmação de acesso</span>
+          <h2 id="client-link-title">Vamos confirmar<br />que é você.</h2>
+          <p className="client-auth-card-copy">Insira o token do link e o código de seis dígitos enviado pelo escritório.</p>
+          <form className="client-auth-form" onSubmit={(event) => { event.preventDefault(); void handleVerify(); }}>
+            <div className="client-auth-field"><label htmlFor="client-link-token">Token do link</label><Input id="client-link-token" value={token} onChange={(event) => setToken(event.target.value)} placeholder="Cole o token recebido" autoComplete="off" /></div>
+            <div className="client-auth-field"><label htmlFor="client-link-otp">Código de segurança</label><Input id="client-link-otp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" /><small>O código expira por segurança. Se necessário, solicite um novo.</small></div>
+            <Button type="submit" className="client-auth-primary" disabled={!token || verifying}>{verifying ? "Confirmando acesso..." : "Continuar com segurança →"}</Button>
+            {otpStatus && <p role="status" className="client-auth-status">{otpStatus}</p>}
+            <button type="button" className="client-auth-resend" onClick={() => void handleResendOtp()} disabled={!token || sendingOtp}>{sendingOtp ? "Enviando novo código..." : "Não recebi o código · enviar novamente"}</button>
+            {message && <p role="alert" className="client-auth-error">{message}</p>}
+          </form>
+          <p className="client-auth-footer">A MF Contabilidade nunca solicita seu token por mensagem.</p>
+        </section>
       </div>
-      <Card className="p-6 space-y-4">
-        <div>
-          <label htmlFor="client-link-token" className="text-sm font-semibold text-slate">Token</label>
-          <Input id="client-link-token" value={token} onChange={(event) => setToken(event.target.value)} placeholder="token do link" />
-        </div>
-        <div>
-          <label htmlFor="client-link-otp" className="text-sm font-semibold text-slate">OTP</label>
-          <Input id="client-link-otp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="123456" />
-        </div>
-        <Button onClick={handleVerify} className="w-full">
-          Entrar
-        </Button>
-        {otpStatus && <p role="status" className="text-sm text-slate">{otpStatus}</p>}
-        <Button onClick={handleResendOtp} className="w-full bg-ink" disabled={!token || sendingOtp}>
-          {sendingOtp ? "Enviando OTP..." : "Enviar novo OTP"}
-        </Button>
-        {message && <p role="alert" className="text-sm text-clay">{message}</p>}
-      </Card>
       <SupportChat />
     </main>
   );

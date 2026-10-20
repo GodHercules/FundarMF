@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("next/navigation", () => ({
@@ -87,14 +87,23 @@ describe("ClientProcess submit flow", () => {
     const { default: ClientProcess } = await import("@/app/client/process/[id]/page");
     const user = userEvent.setup();
     render(<ClientProcess />);
+    await screen.findByRole("heading", { name: /formul.rio do cliente/i });
 
-    const btn = await screen.findByRole("button", { name: /enviar tudo para validação/i });
-    await user.click(btn);
+    const continueSection = async (id: string) => {
+      const panel = document.getElementById(`client-section-panel-${id}`);
+      expect(panel).toBeTruthy();
+      await user.click(within(panel as HTMLElement).getByRole("button", { name: /continuar|revisar tudo/i }));
+    };
+    await continueSection("company");
+    await continueSection("partners");
+    await continueSection("address");
+    await continueSection("documents");
+    await user.click(within(document.getElementById("client-section-panel-review") as HTMLElement).getByRole("button", { name: /enviar tudo para validação/i }));
 
     expect(await screen.findByRole("heading", { name: /recebendo seus dados/i })).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: /recebemos os seus dados/i })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /tudo certo.*recebemos suas informações/i })).toBeInTheDocument();
     });
   });
 
@@ -103,7 +112,7 @@ describe("ClientProcess submit flow", () => {
     const user = userEvent.setup();
     render(<ClientProcess />);
 
-    await screen.findByText(/quadro societário/i);
+    await user.click(await screen.findByRole("button", { name: /quadro societário/i }));
     const tipoSocioSwitch = screen.getByTestId("socio-type-toggle-0");
     expect(tipoSocioSwitch).toBeInTheDocument();
     expect(tipoSocioSwitch).toHaveAttribute("aria-checked", "false");
