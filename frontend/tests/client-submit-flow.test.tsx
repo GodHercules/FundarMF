@@ -195,11 +195,13 @@ describe("ClientProcess submit flow", () => {
     render(<ClientProcess />);
 
     await user.click(await screen.findByRole("button", { name: /quadro societário/i }));
-    const tipoSocioSwitch = screen.getByTestId("socio-type-toggle-0");
-    expect(tipoSocioSwitch).toBeInTheDocument();
-    expect(tipoSocioSwitch).toHaveAttribute("aria-checked", "false");
-    await user.click(tipoSocioSwitch);
-    expect(tipoSocioSwitch).toHaveAttribute("aria-checked", "true");
+    const tipoSocioCpf = screen.getByTestId("socio-type-toggle-0-cpf");
+    const tipoSocioCnpj = screen.getByTestId("socio-type-toggle-0-cnpj");
+    expect(tipoSocioCpf).toBeInTheDocument();
+    expect(tipoSocioCpf).toHaveAttribute("aria-checked", "true");
+    expect(tipoSocioCnpj).toHaveAttribute("aria-checked", "false");
+    await user.click(tipoSocioCnpj);
+    expect(tipoSocioCnpj).toHaveAttribute("aria-checked", "true");
   });
 
   it("uses clear visible labels for CPF and CNPJ partners", async () => {
@@ -214,9 +216,13 @@ describe("ClientProcess submit flow", () => {
     expect(screen.getByText("E-mail do sócio")).toBeInTheDocument();
     expect(screen.getByText("Telefone do sócio")).toBeInTheDocument();
     expect(screen.getByText("Participação societária (%)")).toBeInTheDocument();
-    expect(screen.getByText("Sócio administrador?")).toBeInTheDocument();
+    expect(screen.getByText("O Sócio é administrador?")).toBeInTheDocument();
+    const adminToggle = screen.getByRole("switch", { name: "O Sócio é administrador?" });
+    expect(adminToggle).toHaveAttribute("aria-checked", "true");
+    await user.click(adminToggle);
+    expect(adminToggle).toHaveAttribute("aria-checked", "false");
 
-    await user.click(screen.getByTestId("socio-type-toggle-0"));
+    await user.click(screen.getByTestId("socio-type-toggle-0-cnpj"));
     expect(screen.getByText("Razão social da empresa sócia")).toBeInTheDocument();
     expect(screen.getByText("CNPJ da empresa sócia")).toBeInTheDocument();
     expect(screen.getByText("E-mail da empresa sócia")).toBeInTheDocument();
@@ -226,6 +232,22 @@ describe("ClientProcess submit flow", () => {
     expect(screen.getByText("CPF do representante")).toBeInTheDocument();
     expect(screen.getByText("Profissão do representante")).toBeInTheDocument();
     expect(screen.getByText("Estado civil do representante")).toBeInTheDocument();
+    expect(screen.getByText("O Sócio é administrador?").parentElement).toHaveClass("md:col-span-2");
+  });
+
+  it("shows a human-readable status while the client is filling the process", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/processes/process-123") return Promise.resolve({ id: "process-123", status: "AGUARDANDO_CLIENTE", currentStep: "ETAPA_2", steps: [] });
+      if (path === "/chats/process-123") return Promise.resolve({ messages: [] });
+      if (path === "/documents/process-123/items") return Promise.resolve([]);
+      return Promise.resolve({});
+    });
+
+    const { default: ClientProcess } = await import("@/app/client/process/[id]/page");
+    render(<ClientProcess />);
+
+    expect(await screen.findByText("Aguardando o preenchimento")).toBeInTheDocument();
+    expect(screen.queryByText("AGUARDANDO_CLIENTE")).not.toBeInTheDocument();
   });
 
   it("does not show responsavel CNPJ or responsavel email/telefone fields in quadro societario", async () => {
