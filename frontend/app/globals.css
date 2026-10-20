@@ -319,8 +319,12 @@ button:disabled { cursor: not-allowed; }
 .client-auth-shell { display: grid; min-height: 100svh; place-items: center; padding: clamp(1rem, 4vw, 3rem); }
 .client-auth-orbit { position: fixed; top: -14rem; left: -10rem; width: 40rem; height: 40rem; border: 1px solid rgba(17, 70, 221, .08); border-radius: 50%; box-shadow: 0 0 0 4rem rgba(17, 70, 221, .025), 0 0 0 8rem rgba(255, 138, 61, .025); pointer-events: none; }
 .client-auth-layout { position: relative; display: grid; width: min(100%, 1040px); grid-template-columns: minmax(0, 1fr) minmax(360px, 460px); overflow: hidden; border: 1px solid var(--client-border); border-radius: 28px; background: rgba(255, 255, 255, .78); box-shadow: 0 30px 90px rgba(28, 59, 122, .1); }
-.client-auth-intro { display: flex; min-height: 650px; flex-direction: column; padding: clamp(2rem, 6vw, 5rem); background: linear-gradient(150deg, #1146dd, #0b2e98); color: #fff; }
-.client-auth-intro .client-logo { filter: brightness(0) invert(1); }
+.client-auth-intro { position: relative; isolation: isolate; display: flex; min-height: 650px; flex-direction: column; overflow: hidden; padding: clamp(2rem, 6vw, 5rem); background: linear-gradient(150deg, #1146dd, #0b2e98); color: #fff; }
+.client-auth-intro::before { position: absolute; inset: 0; z-index: -1; content: ""; pointer-events: none; opacity: .07; background-image: linear-gradient(rgba(255, 255, 255, .9) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .9) 1px, transparent 1px); background-position: center; background-size: 36px 36px; }
+.client-auth-intro > * { position: relative; z-index: 1; }
+.client-auth-intro .client-logo > div { background: transparent; }
+.client-auth-intro .client-logo img { filter: brightness(0) invert(1); }
+.client-auth-intro .client-logo p { color: #fff !important; }
 .client-auth-intro .client-eyebrow { margin-top: auto; color: #bcd1ff; }
 .client-auth-intro h1 { margin-top: 1rem; color: #fff; font-size: clamp(2.8rem, 5vw, 4.5rem); line-height: .96; }
 .client-auth-intro h1 span { color: #a9c3ff; }

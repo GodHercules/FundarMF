@@ -8,7 +8,6 @@ import { Input } from "@/components/Input";
 import { Logo } from "@/components/Logo";
 import { SupportChat } from "@/components/SupportChat";
 import { notifySuccess } from "@/lib/notify";
-import Link from "next/link";
 
 interface ProcessSummary {
   id: string;
@@ -19,7 +18,7 @@ function ClientLinkInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const queryToken = searchParams.get("token") ?? "";
-  const [token, setToken] = useState(queryToken);
+  const [token] = useState(queryToken);
   const [otp, setOtp] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [otpStatus, setOtpStatus] = useState<string | null>(null);
@@ -143,12 +142,11 @@ function ClientLinkInner() {
           <div className="client-auth-promise"><span aria-hidden="true">✓</span><div><strong>Ambiente seguro</strong><small>Seu token é usado somente para confirmar este acesso.</small></div></div>
         </section>
         <section className="client-auth-card" aria-labelledby="client-link-title">
-          <Link href="/" className="client-topbar-link">← Voltar</Link>
           <span className="client-eyebrow mt-8">Confirmação de acesso</span>
           <h2 id="client-link-title">Vamos confirmar<br />que é você.</h2>
           <p className="client-auth-card-copy">Insira o token do link e o código de seis dígitos enviado pelo escritório.</p>
           <form className="client-auth-form" onSubmit={(event) => { event.preventDefault(); void handleVerify(); }}>
-            <div className="client-auth-field"><label htmlFor="client-link-token">Token do link</label><Input id="client-link-token" value={token} onChange={(event) => setToken(event.target.value)} placeholder="Cole o token recebido" autoComplete="off" /></div>
+            <div className="client-auth-field"><label htmlFor="client-link-token">Token do link</label><Input id="client-link-token" value={token} readOnly aria-readonly="true" placeholder="Token recebido no link" autoComplete="off" className="read-only:bg-slate/5 read-only:text-slate" /></div>
             <div className="client-auth-field"><label htmlFor="client-link-otp">Código de segurança</label><Input id="client-link-otp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" /><small>O código expira por segurança. Se necessário, solicite um novo.</small></div>
             <Button type="submit" className="client-auth-primary" disabled={!token || verifying}>{verifying ? "Confirmando acesso..." : "Continuar com segurança →"}</Button>
             {otpStatus && <p role="status" className="client-auth-status">{otpStatus}</p>}
