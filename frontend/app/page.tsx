@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { FiArrowUpRight, FiBriefcase, FiCheck, FiFileText, FiShield } from "react-icons/fi";
 import { api } from "@/lib/api";
 import { Card } from "@/components/Card";
 import { Input } from "@/components/Input";
@@ -18,7 +19,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     // Warm up backend on free-tier cold starts so login request is faster.
-    void api("/public/health", { method: "GET" }).catch(() => {});
+    void fetch("/api/public/health", { method: "GET", credentials: "include", cache: "no-store" }).catch(() => {});
   }, []);
 
   async function handleLogin() {
@@ -27,8 +28,9 @@ export default function LoginPage() {
     try {
       const result = await api<{ role: "OPERATOR" | "MASTER" }>("/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
       });
+
       if (result.role === "MASTER") {
         router.push("/master/dashboard");
       } else {
@@ -45,48 +47,78 @@ export default function LoginPage() {
   return (
     <main className="login-screen">
       <section className="login-aside" aria-label="Sobre o FundarMF">
+        <div className="login-aside-grid" aria-hidden="true" />
         <div className="login-brand">
           <Logo size={68} />
           <div>
             <p className="login-brand-label">FundarMF</p>
-            <p className="login-brand-name">Portal contábil</p>
+            <p className="login-brand-name">Abertura inteligente</p>
           </div>
         </div>
+
         <div className="login-aside-copy">
-          <p className="login-aside-title">Próximo passo claro.</p>
-          <p className="login-aside-copy-subtitle">Workflow para abertura de empresa. Organize validações, documentos e decisões em um único lugar — do primeiro contato à conclusão.</p>
+          <span className="login-kicker"><FiBriefcase aria-hidden="true" /> Abertura de empresa</span>
+          <h2 className="login-aside-title">Seu CNPJ começa com um próximo passo claro.</h2>
+          <p className="login-aside-copy-subtitle">Dados, documentos e decisões tributárias organizados em um único fluxo — do primeiro contato à empresa pronta.</p>
         </div>
-        <div className="login-process-mark" aria-hidden="true">
-          <span className="login-process-line" />
-          <div><strong>Dados</strong><span>Informações recebidas</span></div>
-          <div><strong>Validação</strong><span>Conferência assistida</span></div>
-          <div><strong>Conclusão</strong><span>Empresa pronta</span></div>
+
+        <div className="login-visual" aria-label="Resumo visual de uma abertura de empresa">
+          <div className="login-visual-orbit login-visual-orbit--one" aria-hidden="true" />
+          <div className="login-visual-orbit login-visual-orbit--two" aria-hidden="true" />
+          <div className="login-document-card login-document-card--back" aria-hidden="true">
+            <FiFileText />
+            <span>Documentos</span>
+            <strong>07 anexos</strong>
+          </div>
+          <div className="login-document-card login-document-card--main">
+            <div className="login-document-head">
+              <div className="login-document-logo"><Logo size={34} /></div>
+              <div>
+                <span>FundarMF</span>
+                <strong>Cadastro em andamento</strong>
+              </div>
+              <FiArrowUpRight aria-hidden="true" />
+            </div>
+            <div className="login-document-id"><span>CNPJ</span><strong>Em preparação</strong></div>
+            <div className="login-document-lines" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+            <div className="login-document-footer"><FiCheck aria-hidden="true" /> Dados organizados para a próxima etapa</div>
+          </div>
+          <div className="login-visual-note"><FiShield aria-hidden="true" /><span>Fluxo seguro e acompanhado</span></div>
         </div>
-        <p className="login-aside-footer">Acesso restrito à equipe FundarMF</p>
+
+        <div className="login-aside-footer"><span>Acesso restrito à equipe FundarMF</span><span className="login-footer-rule" aria-hidden="true" /></div>
       </section>
 
       <section className="login-content" aria-labelledby="login-title">
-        <div className="login-mobile-brand"><Logo size={52} /><span>FundarMF</span></div>
         <div className="login-form-wrap">
-          <h1 id="login-title">Entrar no painel</h1>
-          <p className="login-intro">Acesso interno. Use suas credenciais para continuar a operação.</p>
+          <div className="login-mobile-brand"><Logo size={52} /><span>FundarMF</span></div>
+          <div className="login-form-intro">
+            <span className="login-kicker login-kicker--dark"><FiShield aria-hidden="true" /> Área restrita</span>
+            <h1 id="login-title">Acesse seu painel</h1>
+            <p className="login-intro">Entre para acompanhar a abertura de empresas e manter cada etapa no lugar certo.</p>
+          </div>
+
           <Card className="login-card w-full p-6 sm:p-8">
             <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void handleLogin(); }}>
-            <div className="login-field">
-              <label htmlFor="login-email">E-mail</label>
-              <Input id="login-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" />
-            </div>
-            <div className="login-field">
-              <div className="flex items-center justify-between gap-3">
-                <label htmlFor="login-password">Senha</label>
-                <span className="login-field-hint">Acesso protegido</span>
+              <div className="login-field">
+                <label htmlFor="login-email">E-mail</label>
+                <Input id="login-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" />
               </div>
-              <PasswordField id="login-password" autoComplete="current-password" value={password} onChange={setPassword} placeholder="Digite sua senha" showStrength={false} />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Entrando..." : "Entrar"}
-            </Button>
-            {message && <p role="alert" className="text-sm text-clay">{message}</p>}
+              <div className="login-field">
+                <div className="flex items-center justify-between gap-3">
+                  <label htmlFor="login-password">Senha</label>
+                  <span className="login-field-hint">Acesso protegido</span>
+                </div>
+                <PasswordField id="login-password" autoComplete="current-password" value={password} onChange={setPassword} placeholder="Digite sua senha" showStrength={false} />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Entrando..." : "Entrar"}
+              </Button>
+              {message && <p role="alert" className="text-sm text-clay">{message}</p>}
             </form>
           </Card>
           <p className="login-help">Problemas para acessar? Fale com o administrador do seu ambiente.</p>
