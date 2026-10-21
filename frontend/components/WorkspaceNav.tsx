@@ -179,7 +179,6 @@ export function WorkspaceNav({ role, onCreateProcess }: { role: WorkspaceRole; o
                   {collapsed ? <FiLock /> : <FiUnlock />}
                 </span>
               </span>
-              <span className="workspace-nav-toggle-label">{collapsed ? "Menu fixo" : "Menu aberto"}</span>
             </button>
             <button ref={closeButtonRef} type="button" className="workspace-nav-close" onClick={closeDrawer} aria-label="Fechar navegação">
               <FiX aria-hidden="true" />

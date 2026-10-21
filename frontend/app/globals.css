@@ -1140,24 +1140,28 @@ body .operator-workspace:has(.workspace-nav.is-collapsed) > main.app-container {
 /* Accessible switch replacing the text-only menu pin/collapse control. */
 body .workspace-nav-toggle {
   display: inline-flex;
-  min-width: 40px;
-  min-height: 40px;
+  width: 48px;
+  height: 32px;
+  min-width: 48px;
+  min-height: 32px;
+  flex: 0 0 48px;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  border: 1px solid var(--fm-line);
-  border-radius: 10px;
-  padding: 0 8px;
-  background: var(--fm-panel);
+  border: 1px solid #d6deeb;
+  border-radius: 999px;
+  padding: 3px;
+  background: linear-gradient(180deg, #ffffff 0%, #f2f5fa 100%);
   color: var(--fm-ink-soft);
   cursor: pointer;
-  transition: border-color var(--fm-motion-fast) var(--fm-motion-ease), background-color var(--fm-motion-fast) var(--fm-motion-ease), color var(--fm-motion-fast) var(--fm-motion-ease);
+  box-shadow: 0 2px 6px rgba(18, 26, 41, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition: border-color var(--fm-motion-fast) var(--fm-motion-ease), background-color var(--fm-motion-fast) var(--fm-motion-ease), box-shadow var(--fm-motion-fast) var(--fm-motion-ease), transform var(--fm-motion-fast) var(--fm-motion-ease);
 }
 
 body .workspace-nav-toggle:hover {
   border-color: #b8c8ff;
-  background: #f7f9ff;
-  color: var(--fm-ink);
+  background: linear-gradient(180deg, #ffffff 0%, #eef2ff 100%);
+  box-shadow: 0 4px 10px rgba(49, 94, 251, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  transform: translateY(-1px);
 }
 
 body .workspace-nav-toggle:focus-visible {
@@ -1168,12 +1172,12 @@ body .workspace-nav-toggle:focus-visible {
 body .workspace-nav-toggle-track {
   position: relative;
   display: block;
-  width: 38px;
-  height: 22px;
-  flex: 0 0 38px;
+  width: 40px;
+  height: 24px;
+  flex: 0 0 40px;
   border-radius: 999px;
-  background: #e6ebf3;
-  box-shadow: inset 0 0 0 1px #d4dce8;
+  background: #e3e8f0;
+  box-shadow: inset 0 1px 2px rgba(18, 26, 41, 0.12), inset 0 0 0 1px rgba(180, 191, 208, 0.46);
   transition: background-color var(--fm-motion-normal) var(--fm-motion-ease), box-shadow var(--fm-motion-normal) var(--fm-motion-ease);
 }
 
@@ -1182,13 +1186,13 @@ body .workspace-nav-toggle-thumb {
   top: 3px;
   left: 3px;
   display: grid;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   place-items: center;
   border-radius: 50%;
-  background: #fff;
+  background: linear-gradient(145deg, #ffffff 0%, #eef2f8 100%);
   color: var(--fm-ink-soft);
-  box-shadow: 0 1px 4px rgba(18, 26, 41, 0.22);
+  box-shadow: 0 2px 4px rgba(18, 26, 41, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.95);
   transition: transform var(--fm-motion-normal) var(--fm-motion-ease), color var(--fm-motion-normal) var(--fm-motion-ease);
 }
 
@@ -1199,20 +1203,13 @@ body .workspace-nav-toggle-thumb svg {
 }
 
 body .workspace-nav-toggle.is-on .workspace-nav-toggle-track {
-  background: var(--fm-action);
-  box-shadow: inset 0 0 0 1px rgba(49, 94, 251, 0.18);
+  background: linear-gradient(135deg, #6d83ff 0%, var(--fm-action) 58%, #294bd1 100%);
+  box-shadow: inset 0 1px 2px rgba(18, 26, 41, 0.16), 0 2px 6px rgba(49, 94, 251, 0.2);
 }
 
 body .workspace-nav-toggle.is-on .workspace-nav-toggle-thumb {
   transform: translateX(16px);
   color: var(--fm-action-hover);
-}
-
-body .workspace-nav-toggle-label {
-  color: inherit;
-  font-size: 11px;
-  font-weight: 750;
-  white-space: nowrap;
 }
 
 body .workspace-nav.is-collapsed .workspace-nav-toggle {
@@ -1224,10 +1221,6 @@ body .workspace-nav.is-collapsed .workspace-nav-toggle {
   border-color: #dbe3ef;
   border-radius: 14px;
   padding: 0;
-}
-
-body .workspace-nav.is-collapsed .workspace-nav-toggle-label {
-  display: none;
 }
 
 body .workspace-nav.is-collapsed .workspace-nav-toggle-track {
