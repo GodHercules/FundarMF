@@ -21,7 +21,7 @@ const links: Record<WorkspaceRole, NavItem[]> = {
   master: [{ href: "/master/dashboard", label: "Visão global", description: "Operação completa", icon: FiGrid }]
 };
 
-export function WorkspaceNav({ role }: { role: WorkspaceRole }) {
+export function WorkspaceNav({ role, onCreateProcess }: { role: WorkspaceRole; onCreateProcess?: () => void }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -77,7 +77,7 @@ export function WorkspaceNav({ role }: { role: WorkspaceRole }) {
             return <Link key={link.href} href={link.href} className={clsx("workspace-nav-link", active && "is-active")} aria-current={active ? "page" : undefined} onClick={() => setOpen(false)}><Icon aria-hidden="true" /><span className="workspace-nav-link-copy"><strong>{link.label}</strong><small>{link.description}</small></span></Link>;
           })}
         </nav>
-        {role === "operator" && <Link href="/operator/start" className="workspace-nav-create" onClick={() => setOpen(false)}><span aria-hidden="true">+</span><span className="workspace-nav-link-copy"><strong>Novo processo</strong><small>Iniciar atendimento</small></span></Link>}
+{role === "operator" && (onCreateProcess ? <button type="button" className="workspace-nav-create" onClick={() => { onCreateProcess(); setOpen(false); }}><span aria-hidden="true">+</span><span className="workspace-nav-link-copy"><strong>Novo processo</strong><small>Iniciar atendimento</small></span></button> : <Link href="/operator/start" className="workspace-nav-create" onClick={() => setOpen(false)}><span aria-hidden="true">+</span><span className="workspace-nav-link-copy"><strong>Novo processo</strong><small>Iniciar atendimento</small></span></Link>)}
         <div className="workspace-nav-footer">
           <div className="workspace-nav-user"><span className="workspace-nav-avatar" aria-hidden="true">OP</span><span className="workspace-nav-link-copy"><strong>Operador</strong><small>Acesso interno</small></span></div>
           <button type="button" className="workspace-nav-logout" onClick={() => void handleLogout()}><FiLogOut aria-hidden="true" /><span>Sair</span></button>

@@ -6,7 +6,7 @@
   color-scheme: light;
   --fm-ink: #121a29;
   --fm-ink-soft: #4f5b6d;
-  --fm-ink-faint: #778294;
+  --fm-ink-faint: #596778;
   --fm-paper: #f8f9fb;
   --fm-canvas: #edf0f4;
   --fm-panel: #ffffff;
@@ -18,7 +18,7 @@
   --fm-blue-soft: #edf1ff;
   --fm-gold: #b97b21;
   --fm-success: #177a5b;
-  --fm-danger: #c45252;
+  --fm-danger: #a84444;
   --fm-navy: #172235;
   --fm-radius: 12px;
 }
@@ -241,6 +241,7 @@ main.app-container:has(.workspace-nav.is-collapsed), .operator-workspace:has(.wo
 .operator-primary-action { display: inline-flex; min-height: 42px; align-items: center; gap: 12px; border-radius: 7px; padding: 0 15px; background: var(--fm-blue); color: white; font-size: 13px; font-weight: 700; text-decoration: none; }
 .operator-primary-action:hover { background: var(--fm-blue-dark); opacity: 1; }
 .operator-primary-action span { font-size: 18px; font-weight: 400; line-height: 1; }
+.operator-primary-action { border: 0; cursor: pointer; font-family: inherit; }
 .operator-inline-error { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; border: 1px solid #e7c2c2; border-radius: 7px; padding: 11px 14px; background: #fff7f7; color: var(--fm-danger); font-size: 13px; }
 .operator-inline-error strong { color: #8d3232; }
 .operator-inline-error button { border: 0; background: transparent; color: #8d3232; cursor: pointer; font-weight: 700; text-decoration: underline; }
@@ -252,7 +253,7 @@ main.app-container:has(.workspace-nav.is-collapsed), .operator-workspace:has(.wo
 .operator-kpi-strip small { color: var(--fm-ink-faint); font-size: 11px; }
 .operator-kpi-strip .is-attention strong { color: var(--fm-gold); }
 .operator-primary-grid, .operator-secondary-grid { display: grid; gap: 18px; }
-.operator-primary-grid { grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr); }
+.operator-primary-grid { grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr); align-items: start; }
 .operator-secondary-grid { grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr); }
 .operator-panel { min-width: 0; border-radius: 9px; padding: 20px; }
 .operator-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
@@ -306,6 +307,31 @@ main.app-container:has(.workspace-nav.is-collapsed), .operator-workspace:has(.wo
 .operator-check-options { display: flex; grid-column: 1 / -1; gap: 14px; color: var(--fm-ink-soft); font-size: 12px; }
 .operator-check-options label { display: inline-flex; align-items: center; gap: 6px; }
 .operator-form-message { grid-column: 1 / -1; margin: 0; color: var(--fm-danger); font-size: 12px; }
+.workspace-nav-create { width: calc(100% - 8px); cursor: pointer; font: inherit; text-align: left; }
+.operator-process-dialog { width: min(720px, calc(100vw - 32px)); max-height: calc(100svh - 32px); margin: auto; border: 0; border-radius: 16px; padding: 0; background: transparent; color: var(--fm-ink); box-shadow: 0 24px 70px rgba(18, 26, 41, 0.24); }
+.operator-process-dialog::backdrop { background: rgba(18, 26, 41, 0.46); }
+.operator-process-modal { max-height: calc(100svh - 32px); overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--fm-line); border-radius: 16px; background: var(--fm-panel); }
+.operator-process-modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 24px 28px 20px; border-bottom: 1px solid var(--fm-line); }
+.operator-process-modal-header h2 { margin: 4px 0 5px; font-size: 22px; letter-spacing: -0.04em; }
+.operator-process-modal-header p:last-child { margin: 0; color: var(--fm-ink-soft); font-size: 13px; }
+.operator-dialog-close { display: grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border: 1px solid var(--fm-line); border-radius: 9px; background: #fff; color: var(--fm-ink-soft); cursor: pointer; font-size: 24px; line-height: 1; }
+.operator-dialog-close:hover { border-color: var(--fm-blue); color: var(--fm-blue-dark); }
+.operator-process-modal-body { display: grid; gap: 18px; padding: 24px 28px 28px; }
+.operator-process-modal .operator-start-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.operator-process-modal .operator-start-options button { min-height: 74px; border: 1px solid var(--fm-line); border-radius: 10px; padding: 14px; background: #fff; color: var(--fm-ink); cursor: pointer; text-align: left; transition: border-color 140ms ease, background-color 140ms ease, transform 140ms ease; }
+.operator-process-modal .operator-start-options button:hover { border-color: #aebef2; transform: translateY(-1px); }
+.operator-process-modal .operator-start-options button.is-selected { border-color: var(--fm-blue); background: var(--fm-blue-soft); }
+.operator-process-modal .operator-start-options strong, .operator-process-modal .operator-start-options span { display: block; }
+.operator-process-modal .operator-start-options strong { font-size: 13px; }
+.operator-process-modal .operator-start-options span { margin-top: 5px; color: var(--fm-ink-soft); font-size: 12px; line-height: 1.35; }
+.operator-process-modal .operator-start-form { display: grid; grid-template-columns: 1fr; gap: 9px 14px; }
+.operator-process-modal .operator-start-form > label { color: var(--fm-ink-soft); font-size: 12px; font-weight: 700; }
+.operator-process-modal .operator-start-form > .input-control { min-width: 0; }
+.operator-process-modal .operator-start-form > .input-control + label { margin-top: 4px; }
+.operator-process-modal .operator-start-form > div { grid-column: auto; }
+.operator-process-modal .operator-check-options { margin-top: 2px; }
+.operator-process-modal-actions { display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--fm-line); padding-top: 18px; }
+.operator-process-modal-actions button { min-width: 132px; }
 
 @media (max-width: 1100px) {
   .workspace-nav { width: 220px; }
@@ -341,6 +367,16 @@ main.app-container:has(.workspace-nav.is-collapsed), .operator-workspace:has(.wo
   .operator-row-actions { flex-direction: column; align-items: flex-end; gap: 5px; }
   .operator-process-meta .badge { max-width: 115px; }
   .operator-item-copy span { white-space: normal; }
+.operator-process-dialog { width: min(620px, calc(100vw - 24px)); }
+.operator-process-modal-header { padding: 18px 20px 16px; }
+.operator-process-modal-header h2 { font-size: 20px; }
+.operator-process-modal-body { gap: 14px; padding: 16px 20px 20px; }
+.operator-process-modal-header, .operator-process-modal-body { padding-inline: 20px; }
+.operator-process-modal .operator-start-options button { min-height: 64px; padding: 11px; }
+.operator-process-modal .operator-start-options, .operator-process-modal .operator-start-form { grid-template-columns: 1fr; }
+.operator-process-modal .operator-start-form > div { grid-column: auto; }
+.operator-process-modal-actions { flex-direction: row; }
+.operator-process-modal-actions button { width: auto; min-width: 0; flex: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   .workspace-nav { transition: none; }

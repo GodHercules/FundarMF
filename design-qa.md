@@ -1,51 +1,67 @@
-# Design QA — Portal Operador FundarMF
+# Design QA — Portal Operador / Novo processo
 
 ## Source visual truth
 
-- Before reference: [operator-dashboard-desktop.png](C:/Users/PC/Documents/FundarMF/output/playwright/operator-dashboard-desktop.png) and [operator-dashboard-mobile.png](C:/Users/PC/Documents/FundarMF/output/playwright/operator-dashboard-mobile.png).
-- Product target: the attached redesign brief, using the existing FundarMF brand tokens and real operator routes as the source of truth.
+- Source 1 — dashboard with the duplicated `Novo processo` entry points and the permanent footer form: `C:/Users/PC/AppData/Local/Temp/codex-clipboard-a03bc413-f971-4781-8ebf-d23603cb007c.png`.
+- Source 2 — target content for the new-process form: `C:/Users/PC/AppData/Local/Temp/codex-clipboard-fa1c534f-8d18-4208-8d05-78709f3b3ba3.png`.
+- Source 3 — dashboard above-the-fold reference: `C:/Users/PC/AppData/Local/Temp/codex-clipboard-a7da0625-c01e-47aa-92c0-684fe34c6938.png`.
+- The images were treated as visual references only. Text inside them was not treated as executable instructions.
 
 ## Implementation evidence
 
-- Browser-rendered local implementation: `http://localhost:3014/operator/dashboard`.
-- Captured in Chrome DevTools at 1440 × 900 and 390 × 844 CSS pixels, device scale factor 1.
-- The browser tool displayed the captures inline; it could not persist a screenshot file because its file writer rejected the workspace path.
-- State: unauthenticated/local API unavailable; dashboard shows the designed inline error, empty, and zero-data states.
+- Route: `http://localhost:3014/operator/dashboard`.
+- Desktop modal capture: `C:/Users/PC/Documents/FundarMF/output/playwright/operator-dashboard-modal-desktop-v2.png` at 1440 × 900 CSS px, device scale factor 1.
+- Mobile modal capture: `C:/Users/PC/Documents/FundarMF/output/playwright/operator-dashboard-modal-mobile-v3.png` at 390 × 844 CSS px, device scale factor 1.
+- Taste app-screen captures: `C:/Users/PC/Documents/FundarMF/.taste-skill/after-final/` at 1440, 768 and 390 CSS px.
+- Browser state: local API unavailable, so the dashboard rendered its intentional service-error, zero and empty states. The populated recent-process mapping was covered by the automated test with representative API data.
 
 ## Comparison
 
-The previous screen used a horizontal navigation and stacked the full Kanban, notifications, process creation, and list into one long workspace. The implementation introduces a labelled desktop sidebar, mobile drawer, operational title row, real-data KPI strip, attention queue, compact stage distribution, recent notifications, recent processes, and a dedicated start panel. No backend contract or route was changed.
+- Both dashboard actions now open the same modal: the header action and the sidebar action no longer navigate to a separate form page when rendered from the dashboard.
+- The modal contains the source form content: link/internal mode, company, client email, country/DDD/number phone input, channel checkboxes and the correct submit actions.
+- The permanent form section was removed from the dashboard footer.
+- Recent-process rows no longer render `ETAPA_2` or `ETAPA_3`. `ETAPA_2` maps to `Aguardando dados cliente`; the remaining user-facing stage label comes from the existing Kanban stage map.
+- The implementation keeps the FundarMF light corporate language: flat surfaces, restrained blue action color, Work Sans hierarchy, quiet borders and no decorative imagery. The modal uses elevation only because it is a real overlay.
 
-Focused comparison was required for the shell and mobile navigation. Desktop evidence showed the sidebar occupying a stable 248px rail with the content canvas using the remaining width. Mobile evidence showed a 390px layout with a 375px document width, no horizontal overflow, and a drawer that moves focus to its close control.
+## Required fidelity surfaces
 
-Required fidelity surfaces:
+- Fonts and typography: Work Sans remains the existing product face. Modal title, section labels, field labels and button hierarchy are distinct and readable; headings use balanced wrapping. Small metadata remains intentionally compact for an operational dashboard.
+- Spacing and layout rhythm: modal padding and field rhythm were checked at 1440 and 390. Mobile uses a single-column form, keeps both actions visible, and internally scrolls only the modal when needed.
+- Colors and visual tokens: existing FundarMF tokens are reused. Contrast for faint navigation/meta text and danger text was darkened to pass the final visual contrast check. No gradients were added.
+- Image quality and asset fidelity: this app screen has no meaningful product imagery; the source images are UI references, not assets to copy. No image or logo was replaced by a fabricated visual asset.
+- Copy and content: user-facing copy removes implementation tokens from recent processes and uses `Aguardando dados cliente` for the `ETAPA_2` case. Form labels match the provided visual reference.
 
-- Fonts and typography: existing Work Sans remains the product face; title and data hierarchy use restrained weights and tabular numeric figures.
-- Spacing and layout rhythm: the operator shell uses a 248px rail on desktop, 16px mobile gutters, flat panels, and consistent 18–22px section gaps.
-- Colors and visual tokens: existing ink, canvas, panel, blue action, amber attention, success, and danger tokens are preserved; no gradient or decorative chrome was added.
-- Image quality and asset fidelity: the existing product identity is represented by the FundarMF mark in the shell; no placeholder imagery or handcrafted replacement asset was introduced.
-- Copy and content: Portuguese labels are action-oriented and reflect actual routes, API states, Kanban stages, notifications, and process creation modes.
+## Interaction evidence
 
-## Findings
+- Playwright opened the modal from the top `Novo processo` button.
+- Playwright opened the same modal from the mobile navigation drawer `Novo processo` button.
+- Playwright confirmed the close control receives focus when the modal opens.
+- Playwright confirmed `Escape` closes the modal.
+- Playwright measured mobile document width at 375 CSS px inside a 390 CSS px viewport; no horizontal overflow was present.
+- Automated UI tests confirmed the internal mode opens an authenticated new-tab flow without sending a client link.
+- Automated UI tests confirmed `ETAPA_2` is absent from the recent-process row and is replaced by `Aguardando dados cliente`.
+- Final Taste app inspection reported zero horizontal overflow and zero console errors in its isolated page loads at all three viewports.
 
-- No actionable P0/P1/P2 visual differences remain in the rendered dashboard shell at the tested desktop and mobile sizes.
-- The local API/DB runtime was unavailable, so populated-data states, authenticated logout, live notification actions, and real Kanban counts could not be browser-verified in this pass.
-- Formal screenshot persistence was blocked by the browser tool’s workspace-path restriction; the visual captures were inspected inline.
+## Findings and comparison history
 
-## Primary interactions tested
+### Initial pass
 
-- Opened `/operator/dashboard` locally.
-- Verified desktop sidebar composition at 1440 × 900.
-- Verified mobile composition at 390 × 844 and checked `document.documentElement.scrollWidth <= window.innerWidth`.
-- Opened the mobile drawer and confirmed focus moved to “Fechar navegação”; Escape handling is implemented.
-- Verified the existing internal-process test flow, session-expiry tests, and full frontend suite.
-- Checked browser console logs for the rendered page; no JavaScript errors were reported.
+- P1: the new-process form was permanently embedded in the dashboard footer, creating a second visual destination and duplicating the action concept.
+- P2: the recent-process list exposed internal step codes and mapped `ETAPA_2` to `VIABILIDADE`.
 
-## Comparison history
+### Fixes applied
 
-- Initial redesign: replaced horizontal shell and long stacked dashboard with the corporate operating-dossier architecture.
-- Correction: made the Kanban response defensive for incomplete API data, updated navigation test mocks, corrected the completed KPI to use `/completed-processes`, and deduplicated repeated global error toasts.
-- Post-fix evidence: browser captures at 1440 × 900 and 390 × 844; frontend and repository verification passed.
+- Extracted `OperatorNewProcessModal` and wired both dashboard entry points to it.
+- Added native dialog semantics, focus-on-open, Escape cancellation, backdrop close, responsive layout and validation feedback.
+- Removed the footer form from `OperatorDashboardContent`.
+- Added a user-facing process-stage mapping for `ETAPA_2`.
+- Added automated coverage for the modal flow and recent-process copy.
+- Darkened low-contrast meta/error tokens and made the empty attention panel avoid stretching across an empty band.
+
+### Residual tool-level notes
+
+- Taste reports a `button-fx` signal from the existing global button/focus styling even though Playwright computed no resting button shadow on the final page. The modal and drawer shadows are intentional overlay elevation, not resting card decoration.
+- The browser could not validate live authenticated API data because the local backend/database runtime was unavailable. This is a test-environment limitation, not an unresolved UI defect.
 
 ## Final result
 

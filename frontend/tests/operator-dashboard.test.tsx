@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const apiMock = vi.fn();
@@ -15,7 +15,7 @@ vi.mock("@/components/OperatorKanbanBoard", () => ({ OperatorKanbanBoard: () => 
 vi.mock("@/lib/notify", () => ({ notifySuccess: vi.fn(), notifyError: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api: (...args: unknown[]) => apiMock(...args) }));
 
-describe("OperatorDashboard internal process start", () => {
+describe("OperatorDashboard new process modal", () => {
   beforeEach(() => {
     apiMock.mockReset();
     openMock.mockReset();
@@ -34,16 +34,17 @@ describe("OperatorDashboard internal process start", () => {
     });
   });
 
-  it("abre o formulário do cliente em uma nova aba sem enviar link", async () => {
+  it("abre o formulário interno em nova aba sem enviar link", async () => {
     const { default: OperatorDashboard } = await import("@/app/operator/dashboard/page");
     const user = userEvent.setup();
     render(<OperatorDashboard />);
 
-    const internalOptions = await screen.findAllByRole("button", { name: /iniciar processo interno/i });
-    await user.click(internalOptions[0]);
-    await user.type(screen.getByPlaceholderText("Nome da empresa"), "Empresa Interna");
+    await user.click(await screen.findByRole("button", { name: /novo processo/i }));
+    await user.click(screen.getByRole("button", { name: /iniciar processo interno/i }));
+    await user.type(screen.getByPlaceholderText("Nome da empresa"), "Empresa interna");
     await user.type(screen.getByPlaceholderText("E-mail do cliente"), "interno@example.com");
-    await user.click(screen.getByRole("button", { name: /^iniciar processo interno$/i }));
+    const submitButtons = screen.getAllByRole("button", { name: /iniciar processo interno/i });
+    await user.click(submitButtons[submitButtons.length - 1]);
 
     await waitFor(() => expect(apiMock).toHaveBeenCalledWith(
       "/processes",
@@ -52,9 +53,28 @@ describe("OperatorDashboard internal process start", () => {
         body: expect.stringContaining('"sendEmail":false')
       })
     ));
-    expect(openMock).toHaveBeenCalledWith("about:blank", "_blank");
-    const openedWindow = openMock.mock.results[0].value as { location: { href: string } };
+
+    const openedWindow = openMock.mock.results[0].value;
     expect(openedWindow.location.href).toBe("http://localhost:3000/client/process/process-interno-1?modo=interno");
     expect(openedWindow.document.write).toHaveBeenCalledWith(expect.stringContaining("Preparando o preenchimento"));
+  });
+
+  it("substitui códigos internos por linguagem de atendimento nos processos recentes", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path.startsWith("/processes?")) return Promise.resolve([{ id: "process-2", clientName: "Cliente teste", status: "IN_PROGRESS", currentStep: "ETAPA_2", kanbanStage: "VIABILIDADE", createdAt: "2026-10-21T10:00:00.000Z" }]);
+      if (path.startsWith("/notifications?")) return Promise.resolve([]);
+      if (path === "/notifications/unread-count") return Promise.resolve({ count: 0 });
+      if (path === "/completed-processes?limit=1&offset=0") return Promise.resolve({ total: 0 });
+      if (path.startsWith("/processes/kanban")) return Promise.resolve([]);
+      return Promise.resolve({ ok: true });
+    });
+
+    const { default: OperatorDashboard } = await import("@/app/operator/dashboard/page");
+    render(<OperatorDashboard />);
+    const recentPanel = screen.getByRole("heading", { name: "Processos recentes" }).closest(".card");
+
+    expect(recentPanel).not.toBeNull();
+    expect(await within(recentPanel as HTMLElement).findByText("Aguardando dados cliente")).toBeInTheDocument();
+    expect(within(recentPanel as HTMLElement).queryByText("ETAPA_2")).not.toBeInTheDocument();
   });
 });
