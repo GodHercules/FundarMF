@@ -9,6 +9,7 @@ let tipo = "nome";
 vi.mock("next/navigation", () => ({
   useParams: () => ({ id: "process-123" }),
   useRouter: () => ({ push: pushMock }),
+  usePathname: () => "/client/process/process-123/alteracao-contratual",
   useSearchParams: () => ({ get: (key: string) => (key === "tipo" ? tipo : null) })
 }));
 vi.mock("next/link", () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }));

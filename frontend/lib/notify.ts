@@ -23,9 +23,11 @@ const fixMojibake = (value: string) => {
 export function notify(payload: NotifyPayload) {
   if (typeof window === "undefined") return;
   const message = fixMojibake(payload.message);
-  if (payload.type === "success") toast.success(message);
-  else if (payload.type === "error") toast.error(message);
-  else toast.info(message);
+  const toastId = `${payload.type}:${message}`;
+  if (toast.isActive(toastId)) return;
+  if (payload.type === "success") toast.success(message, { toastId });
+  else if (payload.type === "error") toast.error(message, { toastId });
+  else toast.info(message, { toastId });
 }
 
 export function notifySuccess(message: string) {

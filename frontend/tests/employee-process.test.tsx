@@ -7,7 +7,8 @@ const fetchMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ id: "process-123" }),
-  useRouter: () => ({ push: pushMock })
+  useRouter: () => ({ push: pushMock }),
+  usePathname: () => "/operator/process/process-123"
 }));
 
 vi.mock("next/link", () => ({
