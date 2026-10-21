@@ -38,9 +38,6 @@ function isProtectedWorkspaceRequest(path: string) {
 }
 
 function sessionLoginDestination() {
-  if (typeof window !== "undefined" && window.location.pathname.startsWith("/operator/")) {
-    return "/operator?reason=session-expired";
-  }
   return "/?reason=session-expired";
 }
 

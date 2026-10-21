@@ -57,7 +57,7 @@ vi.unstubAllGlobals();
       credentials: "include"
     }));
     expect(window.sessionStorage.getItem("fundarmf:session-message")).toBe("Sessão expirada. Faça novamente o login.");
-    expect(replaceMock).toHaveBeenCalledWith("/operator?reason=session-expired");
+    expect(replaceMock).toHaveBeenCalledWith("/?reason=session-expired");
     expect(assignMock).not.toHaveBeenCalled();
     expect(notifyErrorMock).toHaveBeenCalledWith("Sessão expirada. Faça novamente o login.");
   });
