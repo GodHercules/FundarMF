@@ -7,13 +7,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FiArchive,
   FiBriefcase,
-  FiChevronLeft,
-  FiChevronRight,
   FiClipboard,
   FiFileText,
   FiGrid,
+  FiLock,
   FiLogOut,
   FiMenu,
+  FiUnlock,
   FiUsers,
   FiX
 } from "react-icons/fi";
@@ -167,14 +167,19 @@ export function WorkspaceNav({ role, onCreateProcess }: { role: WorkspaceRole; o
           <div className="workspace-nav-top-actions">
             <button
               type="button"
-              className="workspace-nav-collapse"
+              className={clsx("workspace-nav-toggle", collapsed && "is-on")}
               onClick={toggleCollapsed}
-              aria-label={collapsed ? "Fixar menu" : "Recolher menu"}
-              aria-pressed={!collapsed}
-              title={collapsed ? "Fixar menu" : "Recolher menu"}
+              role="switch"
+              aria-checked={collapsed}
+              aria-label={collapsed ? "Desfixar e expandir menu" : "Fixar e recolher menu"}
+              title={collapsed ? "Desfixar e expandir menu" : "Fixar e recolher menu"}
             >
-              {collapsed ? <FiChevronRight aria-hidden="true" /> : <FiChevronLeft aria-hidden="true" />}
-              <span>{collapsed ? "Fixar" : "Recolher"}</span>
+              <span className="workspace-nav-toggle-track" aria-hidden="true">
+                <span className="workspace-nav-toggle-thumb">
+                  {collapsed ? <FiLock /> : <FiUnlock />}
+                </span>
+              </span>
+              <span className="workspace-nav-toggle-label">{collapsed ? "Menu fixo" : "Menu aberto"}</span>
             </button>
             <button ref={closeButtonRef} type="button" className="workspace-nav-close" onClick={closeDrawer} aria-label="Fechar navegação">
               <FiX aria-hidden="true" />
