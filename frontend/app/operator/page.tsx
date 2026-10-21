@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, SESSION_EXPIRED_MESSAGE } from "@/lib/api";
 import { Card } from "@/components/Card";
 import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
@@ -16,6 +16,25 @@ export default function OperatorLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get("reason");
+    let storedMessage: string | null = null;
+    try {
+      storedMessage = window.sessionStorage.getItem("fundarmf:session-message");
+    } catch {
+      // Storage can be unavailable in private browsing; the query reason is enough.
+    }
+    if (reason === "session-expired" || storedMessage) {
+      setMessage(SESSION_EXPIRED_MESSAGE);
+      try {
+        window.sessionStorage.removeItem("fundarmf:session-message");
+      } catch {
+        // Ignore unavailable storage after the message has been displayed.
+      }
+      window.history.replaceState({}, "", "/operator");
+    }
+  }, []);
 
   async function handleLogin() {
     setMessage(null);

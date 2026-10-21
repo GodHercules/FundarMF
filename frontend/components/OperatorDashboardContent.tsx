@@ -57,6 +57,7 @@ export function OperatorDashboardContent() {
   const [loadingKanban, setLoadingKanban] = useState(false);
   const [newProcessOpen, setNewProcessOpen] = useState(false);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [dashboardStatus, setDashboardStatus] = useState<"loading" | "ready" | "error">("loading");
   const [processOffset, setProcessOffset] = useState(0);
   const [notificationOffset, setNotificationOffset] = useState(0);
   const [hasMoreProcesses, setHasMoreProcesses] = useState(true);
@@ -111,10 +112,13 @@ export function OperatorDashboardContent() {
 
   async function loadAll() {
     setDashboardError(null);
+    setDashboardStatus("loading");
     try {
       await Promise.all([loadProcesses(), loadKanban(), loadCompletedCount(), loadNotifications(), loadUnreadCount()]);
+      setDashboardStatus("ready");
     } catch (error) {
       setDashboardError(error instanceof Error ? error.message : "Não foi possível carregar o painel.");
+      setDashboardStatus("error");
     }
   }
 
@@ -203,16 +207,19 @@ export function OperatorDashboardContent() {
           </button>
         </header>
 
-        {dashboardError && <div className="operator-inline-error" role="alert"><strong>O painel não carregou por completo.</strong><span>{dashboardError}</span><button type="button" onClick={() => void loadAll()}>Tentar novamente</button></div>}
+        {dashboardStatus === "loading" && <div className="operator-inline-error" role="status" aria-live="polite"><strong>Carregando o painel…</strong><span>Aguarde enquanto buscamos os dados atualizados.</span></div>}
+        {dashboardStatus === "error" && <div className="operator-inline-error" role="alert"><strong>O painel não carregou.</strong><span>{dashboardError}</span><button type="button" onClick={() => void loadAll()}>Tentar novamente</button></div>}
 
+        {dashboardStatus === "ready" && <>
         <section className="operator-kpi-strip" aria-label="Indicadores operacionais">
           <div><span>Em andamento</span><strong>{processCount}</strong><small>processos ativos</small></div>
           <div className={unreadCount > 0 ? "is-attention" : ""}><span>Minha atenção</span><strong>{unreadCount}</strong><small>notificações não lidas</small></div>
           <div><span>Aguardando cliente</span><strong>{waitingClientCount}</strong><small>na etapa de documentos</small></div>
           <div><span>Finalizados</span><strong>{finishedCount}</strong><small>no quadro atual</small></div>
         </section>
+        </>}
 
-        <section className="operator-primary-grid">
+        {dashboardStatus === "ready" && <section className="operator-primary-grid">
           <Card className="operator-panel operator-attention-panel">
             <div className="operator-panel-heading"><div><h2>Minha atenção</h2><p>Itens que pedem uma ação do operador.</p></div><span className="operator-panel-count">{attentionItems.length}</span></div>
             <div className="operator-attention-list">
@@ -225,9 +232,9 @@ export function OperatorDashboardContent() {
             <div className="operator-panel-heading"><div><h2>Fluxo de processos</h2><p>Distribuição real por etapa do atendimento.</p></div><Link href="/operator/kanban" className="operator-text-action">Abrir quadro</Link></div>
             <div className="operator-stage-list">{loadingKanban ? <p className="operator-muted">Carregando etapas…</p> : stageCounts.map(({ stage, count }) => <Link key={stage} href="/operator/kanban" className="operator-stage-row" aria-label={`${KANBAN_STAGE_LABELS[stage]}: ${count} processos`}><span>{KANBAN_STAGE_LABELS[stage]}</span><span className="operator-stage-track"><i style={{ width: `${Math.max(count ? 8 : 0, (count / maxStageCount) * 100)}%` }} /></span><strong>{count}</strong></Link>)}</div>
           </Card>
-        </section>
+        </section>}
 
-        <section className="operator-secondary-grid">
+        {dashboardStatus === "ready" && <section className="operator-secondary-grid">
           <Card className="operator-panel operator-notification-panel" id="notificacoes">
             <div className="operator-panel-heading"><div><h2>Notificações recentes</h2><p>{unreadCount} não lidas · eventos do seu atendimento.</p></div><Link href="#notificacoes" className="operator-text-action" onClick={() => setShowRead((value) => !value)}>{showRead ? "Ocultar lidas" : "Ver todas"}</Link></div>
             <div className="operator-notification-list">{previewNotifications.length === 0 && <div className="operator-empty"><strong>Sem notificações recentes</strong><span>Você está em dia com os eventos do portal.</span></div>}{previewNotifications.map((item) => <div key={item.id} className={`operator-notification-row ${item.readAt ? "is-read" : ""}`}><span className="operator-notification-mark" aria-hidden="true" /><div className="operator-item-copy"><strong>{item.title}</strong><span>{item.body}</span><small>{formatDate(item.createdAt)}</small></div><div className="operator-row-actions">{item.processId && <Link href={`/operator/process/${item.processId}`} className="operator-row-action">Abrir</Link>}{!item.readAt && <button type="button" className="operator-row-action" disabled={Boolean(busyNotificationIds[item.id])} onClick={() => void markRead(item.id)}>Lida</button>}<button type="button" className="operator-dismiss" aria-label={`Remover notificação: ${item.title}`} onClick={() => void dismiss(item.id)}>×</button></div></div>)}</div>
@@ -242,7 +249,7 @@ export function OperatorDashboardContent() {
             </div>
             <div className="operator-panel-footer"><span>{processes.length} carregados</span><button type="button" onClick={() => void loadProcesses(processOffset, true)} disabled={!hasMoreProcesses || loadingProcesses}>{loadingProcesses ? "Carregando…" : hasMoreProcesses ? "Carregar mais" : "Fim da lista"}</button></div>
           </Card>
-        </section>
+        </section>}
       </main>
 
       <OperatorNewProcessModal open={newProcessOpen} onClose={() => setNewProcessOpen(false)} onCreated={() => void loadAll()} />

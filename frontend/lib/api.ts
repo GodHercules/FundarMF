@@ -18,15 +18,30 @@ import { notifyError } from "@/lib/notify";
 import { logClientPerf } from "@/lib/perf";
 import { reportClientError } from "@/lib/observability";
 
-const SESSION_EXPIRED_MESSAGE = "Sessão expirada. Faça login novamente.";
+export const SESSION_EXPIRED_MESSAGE = "Sessão expirada. Faça novamente o login.";
+export const ACCESS_DENIED_MESSAGE = "Você não tem permissão para acessar este recurso.";
+let sessionRecoveryNoticeShown = false;
 let sessionRecoveryStarted = false;
 
 function isProtectedWorkspaceRequest(path: string) {
   if (typeof window === "undefined") return false;
   const currentPath = window.location.pathname;
-  const inStaffWorkspace = currentPath.startsWith("/operator/") || currentPath.startsWith("/master/");
-  const isLoginRoute = currentPath === "/operator" || path === "/auth/login" || path === "/auth/operator/login" || path === "/auth/master/login";
-  return inStaffWorkspace && !isLoginRoute;
+  const protectedRoute = currentPath.startsWith("/operator/")
+    || currentPath.startsWith("/master/")
+    || currentPath.startsWith("/client/process/")
+    || currentPath.startsWith("/client/onboarding")
+    || currentPath.startsWith("/client/submitted");
+  const isLoginRequest = path === "/auth/login"
+    || path === "/auth/operator/login"
+    || path === "/auth/master/login";
+  return protectedRoute && !isLoginRequest;
+}
+
+function sessionLoginDestination() {
+  if (typeof window !== "undefined" && window.location.pathname.startsWith("/operator/")) {
+    return "/operator?reason=session-expired";
+  }
+  return "/?reason=session-expired";
 }
 
 async function recoverExpiredSession() {
@@ -49,7 +64,7 @@ async function recoverExpiredSession() {
     // Logout is best effort when the original session is already invalid.
   }
 
-  window.location.assign("/?reason=session-expired");
+  window.location.replace(sessionLoginDestination());
 }
 
 export async function handleSessionExpiry(response: Response, path: string) {
@@ -130,6 +145,10 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
         errorMessage = codeMessages[errorCode];
       }
 
+      if (response.status === 403) {
+        errorMessage = ACCESS_DENIED_MESSAGE;
+      }
+
       if (response.status >= 500) {
         errorMessage = "Serviço temporariamente indisponível. Tente novamente em instantes.";
         reportClientError({ message: `API ${response.status}: ${path}`, operation: `${method} ${path}`, route: typeof window !== "undefined" ? window.location.pathname : undefined, correlationId: response.headers.get("x-correlation-id") ?? undefined });
@@ -138,8 +157,13 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
       const sessionExpired = await handleSessionExpiry(response, path);
       if (sessionExpired) {
         errorMessage = SESSION_EXPIRED_MESSAGE;
+        if (!sessionRecoveryNoticeShown) {
+          sessionRecoveryNoticeShown = true;
+          notifyError(errorMessage);
+        }
+      } else {
+        notifyError(errorMessage);
       }
-      notifyError(errorMessage);
       const err = new ApiError(
         errorMessage,
         response.status,

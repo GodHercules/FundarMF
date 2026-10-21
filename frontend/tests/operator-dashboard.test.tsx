@@ -71,10 +71,29 @@ describe("OperatorDashboard new process modal", () => {
 
     const { default: OperatorDashboard } = await import("@/app/operator/dashboard/page");
     render(<OperatorDashboard />);
-    const recentPanel = screen.getByRole("heading", { name: "Processos recentes" }).closest(".card");
+    const recentHeading = await screen.findByRole("heading", { name: "Processos recentes" });
+    const recentPanel = recentHeading.closest(".card");
 
     expect(recentPanel).not.toBeNull();
     expect(await within(recentPanel as HTMLElement).findByText("Aguardando dados cliente")).toBeInTheDocument();
     expect(within(recentPanel as HTMLElement).queryByText("ETAPA_2")).not.toBeInTheDocument();
+  });
+
+  it("não exibe dados parciais quando uma carga inicial falha", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path.startsWith("/processes?")) return Promise.reject(new Error("Você não tem permissão para acessar este recurso."));
+      if (path.startsWith("/notifications?")) return Promise.resolve([]);
+      if (path === "/notifications/unread-count") return Promise.resolve({ count: 0 });
+      if (path === "/completed-processes?limit=1&offset=0") return Promise.resolve({ total: 1 });
+      if (path.startsWith("/processes/kanban")) return Promise.resolve([]);
+      return Promise.resolve({ ok: true });
+    });
+
+    const { default: OperatorDashboard } = await import("@/app/operator/dashboard/page");
+    render(<OperatorDashboard />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("O painel não carregou.");
+    expect(screen.queryByRole("heading", { name: "Processos recentes" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Finalizados")).not.toBeInTheDocument();
   });
 });

@@ -9,6 +9,7 @@ import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { Logo } from "@/components/Logo";
 import { PasswordField } from "@/components/PasswordField";
+import { SESSION_EXPIRED_MESSAGE } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,8 +22,19 @@ export default function LoginPage() {
     // Warm up backend on free-tier cold starts so login request is faster.
     void fetch("/api/public/health", { method: "GET", credentials: "include", cache: "no-store" }).catch(() => {});
     const reason = new URLSearchParams(window.location.search).get("reason");
-    if (reason === "session-expired") {
-      setMessage("Sessão expirada. Faça login novamente.");
+    let storedMessage: string | null = null;
+    try {
+      storedMessage = window.sessionStorage.getItem("fundarmf:session-message");
+    } catch {
+      // Storage can be unavailable in private browsing; the query reason is enough.
+    }
+    if (reason === "session-expired" || storedMessage) {
+      setMessage(SESSION_EXPIRED_MESSAGE);
+      try {
+        window.sessionStorage.removeItem("fundarmf:session-message");
+      } catch {
+        // Ignore unavailable storage after the message has been displayed.
+      }
       window.history.replaceState({}, "", "/");
     }
   }, []);
