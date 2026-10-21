@@ -207,7 +207,7 @@ export function OperatorDashboardContent() {
           </button>
         </header>
 
-        {dashboardStatus === "loading" && <div className="operator-inline-error" role="status" aria-live="polite"><strong>Carregando o painel…</strong><span>Aguarde enquanto buscamos os dados atualizados.</span></div>}
+        {dashboardStatus === "loading" && <div className="operator-loading-state" role="status" aria-live="polite" aria-busy="true"><div className="operator-loading-copy"><strong>Carregando o painel</strong><span>Aguarde enquanto buscamos os dados atualizados.</span></div><div className="operator-skeleton-row"><span /><span /><span /></div></div>}
         {dashboardStatus === "error" && <div className="operator-inline-error" role="alert"><strong>O painel não carregou.</strong><span>{dashboardError}</span><button type="button" onClick={() => void loadAll()}>Tentar novamente</button></div>}
 
         {dashboardStatus === "ready" && <>

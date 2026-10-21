@@ -44,7 +44,7 @@ export class SessionService {
 
   async findSessionByToken(token: string) {
     const tokenHash = this.hashToken(token);
-    return this.prisma.session.findUnique({ where: { tokenHash }, include: { user: { select: { tenantKey: true } } } });
+    return this.prisma.session.findUnique({ where: { tokenHash }, include: { user: { select: { name: true, tenantKey: true } } } });
   }
 
   async rotateSession(sessionId: string, ttlHours: number) {

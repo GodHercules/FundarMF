@@ -16,7 +16,7 @@ export function Logo({ size = 56, withText = false, className }: LogoProps) {
         style={{ width: box, height: box }}
       >
         <Image
-          src="/logo.png"
+          src="/logo.svg"
           alt="FundarMF"
           width={size}
           height={size}

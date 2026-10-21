@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, SESSION_EXPIRED_MESSAGE } from "@/lib/api";
@@ -36,7 +36,8 @@ export default function OperatorLogin() {
     }
   }, []);
 
-  async function handleLogin() {
+async function handleLogin(event?: FormEvent) {
+event?.preventDefault();
     setMessage(null);
     try {
       await api("/auth/operator/login", {
@@ -62,20 +63,20 @@ export default function OperatorLogin() {
         <h1 className="text-3xl font-semibold">Área do operador</h1>
         <p className="text-slate">Acesso interno para validação, SLA e atendimento ao cliente.</p>
       </div>
-      <Card className="w-full max-w-xl space-y-4 p-6">
+      <Card className="w-full max-w-xl p-6"><form className="space-y-4" onSubmit={(event) => void handleLogin(event)}>
         <div>
           <label htmlFor="operator-login-email" className="text-sm font-semibold text-slate">E-mail</label>
-          <Input id="operator-login-email" value={email} onChange={(event) => setEmail(event.target.value)} />
+          <Input id="operator-login-email" type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} />
         </div>
         <div>
           <label htmlFor="operator-login-password" className="text-sm font-semibold text-slate">Senha</label>
-          <PasswordField id="operator-login-password" value={password} onChange={setPassword} placeholder="Digite sua senha" showStrength={false} />
+          <PasswordField id="operator-login-password" value={password} onChange={setPassword} placeholder="Digite sua senha" autoComplete="current-password" showStrength={false} />
         </div>
-        <Button onClick={handleLogin} className="w-full">
+        <Button type="submit" className="w-full">
           Entrar no painel
         </Button>
         {message && <p role="alert" className="text-sm text-clay">{message}</p>}
-      </Card>
+      </form></Card>
     </main>
   );
 }

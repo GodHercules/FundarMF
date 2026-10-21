@@ -1,6 +1,5 @@
 "use client";
 import Link from "next/link";
-import { Logo } from "@/components/Logo";
 import { OperatorAlteracaoKanbanBoard } from "@/components/OperatorAlteracaoKanbanBoard";
 import { ALTERACAO_CONTRATUAL_OPERATOR_OPTIONS } from "@/lib/alteracao-contratual";
 import { api } from "@/lib/api";
@@ -37,8 +36,7 @@ export default function OperatorAlteracoesContratuaisPage() {
   }
 
   return <main className="app-container flex min-h-screen flex-col gap-8 py-12"><WorkspaceNav role="operator" />
-    <Link href="/operator/dashboard" className="text-sm font-semibold text-slate">Voltar para dashboard</Link>
-    <header className="flex flex-col gap-2"><Logo withText /><span className="badge bg-brass/15 text-ink">Kanban operacional</span><h1 className="text-3xl font-semibold">Alterações Contratuais</h1><p className="text-slate">Crie uma alteração para um processo existente ou para qualquer cliente cadastrado avulso.</p></header>
+    <header className="operator-page-header"><div><p className="operator-breadcrumb"><Link href="/operator/dashboard">Portal operador</Link> / Alterações contratuais</p><h1>Alterações contratuais</h1><p>Registre uma alteração e acompanhe o atendimento por etapa.</p></div><Link href="/operator/dashboard" className="operator-secondary-action">Voltar ao painel</Link></header>
     <section className="rounded-2xl border border-ink/10 bg-white/70 p-4">
       <h2 className="font-semibold">Nova alteração contratual</h2><p className="mt-1 text-sm text-slate">Informe onde será feita a alteração e os dados atuais da empresa para receber as notificações.</p>
       <div className="mt-4 grid gap-3 md:grid-cols-2">

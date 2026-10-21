@@ -8,7 +8,6 @@ import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
 import { PhoneInput } from "@/components/PhoneInput";
 import { Card } from "@/components/Card";
-import { Logo } from "@/components/Logo";
 import { WorkspaceNav } from "@/components/WorkspaceNav";
 import { notifySuccess } from "@/lib/notify";
 
@@ -92,15 +91,7 @@ export default function OperatorRequestLink() {
   return (
     <main className="app-container flex min-h-screen flex-col gap-8 py-12">
       <WorkspaceNav role="operator" />
-      <Link href="/operator/start" className="text-sm font-semibold text-slate">
-        Voltar
-      </Link>
-      <div className="flex flex-col gap-3">
-        <Logo withText />
-        <span className="badge bg-emerald/15 text-ink">Envio de link</span>
-        <h1 className="text-3xl font-semibold">Enviar acesso ao cliente</h1>
-        <p className="text-slate">Informe a empresa e os contatos do cliente para envio do link seguro.</p>
-      </div>
+      <header className="operator-page-header"><div><p className="operator-breadcrumb"><Link href="/operator/start">Novo processo</Link> / Enviar acesso</p><h1>Enviar acesso ao cliente</h1><p>Informe a empresa e os contatos para envio do link seguro.</p></div><Link href="/operator/start" className="operator-secondary-action">Voltar</Link></header>
       <Card className="p-6">
         <label htmlFor="request-link-name" className="text-sm font-semibold text-slate">Nome do cliente</label>
         <Input id="request-link-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Fulano da Silva Santos" />

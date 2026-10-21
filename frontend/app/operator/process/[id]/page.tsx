@@ -9,7 +9,6 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { StatusBadge } from "@/components/Stepper";
 import { Input } from "@/components/Input";
-import { Logo } from "@/components/Logo";
 import { WorkspaceNav } from "@/components/WorkspaceNav";
 import { Select } from "@/components/Select";
 import { Field } from "@/components/Field";
@@ -457,13 +456,8 @@ export default function OperatorProcess() {
   return (
     <main className="app-container flex min-h-screen flex-col gap-8 py-10">
       <WorkspaceNav role="operator" />
-      <Link href="/operator/dashboard" className="text-sm font-semibold text-slate">
-         Voltar
-      </Link>
-      <header className="flex flex-col gap-2">
-        <Logo withText />
-        <span className="badge bg-emerald/15 text-ink">Caso em análise</span>
-        <h1 className="text-3xl font-semibold">Caso {process.id}</h1>
+      <header className="operator-page-header"><div><p className="operator-breadcrumb"><Link href="/operator/dashboard">Portal operador</Link> / Processo</p><h1>Caso {process.id}</h1><p>Dados, documentos e ações do atendimento em andamento.</p></div><Link href="/operator/dashboard" className="operator-secondary-action">Voltar ao painel</Link></header>
+      <section className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
           <StatusBadge status={process.status} />
           <span className="text-sm text-slate">Etapa atual: {process.currentStep}</span>
@@ -481,7 +475,7 @@ export default function OperatorProcess() {
             </Button>
           </div>
         </div>
-      </header>
+      </section>
 
       {message && <p className="text-sm text-slate">{message}</p>}
 

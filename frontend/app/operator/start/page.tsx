@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Logo } from "@/components/Logo";
 import { WorkspaceNav } from "@/components/WorkspaceNav";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -49,15 +48,7 @@ export default function OperatorStart() {
   return (
     <main className="app-container flex min-h-screen flex-col gap-8 py-12">
       <WorkspaceNav role="operator" />
-      <Link href="/" className="text-sm font-semibold text-slate">
-        {"<- Sair"}
-      </Link>
-      <div className="flex flex-col gap-3">
-        <Logo withText />
-        <span className="badge bg-emerald/15 text-ink">Área do operador</span>
-        <h1 className="text-3xl font-semibold">Iniciar processo</h1>
-        <p className="text-slate">Comece um novo processo e envie o link seguro ao cliente.</p>
-      </div>
+      <header className="operator-page-header"><div><p className="operator-breadcrumb">Portal operador / Novo processo</p><h1>Iniciar processo</h1><p>Comece um novo atendimento e envie o link seguro ao cliente.</p></div><Link href="/operator/dashboard" className="operator-secondary-action">Voltar ao painel</Link></header>
 
       <Card className="p-6 space-y-4">
         <Button variant="accent" className="w-full" onClick={() => router.push("/operator/request-link")}>

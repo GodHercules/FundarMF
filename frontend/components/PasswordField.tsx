@@ -60,7 +60,7 @@ export function PasswordField({
       <button
         type="button"
         onClick={() => setVisible((prev) => !prev)}
-        className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md bg-brass/10 text-ink"
+        className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md bg-brass/10 text-ink"
         aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
       >
         {visible ? (

@@ -7,7 +7,6 @@ import clsx from "clsx";
 import { DOCS_API_BASE, api, handleSessionExpiry } from "@/lib/api";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
-import { Logo } from "@/components/Logo";
 import { WorkspaceNav } from "@/components/WorkspaceNav";
 import { StatusBadge } from "@/components/Stepper";
 import { notifyError } from "@/lib/notify";
@@ -125,12 +124,7 @@ export default function OperatorProcessReview() {
   return (
     <main className="app-container flex min-h-screen flex-col gap-6 py-10">
       <WorkspaceNav role="operator" />
-      <Link href={`/operator/process/${processId}`} className="text-sm font-semibold text-slate">
-        Voltar para o processo
-      </Link>
-
-      <header className="flex flex-col gap-2">
-        <Logo withText />
+      <header className="operator-page-header"><div><p className="operator-breadcrumb"><Link href={`/operator/process/${processId}`}>Processo</Link> / Revisão final</p>
         <span
           className={clsx(
             "badge inline-flex w-fit items-center gap-2",
@@ -147,12 +141,12 @@ export default function OperatorProcessReview() {
             </>
           )}
         </span>
-        <h1 className="text-3xl font-semibold">Revisão final · Processo {process.id}</h1>
+        <h1>Revisão final · Processo {process.id}</h1>
         <div className="flex items-center gap-3">
           <StatusBadge status={process.status} />
           <span className="text-sm text-slate">Etapa atual: {process.currentStep}</span>
         </div>
-      </header>
+      </div><Link href={`/operator/process/${processId}`} className="operator-secondary-action">Voltar ao processo</Link></header>
 
       <section className="grid gap-6 lg:grid-cols-2">
         <Card className="p-6">

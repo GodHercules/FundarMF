@@ -83,7 +83,7 @@ function SortableProcessCard({ process, disabled }: { process: ProcessCard; disa
   return (
     <div ref={setNodeRef} style={style}>
       <Card
-        className="cursor-grab border border-ink/10 bg-white/95 p-4 transition hover:-translate-y-0.5 hover:border-brass/40 active:cursor-grabbing"
+        className="operator-kanban-card cursor-grab border border-ink/10 bg-white/95 p-4 transition hover:-translate-y-0.5 hover:border-brass/40 active:cursor-grabbing"
         {...attributes}
         {...listeners}
       >
@@ -91,7 +91,7 @@ function SortableProcessCard({ process, disabled }: { process: ProcessCard; disa
           <p className="line-clamp-2 text-sm font-semibold text-ink">{process.clientName ?? "Processo sem nome"}</p>
           <StatusBadge status={process.status} label={KANBAN_STAGE_LABELS[process.kanbanStage]} />
         </div>
-        <p className="mt-2 break-all font-mono text-[11px] text-slate">{process.id}</p>
+        <p className="operator-kanban-id mt-2 break-all font-mono text-[11px] text-slate" title={process.id}>ID {process.id.slice(0, 8)}…</p>
         <p className="mt-1 text-xs text-slate">Etapa técnica: {process.currentStep}</p>
         <div className="mt-2 flex items-center justify-between">
           <Link href={`/operator/process/${process.id}`} className="text-xs font-semibold text-brass">
@@ -116,7 +116,7 @@ function KanbanColumn({
   const droppable = useDroppable({ id: columnDragId(stage) });
 
   return (
-    <div ref={droppable.setNodeRef} className="w-[min(300px,calc(100vw-2rem))] shrink-0 rounded-2xl border border-ink/10 bg-slate/5 p-3">
+    <div ref={droppable.setNodeRef} className="operator-kanban-column w-[min(300px,calc(100vw-2rem))] shrink-0 rounded-2xl border border-ink/10 bg-slate/5 p-3">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-ink">{KANBAN_STAGE_LABELS[stage]}</h2>
         <span className="badge bg-ink text-white">{processes.length}</span>
@@ -128,7 +128,7 @@ function KanbanColumn({
             <SortableProcessCard key={process.id} process={process} disabled={busyId === process.id} />
           ))}
           {processes.length === 0 && (
-            <div className="rounded-xl border border-dashed border-ink/20 p-4 text-xs text-slate">Arraste cards para esta coluna.</div>
+            <div className="operator-kanban-empty rounded-xl border border-dashed border-ink/20 p-4 text-xs text-slate">Solte um processo aqui.</div>
           )}
         </div>
       </SortableContext>
@@ -258,7 +258,7 @@ export function OperatorKanbanBoard({ onStageChange }: OperatorKanbanBoardProps)
       sensors={sensors}
       onDragEnd={(event) => void handleDragEnd(event)}
     >
-      <section className="overflow-x-auto pb-2" aria-label="Quadro de processos por etapa">
+        <section className="operator-kanban-board overflow-x-auto pb-2" aria-label="Quadro de processos por etapa">
         <div className="flex min-w-max gap-4">
           {KANBAN_STAGES.map((stage) => (
             <KanbanColumn key={stage} stage={stage} processes={grouped[stage]} busyId={busyProcessId} />

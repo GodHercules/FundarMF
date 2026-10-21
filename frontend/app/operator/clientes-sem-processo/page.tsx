@@ -6,7 +6,6 @@ import { FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Input } from "@/components/Input";
-import { Logo } from "@/components/Logo";
 import { WorkspaceNav } from "@/components/WorkspaceNav";
 import { api } from "@/lib/api";
 
@@ -55,8 +54,7 @@ export default function ClientsWithoutProcessPage() {
   }
 
   return <main className="app-container flex min-h-screen flex-col gap-8 py-12"><WorkspaceNav role="operator" />
-    <Link href="/operator/dashboard" className="text-sm font-semibold text-slate">Voltar para dashboard</Link>
-    <header><Logo withText /><span className="badge bg-brass/15 text-ink">Cadastro operacional</span><h1 className="mt-2 text-3xl font-semibold">Clientes sem processo FundarMF</h1><p className="mt-2 text-slate">Cadastre clientes externos ao fluxo de abertura e gerencie contratos e alterações contratuais.</p></header>
+    <header className="operator-page-header"><div><p className="operator-breadcrumb"><Link href="/operator/dashboard">Portal operador</Link> / Clientes</p><h1>Clientes sem processo</h1><p>Cadastre clientes externos ao fluxo de abertura e gerencie seus documentos.</p></div><Link href="/operator/dashboard" className="operator-secondary-action">Voltar ao painel</Link></header>
     <Card className="p-6">
       <h2 className="text-lg font-semibold">Novo cliente</h2>
       <form onSubmit={createClient} className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">

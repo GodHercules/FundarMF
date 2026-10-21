@@ -31,6 +31,7 @@ export class AuthMiddleware implements NestMiddleware {
     req.actor = {
       role: session.role,
       userId: session.userId ?? undefined,
+      name: session.user?.name ?? undefined,
       email: session.clientEmail ?? undefined,
       whatsapp: session.clientWhatsapp ?? undefined,
       tenantKey: session.tenantKey ?? session.user?.tenantKey ?? "default"
