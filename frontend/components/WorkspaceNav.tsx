@@ -109,6 +109,7 @@ export function WorkspaceNav({ role, onCreateProcess }: { role: WorkspaceRole; o
 
   const displayName = actor?.name?.trim() || actor?.email?.split("@")[0] || (role === "master" ? "Master" : "Operador");
   const roleLabel = actor?.role === "MASTER" || role === "master" ? "Acesso master" : "Acesso interno";
+  const menuPinned = !collapsed;
   const displayInitials = useMemo(() => initials(displayName), [displayName]);
 
   async function handleLogout() {
@@ -167,16 +168,16 @@ export function WorkspaceNav({ role, onCreateProcess }: { role: WorkspaceRole; o
           <div className="workspace-nav-top-actions">
             <button
               type="button"
-              className={clsx("workspace-nav-toggle", collapsed && "is-on")}
+              className={clsx("workspace-nav-toggle", menuPinned && "is-on")}
               onClick={toggleCollapsed}
               role="switch"
-              aria-checked={collapsed}
-              aria-label={collapsed ? "Desfixar e expandir menu" : "Fixar e recolher menu"}
-              title={collapsed ? "Desfixar e expandir menu" : "Fixar e recolher menu"}
+              aria-checked={menuPinned}
+              aria-label={menuPinned ? "Desfixar e recolher menu" : "Fixar e expandir menu"}
+              title={menuPinned ? "Desfixar e recolher menu" : "Fixar e expandir menu"}
             >
               <span className="workspace-nav-toggle-track" aria-hidden="true">
                 <span className="workspace-nav-toggle-thumb">
-                  {collapsed ? <FiLock /> : <FiUnlock />}
+                  {menuPinned ? <FiLock /> : <FiUnlock />}
                 </span>
               </span>
             </button>
