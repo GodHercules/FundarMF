@@ -61,6 +61,12 @@ export class ProcessController {
     });
   }
 
+  @Get("dashboard")
+  @Roles("OPERADOR", "MASTER")
+  async dashboard(@Req() req: Request) {
+    return this.processService.getDashboard(req.actor!);
+  }
+
   @Get("entry-destination")
   @Roles("OPERADOR")
   async entryDestination(@Req() req: Request) {

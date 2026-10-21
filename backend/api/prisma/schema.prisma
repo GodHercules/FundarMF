@@ -569,13 +569,15 @@ model UserNotification {
   type      String
   title     String
   body      String
-  readAt    DateTime?
-  createdAt DateTime  @default(now())
+  readAt      DateTime?
+  dismissedAt DateTime?
+  createdAt   DateTime  @default(now())
 
   user    User     @relation(fields: [userId], references: [id])
   process Process? @relation(fields: [processId], references: [id])
 
   @@index([userId, readAt])
+  @@index([userId, createdAt])
 }
 
 model IdempotencyKey {

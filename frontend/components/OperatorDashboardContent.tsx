@@ -27,8 +27,29 @@ type InAppNotification = {
   body: string;
   createdAt: string;
   readAt?: string | null;
+  dismissedAt?: string | null;
   processId?: string | null;
   type: string;
+};
+
+type DashboardProcess = ProcessSummary & {
+  stageLabel?: string;
+  lastActivityAt: string;
+  lastActivityAction: string;
+  attention: {
+    reason: "form_pending" | "inactive" | "both";
+    waitingSince: string;
+    lastActivityAt: string;
+    lastActivityAction: string;
+    message: string;
+  } | null;
+};
+
+type DashboardSnapshot = {
+  attention: DashboardProcess[];
+  recent: DashboardProcess[];
+  activeCount: number;
+  waitingClientCount: number;
 };
 
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
@@ -44,27 +65,47 @@ function formatDate(value?: string) {
   return Number.isNaN(date.getTime()) ? "Sem atualização" : dateFormatter.format(date);
 }
 
+function formatElapsed(value?: string) {
+  if (!value) return "Agora";
+  const elapsedHours = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / (60 * 60 * 1000)));
+  if (elapsedHours < 1) return "Há menos de 1 hora";
+  if (elapsedHours < 24) return `Há ${elapsedHours}h`;
+  const days = Math.floor(elapsedHours / 24);
+  const hours = elapsedHours % 24;
+  return hours > 0 ? `Há ${days}d e ${hours}h` : `Há ${days}d`;
+}
+
+function getProcessActivityAt(process: ProcessSummary | DashboardProcess) {
+  return "lastActivityAt" in process && typeof process.lastActivityAt === "string"
+    ? process.lastActivityAt
+    : process.updatedAt ?? process.createdAt;
+}
+
+function getProcessStageLabel(process: ProcessSummary | DashboardProcess) {
+  return "stageLabel" in process && typeof process.stageLabel === "string"
+    ? process.stageLabel
+    : process.currentStep === "ETAPA_2"
+      ? "Aguardando dados cliente"
+      : process.kanbanStage ? KANBAN_STAGE_LABELS[process.kanbanStage] : undefined;
+}
+
 export function OperatorDashboardContent() {
   const [processes, setProcesses] = useState<ProcessSummary[]>([]);
+  const [dashboardSnapshot, setDashboardSnapshot] = useState<DashboardSnapshot | null>(null);
   const [kanbanProcesses, setKanbanProcesses] = useState<KanbanProcess[]>([]);
   const [completedCount, setCompletedCount] = useState(0);
   const [notifications, setNotifications] = useState<InAppNotification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [showRead, setShowRead] = useState(false);
+  const [, setUnreadCount] = useState(0);
   const [busyNotificationIds, setBusyNotificationIds] = useState<Record<string, true>>({});
-  const [loadingProcesses, setLoadingProcesses] = useState(false);
-  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [, setLoadingProcesses] = useState(false);
+  const [, setLoadingNotifications] = useState(false);
   const [loadingKanban, setLoadingKanban] = useState(false);
   const [newProcessOpen, setNewProcessOpen] = useState(false);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [dashboardStatus, setDashboardStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [processOffset, setProcessOffset] = useState(0);
-  const [notificationOffset, setNotificationOffset] = useState(0);
-  const [hasMoreProcesses, setHasMoreProcesses] = useState(true);
-  const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
 
   const processPageSize = 8;
-  const notificationPageSize = 20;
+  const notificationPageSize = 5;
 
   async function loadUnreadCount() {
     const unread = await api<{ count: number }>("/notifications/unread-count");
@@ -76,8 +117,6 @@ export function OperatorDashboardContent() {
     try {
       const data = await api<ProcessSummary[]>(`/processes?limit=${processPageSize}&offset=${nextOffset}`);
       setProcesses((prev) => (append ? [...prev, ...data] : data));
-      setHasMoreProcesses(data.length === processPageSize);
-      setProcessOffset(nextOffset + data.length);
     } finally {
       setLoadingProcesses(false);
     }
@@ -102,11 +141,16 @@ export function OperatorDashboardContent() {
     setLoadingNotifications(true);
     try {
       const data = await api<InAppNotification[]>(`/notifications?limit=${notificationPageSize}&offset=${nextOffset}`);
-      setNotifications((prev) => (append ? [...prev, ...data] : data));
-      setHasMoreNotifications(data.length === notificationPageSize);
-      setNotificationOffset(nextOffset + data.length);
+      setNotifications((prev) => (append ? [...prev, ...data].slice(0, notificationPageSize) : data));
     } finally {
       setLoadingNotifications(false);
+    }
+  }
+
+  async function loadDashboard() {
+    const data = await api<DashboardSnapshot>("/processes/dashboard");
+    if (Array.isArray(data?.attention) && Array.isArray(data?.recent)) {
+      setDashboardSnapshot(data);
     }
   }
 
@@ -114,7 +158,7 @@ export function OperatorDashboardContent() {
     setDashboardError(null);
     setDashboardStatus("loading");
     try {
-      await Promise.all([loadProcesses(), loadKanban(), loadCompletedCount(), loadNotifications(), loadUnreadCount()]);
+      await Promise.all([loadProcesses(), loadDashboard(), loadKanban(), loadCompletedCount(), loadNotifications(), loadUnreadCount()]);
       setDashboardStatus("ready");
     } catch (error) {
       setDashboardError(error instanceof Error ? error.message : "Não foi possível carregar o painel.");
@@ -135,6 +179,17 @@ export function OperatorDashboardContent() {
 
     window.addEventListener("message", handleInternalProcessComplete);
     return () => window.removeEventListener("message", handleInternalProcessComplete);
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState !== "visible") return;
+      void loadDashboard();
+      void loadNotifications();
+      void loadUnreadCount();
+    };
+    const interval = window.setInterval(refresh, 60_000);
+    return () => window.clearInterval(interval);
   }, []);
 
   async function markRead(id: string) {
@@ -178,18 +233,15 @@ export function OperatorDashboardContent() {
     count: kanbanProcesses.filter((item) => item.kanbanEligible !== false && item.kanbanStage === stage).length
   })), [kanbanProcesses]);
   const maxStageCount = Math.max(1, ...stageCounts.map((item) => item.count));
-  const unreadNotifications = useMemo(() => notifications.filter((item) => !item.readAt).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)), [notifications]);
-  const readNotifications = useMemo(() => notifications.filter((item) => item.readAt).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)), [notifications]);
-  const attentionItems = unreadNotifications.slice(0, 3);
-  const previewNotifications = (showRead ? [...unreadNotifications, ...readNotifications] : unreadNotifications).slice(0, 4);
-  const processCount = kanbanProcesses.filter((item) => item.kanbanEligible !== false && item.kanbanStage !== "FINALIZADO").length;
-  const waitingClientCount = kanbanProcesses.filter((item) => item.kanbanStage === "AGUARDANDO_DOCUMENTOS").length;
+  const previewNotifications = useMemo(() => notifications
+    .filter((item) => Date.parse(item.createdAt) > Date.now() - 72 * 60 * 60 * 1000 && !item.dismissedAt)
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+    .slice(0, 5), [notifications]);
+  const attentionItems = dashboardSnapshot?.attention ?? [];
+  const recentProcesses = dashboardSnapshot?.recent ?? processes.slice(0, 4);
+  const processCount = dashboardSnapshot?.activeCount ?? kanbanProcesses.filter((item) => item.kanbanEligible !== false && item.kanbanStage !== "FINALIZADO").length;
+  const waitingClientCount = dashboardSnapshot?.waitingClientCount ?? kanbanProcesses.filter((item) => item.kanbanStage === "AGUARDANDO_DOCUMENTOS").length;
   const finishedCount = completedCount;
-
-  function getProcessStageLabel(process: ProcessSummary) {
-    if (process.currentStep === "ETAPA_2") return "Aguardando dados cliente";
-    return process.kanbanStage ? KANBAN_STAGE_LABELS[process.kanbanStage] : undefined;
-  }
 
   return (
     <div className="operator-workspace">
@@ -213,7 +265,7 @@ export function OperatorDashboardContent() {
         {dashboardStatus === "ready" && <>
         <section className="operator-kpi-strip" aria-label="Indicadores operacionais">
           <div><span>Em andamento</span><strong>{processCount}</strong><small>processos ativos</small></div>
-          <div className={unreadCount > 0 ? "is-attention" : ""}><span>Minha atenção</span><strong>{unreadCount}</strong><small>notificações não lidas</small></div>
+          <div className={attentionItems.length > 0 ? "is-attention" : ""}><span>Minha atenção</span><strong>{attentionItems.length}</strong><small>pendências operacionais</small></div>
           <div><span>Aguardando cliente</span><strong>{waitingClientCount}</strong><small>na etapa de documentos</small></div>
           <div><span>Finalizados</span><strong>{finishedCount}</strong><small>no quadro atual</small></div>
         </section>
@@ -223,8 +275,21 @@ export function OperatorDashboardContent() {
           <Card className="operator-panel operator-attention-panel">
             <div className="operator-panel-heading"><div><h2>Minha atenção</h2><p>Itens que pedem uma ação do operador.</p></div><span className="operator-panel-count">{attentionItems.length}</span></div>
             <div className="operator-attention-list">
-              {attentionItems.length === 0 && <div className="operator-empty"><strong>Nenhuma pendência agora</strong><span>As notificações acionáveis aparecerão aqui.</span></div>}
-              {attentionItems.map((item) => <div key={item.id} className="operator-attention-item"><span className="operator-status-dot" aria-hidden="true" /><div className="operator-item-copy"><strong>{item.title}</strong><span>{item.body}</span><small>{formatDate(item.createdAt)}</small></div>{item.processId ? <Link href={`/operator/process/${item.processId}`} className="operator-row-action">Abrir</Link> : <button type="button" className="operator-row-action" onClick={() => void markRead(item.id)}>Marcar lida</button>}</div>)}
+              {attentionItems.length === 0 && <div className="operator-empty"><strong>Tudo em dia!</strong><span>Nenhum formulário aguardando análise e nenhum processo atribuído a você parado há mais de 72 horas.</span></div>}
+              {attentionItems.map((item) => {
+                const attention = item.attention;
+                if (!attention) return null;
+                return <div key={item.id} className="operator-attention-item">
+                  <span className={`operator-status-dot is-${attention.reason}`} aria-hidden="true" />
+                  <div className="operator-item-copy">
+                    <strong>{item.clientName}</strong>
+                    <span>{attention.message}</span>
+                    <small>{attention.reason === "inactive" ? `${formatElapsed(attention.lastActivityAt)} · Última atividade: ${attention.lastActivityAction}` : `Recebido ${formatDate(attention.waitingSince)}`}</small>
+                  </div>
+                  <span className={`operator-attention-badge is-${attention.reason}`}>{attention.reason === "inactive" ? "Inativo" : attention.reason === "both" ? "Análise + inativo" : "Análise pendente"}</span>
+                  <Link href={`/operator/process/${item.id}`} className="operator-row-action">Analisar</Link>
+                </div>;
+              })}
             </div>
           </Card>
 
@@ -236,18 +301,18 @@ export function OperatorDashboardContent() {
 
         {dashboardStatus === "ready" && <section className="operator-secondary-grid">
           <Card className="operator-panel operator-notification-panel" id="notificacoes">
-            <div className="operator-panel-heading"><div><h2>Notificações recentes</h2><p>{unreadCount} não lidas · eventos do seu atendimento.</p></div><Link href="#notificacoes" className="operator-text-action" onClick={() => setShowRead((value) => !value)}>{showRead ? "Ocultar lidas" : "Ver todas"}</Link></div>
-            <div className="operator-notification-list">{previewNotifications.length === 0 && <div className="operator-empty"><strong>Sem notificações recentes</strong><span>Você está em dia com os eventos do portal.</span></div>}{previewNotifications.map((item) => <div key={item.id} className={`operator-notification-row ${item.readAt ? "is-read" : ""}`}><span className="operator-notification-mark" aria-hidden="true" /><div className="operator-item-copy"><strong>{item.title}</strong><span>{item.body}</span><small>{formatDate(item.createdAt)}</small></div><div className="operator-row-actions">{item.processId && <Link href={`/operator/process/${item.processId}`} className="operator-row-action">Abrir</Link>}{!item.readAt && <button type="button" className="operator-row-action" disabled={Boolean(busyNotificationIds[item.id])} onClick={() => void markRead(item.id)}>Lida</button>}<button type="button" className="operator-dismiss" aria-label={`Remover notificação: ${item.title}`} onClick={() => void dismiss(item.id)}>×</button></div></div>)}</div>
-            <div className="operator-panel-footer"><span>Mostrando {previewNotifications.length} de {notifications.length}</span><button type="button" onClick={() => void loadNotifications(notificationOffset, true)} disabled={!hasMoreNotifications || loadingNotifications}>{loadingNotifications ? "Carregando…" : hasMoreNotifications ? "Carregar mais" : "Fim da lista"}</button></div>
+            <div className="operator-panel-heading"><div><h2>Notificações recentes</h2><p>Eventos do seu atendimento nos últimos 3 dias.</p></div><span className="operator-panel-count">{previewNotifications.length}</span></div>
+            <div className="operator-notification-list">{previewNotifications.length === 0 && <div className="operator-empty"><strong>Nenhuma notificação recente.</strong><span>As próximas atualizações aparecerão aqui.</span></div>}{previewNotifications.map((item) => <div key={item.id} className={`operator-notification-row ${item.readAt ? "is-read" : ""}`}><span className="operator-notification-mark" aria-hidden="true" /><div className="operator-item-copy"><strong>{item.title}</strong><span>{item.body}</span><small>{formatDate(item.createdAt)}</small></div><div className="operator-row-actions">{item.processId && <Link href={`/operator/process/${item.processId}`} className="operator-row-action">Abrir</Link>}{!item.readAt && <button type="button" className="operator-row-action" disabled={Boolean(busyNotificationIds[item.id])} onClick={() => void markRead(item.id)}>Marcar como lida</button>}<button type="button" className="operator-dismiss" aria-label={`Dispensar notificação: ${item.title}`} onClick={() => void dismiss(item.id)}>×</button></div></div>)}</div>
+            <div className="operator-panel-footer"><span>{previewNotifications.length === 0 ? "Nenhum evento recente" : `Mostrando ${previewNotifications.length} evento${previewNotifications.length === 1 ? "" : "s"}`}</span><span>Expira após 72h</span></div>
           </Card>
 
           <Card className="operator-panel operator-process-panel">
             <div className="operator-panel-heading"><div><h2>Processos recentes</h2><p>Últimos casos recebidos ou atualizados.</p></div><Link href="/operator/kanban" className="operator-text-action">Ver processos</Link></div>
             <div className="operator-process-list">
-              {processes.slice(0, 5).map((process) => <Link key={process.id} href={`/operator/process/${process.id}`} className="operator-process-row"><span className="operator-process-initial" aria-hidden="true">{(process.clientName ?? "P").slice(0, 1).toUpperCase()}</span><span className="operator-item-copy"><strong>{process.clientName ?? "Processo sem nome"}</strong></span><span className="operator-process-meta"><StatusBadge status={process.status} label={getProcessStageLabel(process)} /><small>{formatDate(process.updatedAt ?? process.createdAt)}</small></span></Link>)}
-              {processes.length === 0 && <div className="operator-empty"><strong>Nenhum processo carregado</strong><span>Inicie um novo atendimento para começar.</span></div>}
+              {recentProcesses.map((process) => <Link key={process.id} href={`/operator/process/${process.id}`} className="operator-process-row"><span className="operator-process-initial" aria-hidden="true">{(process.clientName ?? "P").slice(0, 1).toUpperCase()}</span><span className="operator-item-copy"><strong>{process.clientName ?? "Processo sem nome"}</strong><small>Última movimentação: {formatDate(getProcessActivityAt(process))}</small></span><span className="operator-process-meta"><StatusBadge status={process.status} label={getProcessStageLabel(process)} /></span></Link>)}
+              {recentProcesses.length === 0 && <div className="operator-empty"><strong>Nenhum processo em andamento</strong><span>Os processos ativos mais recentes aparecerão aqui.</span></div>}
             </div>
-            <div className="operator-panel-footer"><span>{processes.length} carregados</span><button type="button" onClick={() => void loadProcesses(processOffset, true)} disabled={!hasMoreProcesses || loadingProcesses}>{loadingProcesses ? "Carregando…" : hasMoreProcesses ? "Carregar mais" : "Fim da lista"}</button></div>
+            <div className="operator-panel-footer"><span>{recentProcesses.length} processo{recentProcesses.length === 1 ? "" : "s"} exibido{recentProcesses.length === 1 ? "" : "s"}</span><Link href="/operator/kanban" className="operator-row-action">Ver quadro completo</Link></div>
           </Card>
         </section>}
       </main>

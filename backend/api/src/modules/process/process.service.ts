@@ -969,6 +969,132 @@ export class ProcessService {
     return { ok: true };
   }
 
+  async getDashboard(actor: Actor) {
+    if (actor.role !== "OPERADOR" && actor.role !== "MASTER") {
+      throw new ForbiddenException();
+    }
+
+    const tenantKey = actor.tenantKey ?? "default";
+    const processWhere: Prisma.ProcessWhereInput = {
+      tenantKey,
+      status: { notIn: [ProcessStatus.CONCLUIDO, ProcessStatus.CANCELADO] },
+      ...(actor.role === "OPERADOR" ? { ownerId: actor.userId } : {})
+    };
+    const processes = await this.prisma.process.findMany({
+      where: processWhere,
+      select: {
+        id: true,
+        clientName: true,
+        status: true,
+        currentStep: true,
+        kanbanStage: true,
+        createdAt: true,
+        steps: {
+          where: { side: StepSide.CLIENTE, status: ProcessStatus.AGUARDANDO_OPERADOR },
+          select: { stepKey: true, updatedAt: true }
+        }
+      },
+      orderBy: { createdAt: "desc" },
+      take: 200
+    });
+
+    const processIds = processes.map((process) => process.id);
+    const relevantActions = [
+      "approve_step", "assign_owner", "client_data_validation_edit", "client_status_update",
+      "client_submitted", "kanban_stage_updated", "mark_in_progress", "process_reopened",
+      "request_correction", "submit_step", "update_step", "upload_documents", "validate_documents"
+    ];
+    const auditEvents = processIds.length === 0
+      ? []
+      : await this.prisma.auditEvent.findMany({
+          where: {
+            tenantKey,
+            entity: "Process",
+            entityId: { in: processIds },
+            action: { in: relevantActions }
+          },
+          orderBy: { createdAt: "desc" },
+          take: Math.min(2000, processIds.length * 16),
+          select: { entityId: true, action: true, createdAt: true }
+        });
+    const latestActivity = new Map<string, { action: string; createdAt: Date }>();
+    for (const event of auditEvents) {
+      if (event.entityId && !latestActivity.has(event.entityId)) {
+        latestActivity.set(event.entityId, { action: event.action, createdAt: event.createdAt });
+      }
+    }
+
+    const staleCutoff = Date.now() - 72 * 60 * 60 * 1000;
+    const stageLabels: Partial<Record<KanbanStage, string>> = {
+      [KanbanStage.VIABILIDADE]: "Viabilidade",
+      [KanbanStage.DOC_INICIAL_APROVADA]: "Doc. inicial aprovada",
+      [KanbanStage.DBE_RECEITA_FEDERAL]: "DBE / Receita Federal",
+      [KanbanStage.PREPARACAO_DOCUMENTOS]: "Preparação de documentos",
+      [KanbanStage.AGUARDANDO_DOCUMENTOS]: "Aguardando documentos",
+      [KanbanStage.ANALISE_JUCEB]: "Análise JUCEB",
+      [KanbanStage.EXIGENCIA_JUCEB]: "Exigência JUCEB"
+    };
+    const actionLabels: Record<string, string> = {
+      approve_step: "validação da etapa",
+      client_submitted: "envio do formulário",
+      kanban_stage_updated: "mudança de etapa",
+      request_correction: "solicitação de correção",
+      submit_step: "envio de informações",
+      update_step: "atualização de dados",
+      upload_documents: "envio de documentos",
+      validate_documents: "validação de documentos"
+    };
+
+    const enriched = processes.map((process) => {
+      const activity = latestActivity.get(process.id);
+      const lastActivityAt = activity?.createdAt ?? process.createdAt;
+      const pendingStep = process.steps[0];
+      const inactive = lastActivityAt.getTime() < staleCutoff;
+      const formPending = Boolean(pendingStep);
+      const reason = formPending && inactive ? "both" : formPending ? "form_pending" : inactive ? "inactive" : null;
+      const lastActivityAction = activity ? actionLabels[activity.action] ?? "movimentação operacional" : "criação do processo";
+      const waitingSince = pendingStep?.updatedAt ?? lastActivityAt;
+
+      return {
+        id: process.id,
+        clientName: process.clientName ?? "Processo sem nome",
+        status: process.status,
+        currentStep: process.currentStep,
+        kanbanStage: process.kanbanStage,
+        stageLabel: stageLabels[process.kanbanStage] ?? process.kanbanStage,
+        createdAt: process.createdAt,
+        lastActivityAt,
+        lastActivityAction,
+        attention: reason
+          ? {
+              reason,
+              waitingSince,
+              lastActivityAt,
+              lastActivityAction,
+              message: formPending ? "Formulário recebido — aguardando análise" : "Processo sem movimentação"
+            }
+          : null
+      };
+    });
+
+    const attention = enriched
+      .filter((process) => process.attention !== null)
+      .sort((a, b) => {
+        const priority = (reason: string | null) => reason === "form_pending" || reason === "both" ? 0 : 1;
+        const priorityDiff = priority(a.attention?.reason ?? null) - priority(b.attention?.reason ?? null);
+        return priorityDiff || (a.attention?.waitingSince.getTime() ?? 0) - (b.attention?.waitingSince.getTime() ?? 0);
+      })
+      .map((process) => ({ ...process, attention: process.attention! }));
+    const recent = [...enriched].sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()).slice(0, 4);
+
+    return {
+      attention,
+      recent,
+      activeCount: enriched.length,
+      waitingClientCount: enriched.filter((process) => process.status === ProcessStatus.AGUARDANDO_CLIENTE || process.kanbanStage === KanbanStage.AGUARDANDO_DOCUMENTOS).length
+    };
+  }
+
   async listProcesses(actor: Actor, options?: { take?: number; skip?: number }) {
     const tenantKey = actor.tenantKey ?? "default";
     const take = options?.take && options.take > 0 ? Math.min(options.take, 200) : 100;

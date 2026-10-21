@@ -229,31 +229,18 @@ export class NotificationService {
     const take = Number.isFinite(limit) && limit > 0 ? Math.min(limit, 200) : 50;
     const skip = Number.isFinite(offset) && offset > 0 ? offset : 0;
 
-    // Curated feed:
-    // - Always include ALL unread (even if old), because the operator must not miss them.
-    // - Include only recently created read items (older reads are considered stale UI noise).
-    //
-    // Sorting/pinning rules are handled client-side; the server just guarantees visibility.
-    const unread = await this.prisma.userNotification.findMany({
-      where: { userId, readAt: null },
+    const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000);
+    return this.prisma.userNotification.findMany({
+      where: { userId, dismissedAt: null, createdAt: { gt: cutoff } },
       orderBy: { createdAt: "desc" },
-      take: 200
+      take,
+      skip
     });
-
-    const readCutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-    const readRecent = await this.prisma.userNotification.findMany({
-      where: { userId, readAt: { not: null }, createdAt: { gte: readCutoff } },
-      orderBy: { createdAt: "desc" },
-      take: 200
-    });
-
-    const combined = [...unread, ...readRecent];
-    return combined.slice(skip, skip + take);
   }
 
   async unreadCount(userId: string) {
     return this.prisma.userNotification.count({
-      where: { userId, readAt: null }
+      where: { userId, readAt: null, dismissedAt: null }
     });
   }
 
@@ -266,8 +253,9 @@ export class NotificationService {
   }
 
   async dismiss(userId: string, notificationId: string) {
-    const result = await this.prisma.userNotification.deleteMany({
-      where: { id: notificationId, userId }
+    const result = await this.prisma.userNotification.updateMany({
+      where: { id: notificationId, userId },
+      data: { dismissedAt: new Date() }
     });
     return { ok: result.count > 0 };
   }
