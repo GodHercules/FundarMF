@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FundarMF — auditoria de movimento</title>
+  <style>
+    :root { color-scheme: light; --bg:#f3f5f8; --paper:#fff; --ink:#121a29; --muted:#5c6878; --line:#d9dee7; --blue:#315efb; --good:#187955; --amber:#9b6510; --red:#a84444; --radius:18px; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); line-height:1.55; }
+    .wrap { width:min(1100px, calc(100% - 32px)); margin:0 auto; padding:48px 0 72px; }
+    .eyebrow, .label { color:var(--blue); font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    h1 { max-width:760px; margin:10px 0 12px; font-size:clamp(2.2rem, 5vw, 4.5rem); letter-spacing:-.06em; line-height:.98; text-wrap:balance; }
+    h2 { margin:0; font-size:1.3rem; letter-spacing:-.03em; }
+    h3 { margin:0; font-size:1rem; }
+    p { margin:0; color:var(--muted); }
+    .lede { max-width:720px; font-size:1.05rem; }
+    .meta, .stats { display:flex; flex-wrap:wrap; gap:10px 18px; margin-top:22px; color:var(--muted); font-size:.85rem; }
+    .stats { margin-top:30px; }
+    .stat { padding:10px 14px; border:1px solid var(--line); border-radius:12px; background:var(--paper); }
+    .stat strong { display:block; color:var(--ink); font-size:1.25rem; }
+    .assessment, .section, .timing, .recommendations { margin-top:28px; padding:24px; border:1px solid var(--line); border-radius:var(--radius); background:var(--paper); }
+    .assessment p { margin-top:10px; max-width:780px; }
+    .section-head { display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-bottom:16px; }
+    .weight { color:var(--blue); font-size:.75rem; font-weight:800; }
+    .verdict { margin-top:6px; color:var(--good); font-size:.85rem; font-weight:700; }
+    .grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:16px; margin-top:18px; }
+    .lens { padding:18px; border:1px solid var(--line); border-radius:14px; }
+    .lens ul { margin:12px 0 0; padding-left:18px; color:var(--muted); }
+    .lens li + li { margin-top:8px; }
+    .lens-take { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); font-size:.9rem; }
+    .timeline { display:grid; grid-template-columns:repeat(4,1fr); overflow:hidden; margin-top:18px; border-radius:12px; }
+    .zone { min-height:76px; padding:14px; border-right:1px solid rgba(18,26,41,.08); font-size:.82rem; }
+    .zone:last-child { border:0; }
+    .zone strong { display:block; color:var(--ink); }
+    .zone.good { background:#e8f5ef; } .zone.mid { background:#fff1d8; } .zone.slow { background:#fbe8e8; }
+    .rec + .rec { margin-top:16px; }
+    .rec h3 { margin-bottom:8px; }
+    .rec p { padding:10px 0; border-top:1px solid var(--line); }
+    code { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; color:var(--ink); font-size:.82em; }
+    footer { margin-top:28px; color:var(--muted); font-size:.8rem; }
+    @media (max-width:760px) { .wrap { padding-top:28px; } .grid { grid-template-columns:1fr; } .timeline { grid-template-columns:1fr 1fr; } }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior:auto !important; } }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <p class="eyebrow">MOTION AUDIT · DESIGN-MOTION-PRINCIPLES</p>
+    <h1>FundarMF — movimento operacional com propósito</h1>
+    <p class="lede">Auditoria e criação de movimento para todas as rotas <code>/operator</code>, com foco em orientação, resposta tátil e transições rápidas que não interrompem o trabalho.</p>
+    <div class="meta"><span>Stack: Next.js + React + CSS</span><span>Escopo: login, dashboard, kanban, clientes, alterações, arquivo, processo e formulários</span><span>Data: 21/10/2026</span></div>
+    <div class="stats"><div class="stat"><strong>0</strong>Críticos</div><div class="stat"><strong>0</strong>Importantes</div><div class="stat"><strong>5</strong>Oportunidades</div><div class="stat"><strong>3</strong>Lentes usadas</div></div>
+
+    <section class="assessment"><p class="eyebrow">AVALIAÇÃO GERAL</p><p>O movimento existente estava concentrado em componentes do portal do cliente e em transições pontuais do operador. A aplicação agora tem uma linguagem compartilhada para as rotas operacionais: entrada de página curta, navegação com feedback discreto, drawer móvel espacialmente ancorado e modal com entrada e saída suaves. Não foram adicionados loops decorativos nem stagger indiscriminado. Todas as animações criadas possuem variante de movimento reduzido.</p></section>
+
+    <section class="timing">
+      <div class="section-head"><div><p class="eyebrow">ORÇAMENTO DE TEMPO</p><h2>Movimento onde a interface muda de estado</h2></div><span class="weight">Alvo: 160–220ms</span></div>
+      <div class="timeline"><div class="zone good"><strong>0–100ms</strong>feedback de pressão</div><div class="zone good"><strong>100–300ms</strong>links, linhas e modal</div><div class="zone mid"><strong>300–500ms</strong>reservado para momentos raros</div><div class="zone slow"><strong>500ms+</strong>não usado em utilidades</div></div>
+      <p style="margin-top:14px">A navegação e o modal usam curvas de saída customizadas; atualizações de listas não ganham animação chamativa porque são acionadas com frequência e precisam permanecer legíveis.</p>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div><p class="eyebrow">LENTES DE DECISÃO</p><h2>Resumo por perspectiva</h2></div></div>
+      <div class="grid">
+        <article class="lens"><div class="section-head"><h3>Emil Kowalski — contenção e velocidade</h3><span class="weight">Primária</span></div><p class="verdict">✓ Forte</p><ul><li>Rotas de alta frequência usam transições curtas e interruptíveis.</li><li>Não há hover-scale global, pulso de status ou stagger em listas.</li><li>O loader de nova aba desliga completamente com movimento reduzido.</li></ul><p class="lens-take"><strong>Through Emil's lens:</strong> a animação só entra quando comunica uma mudança espacial ou dá confirmação imediata.</p></article>
+        <article class="lens"><div class="section-head"><h3>Jakub Krehel — acabamento de produção</h3><span class="weight">Secundária</span></div><p class="verdict">✓ Forte</p><ul><li>Modal nasce da posição central com escala mínima, sem bounce.</li><li>Saída é mais sutil que entrada.</li><li>Transform e opacity dominam as transições; não há <code>transition: all</code>.</li></ul><p class="lens-take"><strong>Through Jakub's lens:</strong> o acabamento fica percebido como fluidez, não como espetáculo.</p></article>
+        <article class="lens"><div class="section-head"><h3>Jhey Tompkins — experimentação e delight</h3><span class="weight">Seletiva</span></div><p class="verdict">✓ Contida</p><ul><li>Microfeedback de pressão e atualização das barras usa curiosidade mínima.</li><li>Não há experimentos lúdicos em tarefas financeiras/operacionais.</li><li>O espaço para delight fica reservado a estados futuros de sucesso.</li></ul><p class="lens-take"><strong>Through Jhey's lens:</strong> criatividade é aplicada como uma pergunta de produto, não como ornamento obrigatório.</p></article>
+      </div>
+    </section>
+
+    <section class="recommendations">
+      <p class="eyebrow">RECOMENDAÇÕES</p>
+      <div class="rec"><h3 style="color:var(--red)">Críticos · 0</h3><p>Nenhuma falha crítica após a implementação. <code>prefers-reduced-motion</code> cobre a entrada de rota, drawer, modal, listas e loader interno.</p></div>
+      <div class="rec"><h3 style="color:var(--amber)">Importantes · 0</h3><p>Nenhuma falha importante restante. O modal possui entrada, saída, backdrop e foco preservados sem bounce.</p></div>
+      <div class="rec"><h3 style="color:var(--good)">Oportunidades · 5</h3><p><strong>1.</strong> Adicionar crossfade funcional ao trocar loading/erro/conteúdo em listas muito longas, se métricas de compreensão indicarem ganho — <code>OperatorDashboardContent.tsx</code>.</p><p><strong>2.</strong> Animar a confirmação de upload apenas no ponto em que o operador conclui uma ação — <code>OperatorClientDataEditor.tsx</code>.</p><p><strong>3.</strong> Usar um estado de sucesso com microinteração de check em ações concluídas de alterações contratuais — <code>OperatorAlteracaoKanbanBoard.tsx</code>.</p><p><strong>4.</strong> Instrumentar tempo percebido de abertura do modal e conclusão de envio para validar o orçamento de 160–220ms.</p><p><strong>5.</strong> Reavaliar as oportunidades com dados reais de uso antes de introduzir qualquer técnica criativa de Jhey.</p></div>
+    </section>
+
+    <section class="section"><p class="eyebrow">EVIDÊNCIA</p><h2>Arquivos e verificações</h2><ul><li><code>frontend/components/PageMotion.tsx</code> — classificação das rotas e entrada operacional.</li><li><code>frontend/app/globals.css</code> — tokens de duração, easing, drawer, modal e reduced motion.</li><li><code>frontend/components/OperatorNewProcessModal.tsx</code> — entrada/saída do modal e loader seguro.</li><li>Rotas auditadas: <code>/operator</code>, <code>/operator/dashboard</code>, <code>/operator/kanban</code>, <code>/operator/alteracoes-contratuais</code>, <code>/operator/clientes-sem-processo</code>, <code>/operator/processos-finalizados</code>, <code>/operator/process/[id]</code>, <code>/operator/process/[id]/review</code>, <code>/operator/request-link</code> e <code>/operator/start</code>.</li><li>TypeScript: aprovado. Vitest: 30 testes aprovados. Lint: 0 erros e 9 avisos preexistentes.</li></ul></section>
+    <footer>FundarMF · auditoria gerada após a implementação · sem demos animadas porque não restaram achados críticos/importantes.</footer>
+  </main>
+</body>
+</html>

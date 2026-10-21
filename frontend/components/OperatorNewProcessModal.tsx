@@ -19,15 +19,17 @@ type OperatorNewProcessModalProps = {
 function showInternalProcessLoader(target: Window) {
   const loadingDocument = target.document;
   loadingDocument.open();
-  loadingDocument.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Preparando preenchimento</title><style>:root{font-family:system-ui,sans-serif}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f8f9fb;color:#121a29}.loading{display:grid;justify-items:center;gap:14px;padding:32px;text-align:center}.loader{width:38px;height:38px;border:3px solid #d9dee7;border-top-color:#315efb;border-radius:50%;animation:spin 1s linear infinite}h1{margin:0;font-size:18px}p{margin:0;max-width:340px;color:#4f5b6d;font-size:14px;line-height:1.5}@keyframes spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.loader{animation-duration:2s}}</style></head><body><main class="loading" role="status" aria-live="polite"><div class="loader" aria-hidden="true"></div><h1>Preparando o preenchimento</h1><p>Aguarde enquanto abrimos o formulário interno já autenticado.</p></main></body></html>`);
+  loadingDocument.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Preparando preenchimento</title><style>:root{font-family:system-ui,sans-serif}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f8f9fb;color:#121a29}.loading{display:grid;justify-items:center;gap:14px;padding:32px;text-align:center}.loader{width:38px;height:38px;border:3px solid #d9dee7;border-top-color:#315efb;border-radius:50%;animation:spin 1s linear infinite}h1{margin:0;font-size:18px}p{margin:0;max-width:340px;color:#4f5b6d;font-size:14px;line-height:1.5}@keyframes spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.loader{animation:none}}</style></head><body><main class="loading" role="status" aria-live="polite"><div class="loader" aria-hidden="true"></div><h1>Preparando o preenchimento</h1><p>Aguarde enquanto abrimos o formulário interno já autenticado.</p></main></body></html>`);
   loadingDocument.close();
 }
 
 export function OperatorNewProcessModal({ open, onClose, onCreated }: OperatorNewProcessModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const closeTimerRef = useRef<number | null>(null);
   const [startMode, setStartMode] = useState<ProcessStartMode>("link");
   const [creating, setCreating] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [form, setForm] = useState({ nome: "", email: "", telefone: "", sendEmail: true, sendWhatsapp: true });
 
@@ -35,10 +37,14 @@ export function OperatorNewProcessModal({ open, onClose, onCreated }: OperatorNe
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (open && !dialog.open) {
+      setClosing(false);
       if (typeof dialog.showModal === "function") dialog.showModal();
       else dialog.setAttribute("open", "");
     }
     if (!open && dialog.open) {
+      if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+      setClosing(false);
       if (typeof dialog.close === "function") dialog.close();
       else dialog.removeAttribute("open");
     }
@@ -46,11 +52,27 @@ export function OperatorNewProcessModal({ open, onClose, onCreated }: OperatorNe
       setMessage(null);
       window.requestAnimationFrame(() => closeButtonRef.current?.focus());
     }
+    return () => {
+      if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+    };
   }, [open]);
 
-  function closeModal() {
-    if (creating) return;
-    onClose();
+  function closeModal(force = false) {
+    if (creating && !force) return;
+    if (closing) return;
+    const dialog = dialogRef.current;
+    if (!dialog?.open) {
+      onClose();
+      return;
+    }
+    setClosing(true);
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = null;
+      setClosing(false);
+      if (typeof dialog.close === "function") dialog.close();
+      else dialog.removeAttribute("open");
+      onClose();
+    }, 160);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -101,7 +123,7 @@ export function OperatorNewProcessModal({ open, onClose, onCreated }: OperatorNe
 
       setForm({ nome: "", email: "", telefone: "", sendEmail: true, sendWhatsapp: true });
       onCreated();
-      onClose();
+      closeModal(true);
     } catch (error) {
       openedInternalWindow?.close();
       setMessage(error instanceof Error ? error.message : "Não foi possível iniciar o processo.");
@@ -114,6 +136,7 @@ export function OperatorNewProcessModal({ open, onClose, onCreated }: OperatorNe
     <dialog
       ref={dialogRef}
       className="operator-process-dialog"
+      data-closing={closing ? "true" : undefined}
       aria-labelledby="operator-process-dialog-title"
       onCancel={(event) => { event.preventDefault(); closeModal(); }}
       onClick={(event) => { if (event.target === event.currentTarget) closeModal(); }}
@@ -125,7 +148,7 @@ export function OperatorNewProcessModal({ open, onClose, onCreated }: OperatorNe
             <h2 id="operator-process-dialog-title">Começar um novo atendimento</h2>
             <p>Escolha como os dados iniciais serão preenchidos.</p>
           </div>
-          <button ref={closeButtonRef} type="button" className="operator-dialog-close" aria-label="Fechar novo atendimento" onClick={closeModal}>×</button>
+          <button ref={closeButtonRef} type="button" className="operator-dialog-close" aria-label="Fechar novo atendimento" onClick={() => closeModal()}>×</button>
         </header>
 
         <form className="operator-process-modal-body" onSubmit={handleSubmit}>
@@ -151,7 +174,7 @@ export function OperatorNewProcessModal({ open, onClose, onCreated }: OperatorNe
 
           {message && <p className="operator-form-message" role="alert">{message}</p>}
           <div className="operator-process-modal-actions">
-            <Button type="button" variant="ghost" onClick={closeModal} disabled={creating}>Cancelar</Button>
+            <Button type="button" variant="ghost" onClick={() => closeModal()} disabled={creating}>Cancelar</Button>
             <Button type="submit" variant="accent" disabled={creating}>{creating ? "Iniciando…" : startMode === "link" ? "Enviar acesso seguro" : "Iniciar processo interno"}</Button>
           </div>
         </form>

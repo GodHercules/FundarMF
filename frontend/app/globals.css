@@ -583,3 +583,129 @@ main.app-container:has(.workspace-nav.is-collapsed), .operator-workspace:has(.wo
 @media (max-width: 900px) { .client-hero { grid-template-columns: 1fr; } .client-layout { grid-template-columns: 1fr; } .client-side-note { position: static; } }
 @media (max-width: 620px) { .client-shell { padding-inline: 14px; } .client-topbar { margin-bottom: 2.5rem; } .client-topbar .client-logo { transform: scale(.72); } .client-hero h1 { font-size: clamp(2.2rem, 12vw, 3.5rem); } .client-section-grid--two, .client-section-grid--three { grid-template-columns: 1fr; } .client-section-grid .md\:col-span-2 { grid-column: auto; } .client-section-footer { align-items: stretch; flex-direction: column; } .client-next-button, .client-secondary-button { width: 100%; } .client-accordion-trigger { grid-template-columns: 2.2rem minmax(0, 1fr) 1.2rem; padding: .95rem .8rem; } .client-accordion-index { width: 2rem; height: 2rem; } .client-accordion-content { padding-inline: .8rem; } .client-accordion-description { white-space: normal; } .client-progress-meta { align-items: flex-start; flex-direction: column; gap: .25rem; } }
 @media (prefers-reduced-motion: reduce) { .client-portal *, .client-portal *::before, .client-portal *::after { animation: none !important; transition-duration: .01ms !important; } }
+
+/* Purposeful operator motion: fast orientation, tactile feedback, and spatially
+   anchored overlays. Static content stays immediate; state changes do the work. */
+@keyframes operator-route-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.operator-page-motion {
+  animation: operator-route-enter 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.operator-page-motion .workspace-nav-link,
+.operator-page-motion .workspace-nav-create,
+.operator-page-motion .workspace-nav-logout,
+.operator-page-motion .workspace-nav-collapse,
+.operator-page-motion .workspace-nav-close,
+.operator-page-motion .workspace-mobile-trigger,
+.operator-page-motion .operator-primary-action,
+.operator-page-motion .operator-dialog-close,
+.operator-page-motion .operator-start-options button,
+.operator-page-motion .operator-row-action,
+.operator-page-motion .operator-text-action,
+.operator-page-motion .operator-panel-footer button,
+.operator-page-motion .operator-dismiss {
+  transition-property: background-color, border-color, color, opacity, transform, box-shadow;
+  transition-duration: 160ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  touch-action: manipulation;
+}
+
+.operator-page-motion .workspace-nav-link:hover,
+.operator-page-motion .workspace-nav-create:hover,
+.operator-page-motion .operator-row-action:hover,
+.operator-page-motion .operator-text-action:hover,
+.operator-page-motion .operator-panel-footer button:hover:not(:disabled) {
+  transform: translateX(2px);
+}
+
+.operator-page-motion .workspace-nav-create:active,
+.operator-page-motion .operator-primary-action:active,
+.operator-page-motion .operator-start-options button:active,
+.operator-page-motion .operator-dialog-close:active {
+  transform: scale(0.98);
+}
+
+.operator-page-motion .operator-attention-item,
+.operator-page-motion .operator-notification-row,
+.operator-page-motion .operator-process-row,
+.operator-page-motion .operator-stage-row {
+  transition: background-color 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.operator-page-motion .operator-process-row:hover,
+.operator-page-motion .operator-attention-item:hover,
+.operator-page-motion .operator-notification-row:hover {
+  background-color: #fbfcfd;
+}
+
+.operator-page-motion .operator-stage-track i {
+  transition: width 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.operator-page-motion .operator-process-dialog {
+  opacity: 0;
+  transform: translateY(8px) scale(0.985);
+  transition: opacity 180ms cubic-bezier(0.22, 1, 0.36, 1), transform 180ms cubic-bezier(0.22, 1, 0.36, 1), display 180ms allow-discrete, overlay 180ms allow-discrete;
+}
+
+.operator-page-motion .operator-process-dialog[open] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.operator-page-motion .operator-process-dialog[data-closing="true"] {
+  opacity: 0;
+  transform: translateY(5px) scale(0.99);
+}
+
+@starting-style {
+  .operator-page-motion .operator-process-dialog[open] {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+
+.operator-page-motion .operator-process-dialog::backdrop {
+  background: rgba(18, 26, 41, 0);
+  transition: background-color 180ms cubic-bezier(0.22, 1, 0.36, 1), display 180ms allow-discrete, overlay 180ms allow-discrete;
+}
+
+.operator-page-motion .operator-process-dialog[open]::backdrop {
+  background: rgba(18, 26, 41, 0.46);
+}
+
+@media (max-width: 767px) {
+  .operator-page-motion .workspace-nav-overlay {
+    opacity: 1;
+    transition: opacity 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .operator-page-motion .workspace-nav {
+    will-change: transform;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-motion,
+  .operator-page-motion,
+  .operator-page-motion .workspace-nav,
+  .operator-page-motion .workspace-nav-overlay,
+  .operator-page-motion .operator-process-dialog,
+  .operator-page-motion .operator-process-dialog::backdrop,
+  .operator-page-motion .operator-stage-track i,
+  .operator-page-motion .operator-attention-item,
+  .operator-page-motion .operator-notification-row,
+  .operator-page-motion .operator-process-row,
+  .operator-page-motion .operator-stage-row,
+  .operator-page-motion button,
+  .operator-page-motion a {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    will-change: auto !important;
+  }
+}
