@@ -31,6 +31,18 @@ type OperationsResponse = {
   summary: { active: number; awaitingOperator: number; awaitingClient: number; inProgress: number };
 };
 
+type LegacyProcess = {
+  id: string;
+  clientName?: string | null;
+  clientEmail?: string | null;
+  status?: string | null;
+  currentStep?: string | null;
+  kanbanStage?: KanbanStage | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  kanbanEligible?: boolean;
+};
+
 const PAGE_SIZE = 12;
 
 const statusLabels: Record<string, string> = {
@@ -52,6 +64,69 @@ function stageLabel(stage: KanbanStage) {
 
 function operationalStatus(process: OperationalProcess) {
   return statusLabels[process.status] ?? process.situation;
+}
+
+function normalizeLegacyProcess(process: LegacyProcess): OperationalProcess {
+  const status = process.status ?? "EM_ANDAMENTO";
+  const kanbanStage = process.kanbanStage ?? "VIABILIDADE";
+  const createdAt = process.createdAt ?? new Date(0).toISOString();
+  const updatedAt = process.updatedAt ?? createdAt;
+  const pending = status === "AGUARDANDO_OPERADOR"
+    ? ["Conferir dados enviados pelo cliente"]
+    : status === "AGUARDANDO_CLIENTE"
+      ? ["Aguardar informações do cliente"]
+      : [];
+
+  return {
+    id: process.id,
+    clientName: process.clientName ?? "Empresa sem nome",
+    clientEmail: process.clientEmail ?? "",
+    status,
+    currentStep: process.currentStep ?? "ETAPA_2",
+    kanbanStage,
+    createdAt,
+    updatedAt,
+    fillStatus: status === "AGUARDANDO_OPERADOR"
+      ? "Aguardando conferência"
+      : status === "AGUARDANDO_CLIENTE"
+        ? "Em preenchimento"
+        : "Completo",
+    situation: statusLabels[status] ?? "Em andamento",
+    pending,
+    nextAction: pending[0] ?? "Acompanhar próxima etapa",
+    pendingDocuments: 0,
+    kanbanEligible: process.kanbanEligible ?? false
+  };
+}
+
+function buildLegacyResponse(
+  processes: LegacyProcess[],
+  filters: { search: string; status: string; stage: string; offset: number }
+): OperationsResponse {
+  const active = processes
+    .filter((process) => process.status !== "CONCLUIDO" && process.status !== "CANCELADO")
+    .map(normalizeLegacyProcess);
+  const search = filters.search.toLocaleLowerCase("pt-BR");
+  const filtered = active.filter((process) => {
+    const matchesSearch = !search
+      || process.clientName.toLocaleLowerCase("pt-BR").includes(search)
+      || process.clientEmail.toLocaleLowerCase("pt-BR").includes(search);
+    const matchesStatus = !filters.status || process.status === filters.status;
+    const matchesStage = !filters.stage || process.kanbanStage === filters.stage;
+    return matchesSearch && matchesStatus && matchesStage;
+  });
+
+  return {
+    items: filtered.slice(filters.offset, filters.offset + PAGE_SIZE),
+    total: filtered.length,
+    hasMore: filters.offset + PAGE_SIZE < filtered.length,
+    summary: {
+      active: active.length,
+      awaitingOperator: active.filter((process) => process.status === "AGUARDANDO_OPERADOR").length,
+      awaitingClient: active.filter((process) => process.status === "AGUARDANDO_CLIENTE").length,
+      inProgress: active.filter((process) => process.status === "EM_ANDAMENTO").length
+    }
+  };
 }
 
 function StatButton({ label, value, detail, active, onClick }: { label: string; value: number; detail: string; active?: boolean; onClick: () => void }) {
@@ -91,8 +166,24 @@ export function OperatorProcessList() {
     if (status) params.set("status", status);
     if (stage) params.set("stage", stage);
     try {
-      setResponse(await api<OperationsResponse>(`/processes/operations?${params.toString()}`));
+      setResponse(await api<OperationsResponse>(`/processes/operations?${params.toString()}`, { suppressErrorNotification: true }));
     } catch (err: unknown) {
+      const isMissingOperationsRoute = err
+        && typeof err === "object"
+        && "status" in err
+        && (err as { status?: number }).status === 404;
+
+      if (isMissingOperationsRoute) {
+        try {
+          const legacyProcesses = await api<LegacyProcess[]>("/processes?limit=200&offset=0");
+          setResponse(buildLegacyResponse(legacyProcesses, { search: appliedSearch, status, stage, offset }));
+          return;
+        } catch (legacyError: unknown) {
+          setError(legacyError instanceof Error ? legacyError.message : "Não foi possível carregar os processos.");
+          return;
+        }
+      }
+
       setError(err instanceof Error ? err.message : "Não foi possível carregar os processos.");
     } finally {
       setLoading(false);

@@ -50,10 +50,35 @@ describe("OperatorProcessList", () => {
 
     expect(await screen.findByRole("heading", { name: "Processos em andamento" })).toBeInTheDocument();
     expect(await screen.findByText("Empresa Horizonte")).toBeInTheDocument();
-    expect(apiMock).toHaveBeenCalledWith(expect.stringContaining("/processes/operations?"));
+    expect(apiMock).toHaveBeenCalledWith(
+      expect.stringContaining("/processes/operations?"),
+      expect.objectContaining({ suppressErrorNotification: true })
+    );
     expect(screen.getByRole("link", { name: /Abrir processo/ })).toHaveAttribute(
       "href",
       "/operator/processos/process-1"
     );
+  });
+
+  it("usa a listagem legada quando o backend ainda não expõe a rota operacional", async () => {
+    apiMock
+      .mockRejectedValueOnce(Object.assign(new Error("Processo não encontrado"), { status: 404 }))
+      .mockResolvedValueOnce([{
+        id: "legacy-process-1",
+        clientName: "Tech SemiDeus",
+        clientEmail: "tech@test",
+        status: "AGUARDANDO_CLIENTE",
+        currentStep: "ETAPA_2",
+        kanbanStage: "VIABILIDADE",
+        createdAt: "2026-10-20T10:00:00.000Z",
+        updatedAt: "2026-10-20T11:00:00.000Z"
+      }]);
+
+    const { OperatorProcessList } = await import("@/components/OperatorProcessList");
+
+    render(<OperatorProcessList />);
+
+    expect(await screen.findByText("Tech SemiDeus")).toBeInTheDocument();
+    expect(apiMock).toHaveBeenNthCalledWith(2, "/processes?limit=200&offset=0");
   });
 });

@@ -70,24 +70,29 @@ export async function handleSessionExpiry(response: Response, path: string) {
   return true;
 }
 
-export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+export type ApiRequestOptions = RequestInit & {
+  suppressErrorNotification?: boolean;
+};
+
+export async function api<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
   try {
+    const { suppressErrorNotification, ...requestOptions } = options;
     const base = path.startsWith("/documents/") ? DOCS_API_BASE : API_BASE;
     const requestUrl = `${base}${path}`;
     const perfUrl =
       typeof window !== "undefined" ? new URL(requestUrl, window.location.origin).toString() : requestUrl;
     const start = typeof performance !== "undefined" ? performance.now() : Date.now();
-    const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+    const isFormData = typeof FormData !== "undefined" && requestOptions.body instanceof FormData;
     const response = await fetch(requestUrl, {
-      ...options,
+      ...requestOptions,
       credentials: "include",
       headers: {
         ...(isFormData ? {} : { "Content-Type": "application/json" }),
-        ...(options.headers ?? {})
+        ...(requestOptions.headers ?? {})
       }
     });
     const end = typeof performance !== "undefined" ? performance.now() : Date.now();
-    const method = options.method ?? "GET";
+    const method = requestOptions.method ?? "GET";
     let ttfbMs: number | undefined;
     if (typeof performance !== "undefined" && "getEntriesByName" in performance) {
       const entries = performance.getEntriesByName(perfUrl);
@@ -154,11 +159,11 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
       const sessionExpired = await handleSessionExpiry(response, path);
       if (sessionExpired) {
         errorMessage = SESSION_EXPIRED_MESSAGE;
-        if (!sessionRecoveryNoticeShown) {
+        if (!suppressErrorNotification && !sessionRecoveryNoticeShown) {
           sessionRecoveryNoticeShown = true;
           notifyError(errorMessage);
         }
-      } else {
+      } else if (!suppressErrorNotification) {
         notifyError(errorMessage);
       }
       const err = new ApiError(
