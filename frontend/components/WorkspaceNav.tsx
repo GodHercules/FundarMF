@@ -27,7 +27,8 @@ type SessionActor = { name?: string; email?: string; role?: string };
 const links: Record<WorkspaceRole, NavItem[]> = {
   operator: [
     { href: "/operator/dashboard", label: "Visão geral", description: "O que precisa de atenção", icon: FiGrid },
-    { href: "/operator/kanban", label: "Processos", description: "Acompanhe por etapa", icon: FiBriefcase },
+    { href: "/operator/processos", label: "Processos", description: "Localize e trate casos", icon: FiBriefcase },
+    { href: "/operator/kanban", label: "Kanban", description: "Acompanhe por etapa", icon: FiGrid },
     { href: "/operator/alteracoes-contratuais", label: "Alterações", description: "Documentos e contratos", icon: FiFileText },
     { href: "/operator/processos-finalizados", label: "Arquivo", description: "Processos concluídos", icon: FiArchive },
     { href: "/operator/clientes-sem-processo", label: "Clientes", description: "Cadastros independentes", icon: FiUsers }

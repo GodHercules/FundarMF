@@ -1151,6 +1151,113 @@ export class ProcessService {
     });
   }
 
+  async listOperatorProcesses(
+    actor: Actor,
+    options?: { take?: number; skip?: number; search?: string; status?: string; stage?: string }
+  ) {
+    if (actor.role !== "OPERADOR" && actor.role !== "MASTER") {
+      throw new ForbiddenException();
+    }
+
+    const tenantKey = actor.tenantKey ?? "default";
+    const take = options?.take && options.take > 0 ? Math.min(options.take, 100) : 25;
+    const skip = options?.skip && options.skip > 0 ? options.skip : 0;
+    const search = options?.search?.trim();
+    const where: Prisma.ProcessWhereInput = {
+      tenantKey,
+      status: { notIn: [ProcessStatus.CONCLUIDO, ProcessStatus.CANCELADO] },
+      ...(actor.role === "OPERADOR" ? { ownerId: actor.userId } : {}),
+      ...(options?.status ? { status: options.status as ProcessStatus } : {}),
+      ...(options?.stage ? { kanbanStage: options.stage as KanbanStage } : {}),
+      ...(search
+        ? {
+            OR: [
+              { clientName: { contains: search, mode: "insensitive" } },
+              { clientEmail: { contains: search, mode: "insensitive" } },
+              { companyKey: { contains: search, mode: "insensitive" } }
+            ]
+          }
+        : {})
+    };
+
+    const [processes, total, awaitingOperator, awaitingClient, inProgress] = await Promise.all([
+      this.prisma.process.findMany({
+        where,
+        orderBy: { updatedAt: "desc" },
+        take,
+        skip,
+        select: {
+          id: true,
+          clientName: true,
+          clientEmail: true,
+          companyKey: true,
+          status: true,
+          currentStep: true,
+          kanbanStage: true,
+          operatorStatusNote: true,
+          createdAt: true,
+          updatedAt: true,
+          steps: {
+            where: { stepKey: { in: [StepKey.ETAPA_2, StepKey.ETAPA_3] } },
+            select: { stepKey: true, data: true, locked: true, status: true, updatedAt: true }
+          },
+          documents: { select: { itemKey: true, socioId: true, status: true } }
+        }
+      }),
+      this.prisma.process.count({ where }),
+      this.prisma.process.count({ where: { ...where, status: ProcessStatus.AGUARDANDO_OPERADOR } }),
+      this.prisma.process.count({ where: { ...where, status: ProcessStatus.AGUARDANDO_CLIENTE } }),
+      this.prisma.process.count({ where: { ...where, status: ProcessStatus.EM_ANDAMENTO } })
+    ]);
+
+    const items = processes.map((process) => {
+      const step2 = process.steps.find((step) => step.stepKey === StepKey.ETAPA_2);
+      const step3 = process.steps.find((step) => step.stepKey === StepKey.ETAPA_3);
+      const step2Data = (step2?.data ?? {}) as Record<string, unknown>;
+      const step3Data = (step3?.data ?? {}) as Record<string, unknown>;
+      const step2Complete = this.isStep2DataComplete(step2Data);
+      const step3Complete = this.isStep3DataComplete(step3Data);
+      const pendingDocuments = process.documents.filter((document) => document.status !== DocumentItemStatus.APROVADO).length;
+      const rejectedDocuments = process.documents.filter((document) => document.status === DocumentItemStatus.REPROVADO).length;
+      const awaitingOperator = step2?.status === ProcessStatus.AGUARDANDO_OPERADOR;
+      const kanbanReady = this.isKanbanEligible(step2, step3, process.documents);
+      const pending = [
+        ...(awaitingOperator ? ["Conferir dados enviados pelo cliente"] : []),
+        ...(!step2Complete ? ["Preenchimento dos dados da empresa"] : []),
+        ...(step2Complete && !step3Complete ? ["Preencher a estrutura jurídica"] : []),
+        ...(rejectedDocuments > 0 ? [`Revisar ${rejectedDocuments} documento${rejectedDocuments === 1 ? "" : "s"} reprovado${rejectedDocuments === 1 ? "" : "s"}`] : []),
+        ...(pendingDocuments > 0 && !rejectedDocuments ? [`Validar ${pendingDocuments} documento${pendingDocuments === 1 ? "" : "s"}`] : [])
+      ];
+      const nextAction = pending[0] ?? (kanbanReady ? "Acompanhar a próxima etapa" : "Revisar o processo");
+
+      return {
+        id: process.id,
+        clientName: process.clientName ?? "Empresa sem nome",
+        clientEmail: process.clientEmail,
+        companyKey: process.companyKey,
+        status: process.status,
+        currentStep: process.currentStep,
+        kanbanStage: process.kanbanStage,
+        operatorStatusNote: process.operatorStatusNote,
+        createdAt: process.createdAt,
+        updatedAt: process.updatedAt,
+        fillStatus: step2Complete && step3Complete ? "Completo" : awaitingOperator ? "Aguardando conferência" : "Em preenchimento",
+        situation: process.status === ProcessStatus.AGUARDANDO_CLIENTE ? "Aguardando cliente" : process.status === ProcessStatus.AGUARDANDO_OPERADOR ? "Aguardando operador" : "Em andamento",
+        pending,
+        nextAction,
+        pendingDocuments,
+        kanbanEligible: kanbanReady
+      };
+    });
+
+    return {
+      items,
+      total,
+      hasMore: skip + items.length < total,
+      summary: { active: total, awaitingOperator, awaitingClient, inProgress }
+    };
+  }
+
   async getOperatorEntryDestination(actor: Actor) {
     if (actor.role !== "OPERADOR") {
       throw new ForbiddenException();

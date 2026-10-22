@@ -61,6 +61,25 @@ export class ProcessController {
     });
   }
 
+  @Get("operations")
+  @Roles("OPERADOR", "MASTER")
+  async operations(
+    @Req() req: Request,
+    @Query("limit") limit?: string,
+    @Query("offset") offset?: string,
+    @Query("search") search?: string,
+    @Query("status") status?: string,
+    @Query("stage") stage?: string
+  ) {
+    return this.processService.listOperatorProcesses(req.actor!, {
+      take: limit ? Number(limit) : undefined,
+      skip: offset ? Number(offset) : undefined,
+      search,
+      status,
+      stage
+    });
+  }
+
   @Get("dashboard")
   @Roles("OPERADOR", "MASTER")
   async dashboard(@Req() req: Request) {

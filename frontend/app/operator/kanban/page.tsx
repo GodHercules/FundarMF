@@ -8,8 +8,8 @@ export default function OperatorKanbanPage() {
   return <main className="app-container flex min-h-screen flex-col gap-8 py-12">
     <WorkspaceNav role="operator" />
     <header className="operator-page-header">
-      <div><p className="operator-breadcrumb"><Link href="/operator/dashboard">Portal operador</Link> / Processos</p><h1>Processos por etapa</h1><p>Arraste os cards entre colunas para atualizar a etapa e notificar automaticamente o cliente.</p></div>
-      <Link href="/operator/dashboard" className="operator-secondary-action">Voltar ao painel</Link>
+      <div><p className="operator-breadcrumb"><Link href="/operator/processos">Portal operador</Link> / Kanban</p><h1>Kanban operacional</h1><p>Use o quadro para acompanhar as etapas e mover processos após a validação.</p></div>
+      <Link href="/operator/processos" className="operator-secondary-action">Voltar aos processos</Link>
     </header>
     <OperatorKanbanBoard />
   </main>;
