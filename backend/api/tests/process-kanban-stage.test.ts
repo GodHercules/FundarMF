@@ -93,7 +93,7 @@ describe("ProcessService updateKanbanStage", () => {
     expect(result.ok).toBe(true);
     expect(prisma.process.update).toHaveBeenCalledWith({
       where: { id: "p1" },
-      data: { kanbanStage: "DBE_RECEITA_FEDERAL" }
+      data: { kanbanStage: "DBE_RECEITA_FEDERAL", status: ProcessStatus.EM_ANDAMENTO, finalizedAt: null }
     });
     expect(notificationService.sendEmail).toHaveBeenCalledWith(
       "cliente@teste.com",

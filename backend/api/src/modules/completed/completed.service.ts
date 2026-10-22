@@ -135,13 +135,14 @@ export class CompletedService {
 
   async get(id: string, actor: Actor) {
     await this.ensureProcess(id, actor);
-    return this.prisma.process.findUnique({
+    const process = await this.prisma.process.findUnique({
       where: { id },
       include: {
         owner: { select: { id: true, name: true } },
         finalization: true,
         steps: true,
         documents: { include: { files: { select: { id: true, fileName: true, mimeType: true, size: true, createdAt: true } } } },
+        reports: { select: { id: true, fileName: true, mimeType: true, createdAt: true } },
         contracts: {
           include: {
             versions: { orderBy: { version: "desc" }, select: { id: true, version: true, status: true, source: true, createdAt: true } },
@@ -151,6 +152,20 @@ export class CompletedService {
         }
       }
     });
+
+    if (!process) throw new NotFoundException("Processo finalizado não encontrado.");
+
+    const history = await this.prisma.auditEvent.findMany({
+      where: {
+        tenantKey: actor.tenantKey ?? "default",
+        entity: "Process",
+        entityId: id
+      },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, action: true, actorRole: true, actorEmail: true, metadata: true, createdAt: true }
+    });
+
+    return { ...process, history };
   }
 
   async listLegacyClients(actor: Actor, search?: string) {

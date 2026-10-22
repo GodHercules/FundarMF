@@ -63,7 +63,25 @@ function stageLabel(stage: KanbanStage) {
 }
 
 function operationalStatus(process: OperationalProcess) {
+  if (process.kanbanEligible && process.status !== "CONCLUIDO" && process.status !== "CANCELADO") {
+    return statusLabels.EM_ANDAMENTO;
+  }
   return statusLabels[process.status] ?? process.situation;
+}
+
+function normalizeOperationalProcess(process: OperationalProcess): OperationalProcess {
+  if (!process.kanbanEligible || process.status === "CONCLUIDO" || process.status === "CANCELADO") {
+    return process;
+  }
+
+  return {
+    ...process,
+    status: "EM_ANDAMENTO",
+    fillStatus: "Completo",
+    situation: "Em andamento",
+    pending: [],
+    nextAction: "Acompanhar próxima etapa"
+  };
 }
 
 function normalizeLegacyProcess(process: LegacyProcess): OperationalProcess {
@@ -195,7 +213,7 @@ export function OperatorProcessList() {
   }, [appliedSearch, status, stage, offset]);
 
   const items = useMemo(() => {
-    const list = [...(response?.items ?? [])];
+    const list = (response?.items ?? []).map(normalizeOperationalProcess);
     if (sort === "name") return list.sort((a, b) => a.clientName.localeCompare(b.clientName, "pt-BR"));
     return list.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
   }, [response?.items, sort]);

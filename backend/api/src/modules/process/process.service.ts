@@ -1165,9 +1165,12 @@ export class ProcessService {
     const search = options?.search?.trim();
     const where: Prisma.ProcessWhereInput = {
       tenantKey,
-      status: { notIn: [ProcessStatus.CONCLUIDO, ProcessStatus.CANCELADO] },
+      status: options?.status === ProcessStatus.EM_ANDAMENTO
+        ? { in: [ProcessStatus.EM_ANDAMENTO, ProcessStatus.AGUARDANDO_OPERADOR] }
+        : options?.status
+          ? options.status as ProcessStatus
+          : { notIn: [ProcessStatus.CONCLUIDO, ProcessStatus.CANCELADO] },
       ...(actor.role === "OPERADOR" ? { ownerId: actor.userId } : {}),
-      ...(options?.status ? { status: options.status as ProcessStatus } : {}),
       ...(options?.stage ? { kanbanStage: options.stage as KanbanStage } : {}),
       ...(search
         ? {
@@ -1221,8 +1224,11 @@ export class ProcessService {
       const rejectedDocuments = process.documents.filter((document) => document.status === DocumentItemStatus.REPROVADO).length;
       const awaitingOperator = step2?.status === ProcessStatus.AGUARDANDO_OPERADOR;
       const kanbanReady = this.isKanbanEligible(step2, step3, process.documents);
+      const effectiveStatus = kanbanReady && process.status !== ProcessStatus.CONCLUIDO && process.status !== ProcessStatus.CANCELADO
+        ? ProcessStatus.EM_ANDAMENTO
+        : process.status;
       const pending = [
-        ...(awaitingOperator ? ["Conferir dados enviados pelo cliente"] : []),
+        ...(awaitingOperator && !kanbanReady ? ["Conferir dados enviados pelo cliente"] : []),
         ...(!step2Complete ? ["Preenchimento dos dados da empresa"] : []),
         ...(step2Complete && !step3Complete ? ["Preencher a estrutura jurídica"] : []),
         ...(rejectedDocuments > 0 ? [`Revisar ${rejectedDocuments} documento${rejectedDocuments === 1 ? "" : "s"} reprovado${rejectedDocuments === 1 ? "" : "s"}`] : []),
@@ -1235,14 +1241,14 @@ export class ProcessService {
         clientName: process.clientName ?? "Empresa sem nome",
         clientEmail: process.clientEmail,
         companyKey: process.companyKey,
-        status: process.status,
+        status: effectiveStatus,
         currentStep: process.currentStep,
         kanbanStage: process.kanbanStage,
         operatorStatusNote: process.operatorStatusNote,
         createdAt: process.createdAt,
         updatedAt: process.updatedAt,
-        fillStatus: step2Complete && step3Complete ? "Completo" : awaitingOperator ? "Aguardando conferência" : "Em preenchimento",
-        situation: process.status === ProcessStatus.AGUARDANDO_CLIENTE ? "Aguardando cliente" : process.status === ProcessStatus.AGUARDANDO_OPERADOR ? "Aguardando operador" : "Em andamento",
+        fillStatus: kanbanReady ? "Completo" : step2Complete && step3Complete ? "Completo" : awaitingOperator ? "Aguardando conferência" : "Em preenchimento",
+        situation: effectiveStatus === ProcessStatus.AGUARDANDO_CLIENTE ? "Aguardando cliente" : effectiveStatus === ProcessStatus.AGUARDANDO_OPERADOR ? "Aguardando operador" : "Em andamento",
         pending,
         nextAction,
         pendingDocuments,
@@ -1250,11 +1256,13 @@ export class ProcessService {
       };
     });
 
-    return {
-      items,
-      total,
-      hasMore: skip + items.length < total,
-      summary: { active: total, awaitingOperator, awaitingClient, inProgress }
+  const visibleItems = options?.status ? items.filter((item) => item.status === options.status) : items;
+  const kanbanProgressCount = items.filter((item) => item.kanbanEligible && item.status === ProcessStatus.EM_ANDAMENTO).length;
+  return {
+    items: visibleItems,
+    total: options?.status ? visibleItems.length : total,
+    hasMore: skip + visibleItems.length < (options?.status ? visibleItems.length : total),
+    summary: { active: total, awaitingOperator: Math.max(0, awaitingOperator - kanbanProgressCount), awaitingClient, inProgress: Math.max(inProgress, kanbanProgressCount) }
     };
   }
 
@@ -2143,7 +2151,9 @@ export class ProcessService {
       );
     }
 
-    const updateData = kanbanStage === KanbanStage.FINALIZADO ? { kanbanStage, status: ProcessStatus.CONCLUIDO, finalizedAt: new Date() } : { kanbanStage };
+    const updateData = kanbanStage === KanbanStage.FINALIZADO
+      ? { kanbanStage, status: ProcessStatus.CONCLUIDO, finalizedAt: new Date() }
+      : { kanbanStage, status: ProcessStatus.EM_ANDAMENTO, finalizedAt: null };
     let updated;
     if (typeof this.prisma.$transaction === "function") {
       updated = await this.prisma.$transaction(async (tx) => {

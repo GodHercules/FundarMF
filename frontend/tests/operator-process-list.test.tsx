@@ -35,7 +35,7 @@ describe("OperatorProcessList", () => {
         pending: ["Conferir dados enviados pelo cliente"],
         nextAction: "Conferir dados enviados pelo cliente",
         pendingDocuments: 0,
-        kanbanEligible: false
+        kanbanEligible: true
       }],
       total: 1,
       hasMore: false,
@@ -50,6 +50,7 @@ describe("OperatorProcessList", () => {
 
     expect(await screen.findByRole("heading", { name: "Processos em andamento" })).toBeInTheDocument();
     expect(await screen.findByText("Empresa Horizonte")).toBeInTheDocument();
+    expect((await screen.findAllByText("Em andamento")).length).toBeGreaterThan(0);
     expect(apiMock).toHaveBeenCalledWith(
       expect.stringContaining("/processes/operations?"),
       expect.objectContaining({ suppressErrorNotification: true })
